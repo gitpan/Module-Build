@@ -356,49 +356,22 @@ sub dist_version {
   return $p->{dist_version} = $self->version_from_file($version_from);
 }
 
-sub dist_author {
-  my $self = shift;
-  my $p = $self->{properties};
-  return $p->{dist_author} if exists $p->{dist_author};
-  
-  # Figure it out from 'dist_version_from'
-  return unless $p->{dist_version_from};
-  my $fh = IO::File->new($p->{dist_version_from}) or return;
-  
-  my @author;
-  local $_;
-  while (<$fh>) {
-    next unless /^=head1\s+AUTHOR/ ... /^=/;
-    next if /^=/;
-    push @author, $_;
-  }
-  return unless @author;
-  
-  my $author = join '', @author;
-  $author =~ s/^\s+|\s+$//g;
-  return $p->{dist_author} = $author;
-}
+sub dist_author   { shift->_pod_parse('author')   }
+sub dist_abstract { shift->_pod_parse('abstract') }
 
-sub dist_abstract {
-  my $self = shift;
+sub _pod_parse {
+  my ($self, $part) = @_;
   my $p = $self->{properties};
-  return $p->{dist_abstract} if exists $p->{dist_abstract};
+  my $member = "dist_$part";
+  return $p->{$member} if exists $p->{$member};
   
-  # Figure it out from 'dist_version_from'
   return unless $p->{dist_version_from};
   my $fh = IO::File->new($p->{dist_version_from}) or return;
   
-  (my $package = $self->dist_name) =~ s/-/::/g;
-  
-  my $result;
-  local $_;
-  while (<$fh>) {
-    next unless /^=(?!cut)/ .. /^cut/;  # in POD
-    last if ($result) = /^(?:$package\s-\s)(.*)/;
-  }
-  
-  $result =~ s/\s+$//;
-  return $p->{dist_abstract} = $result;
+  require Module::Build::PodParser;
+  my $parser = Module::Build::PodParser->new(fh => $fh);
+  my $method = "get_$part";
+  return $p->{$member} = $parser->$method();
 }
 
 sub find_module_by_name {
@@ -580,6 +553,12 @@ sub prereq_failures {
 	next if !$status->{ok};
 	$status->{conflicts} = delete $status->{need};
 	$status->{message} = "Installed version '$status->{have}' of $modname conflicts with this distribution";
+
+      } elsif ($type eq 'recommends') {
+	next if $status->{ok};
+	$status->{message} = ($status->{have}
+			      ? "Version $status->{have} is installed, but we prefer to have $spec"
+			      : "Optional prerequisite $modname isn't installed");
       } else {
 	next if $status->{ok};
       }
@@ -599,9 +578,9 @@ sub check_prereq {
   
   foreach my $type (qw(requires build_requires conflicts recommends)) {
     next unless $failures->{$type};
-    my $prefix = $type eq 'recommends' ? 'WARNING' : 'ERROR';
+    my $prefix = $type eq 'recommends' ? '' : 'ERROR: ';
     while (my ($module, $status) = each %{$failures->{$type}}) {
-      warn "$prefix: $module: $status->{message}\n";
+      warn " * $prefix$status->{message}\n";
     }
   }
   
@@ -654,7 +633,7 @@ sub check_installed_status {
     
     $status{have} = $self->version_from_file($file);
     if ($spec and !$status{have}) {
-      @status{ qw(have message) } = (undef, "Couldn't find a \$VERSION in prerequisite '$file'");
+      @status{ qw(have message) } = (undef, "Couldn't find a \$VERSION in prerequisite $modname");
       return \%status;
     }
   }
@@ -671,7 +650,7 @@ sub check_installed_status {
     next if $op eq '>=' and !$version;  # Module doesn't have to actually define a $VERSION
     
     unless ($self->compare_versions( $status{have}, $op, $version )) {
-      $status{message} = "Version $status{have} is installed, but we need version $op $version";
+      $status{message} = "Version $status{have} of $modname is installed, but we need version $op $version";
       return \%status;
     }
   }
@@ -1216,11 +1195,14 @@ sub _find_file_by_type {
   }
   
   return {} unless -d $dir;
-  return { map {$_, $_} @{ $self->rscan_dir($dir, qr{\.$type$}) } };
+  return { map {$_, $_}
+	   map $self->localize_file_path($_),
+	   @{ $self->rscan_dir($dir, qr{\.$type$}) } };
 }
 
 sub localize_file_path {
   my ($self, $path) = @_;
+  return $path unless $path =~ m{/};
   return File::Spec->catfile( split qr{/}, $path );
 }
 
@@ -1551,16 +1533,20 @@ sub ACTION_distdir {
   }
   
   my $dist_files = $self->_read_manifest('MANIFEST');
+  delete $dist_files->{SIGNATURE};  # Don't copy, create a fresh one
   unless (keys %$dist_files) {
     warn "No files found in MANIFEST - try running 'manifest' action?\n";
     return;
   }
+  warn "*** Did you forget to add $self->{metafile} to the MANIFEST?\n" unless exists $dist_files->{$self->{metafile}};
   
   my $dist_dir = $self->dist_dir;
   $self->delete_filetree($dist_dir);
   $self->add_to_cleanup($dist_dir);
-  ExtUtils::Manifest::manicopy($dist_files, $dist_dir, 'cp');
-  warn "*** Did you forget to add $self->{metafile} to the MANIFEST?\n" unless exists $dist_files->{$self->{metafile}};
+  
+  foreach my $file (keys %$dist_files) {
+    $self->copy_if_modified(from => $file, to_dir => $dist_dir, verbose => 0);
+  }
   
   $self->_sign_dir($dist_dir) if $self->{properties}{sign};
 }
@@ -1805,15 +1791,30 @@ sub autosplit_file {
 
 sub have_c_compiler {
   my ($self) = @_;
-  return $self->{properties}{have_compiler} if defined $self->{properties}{have_compiler};
+  my $p = $self->{properties}; 
+  return $p->{have_compiler} if defined $p->{have_compiler};
   
-  my $tmpfile = $self->config_file('compilet.c');
+  print "Checking if compiler tools configured... " if $p->{verbose};
+  
+  my $c_file = $self->config_file('compilet.c');
   {
-    my $fh = IO::File->new("> $tmpfile") or die "Can't create $tmpfile: $!";
-    print $fh "int main() { return 0; }\n";
+    my $fh = IO::File->new("> $c_file") or die "Can't create $c_file: $!";
+    print $fh "int boot_compilet() { return 1; }\n";
   }
-
-  return $self->{properties}{have_compiler} = 0 + eval { $self->compile_c($tmpfile); 1 };
+  
+  my ($obj_file, $lib_file);
+  eval {
+    local $p->{module_name} = 'compilet';  # Fool compile_c() and link_c() about the library name
+    $obj_file = $self->compile_c($c_file);
+    (my $file_base = $obj_file) =~ s/\.[^.]+$//;
+    $file_base =~ tr/"//d;
+    $lib_file = $self->link_c($self->config_dir, $file_base);
+  };
+  unlink for grep defined, $c_file, $obj_file, $lib_file;
+  
+  my $result = $p->{have_compiler} = $@ ? 0 : 1;
+  print($result ? "ok.\n" : "failed.\n") if $p->{verbose};
+  return $result;
 }
 
 sub compile_c {
@@ -1830,14 +1831,45 @@ sub compile_c {
 				   File::Spec->catdir($cf->{installarchlib}, 'CORE'));
   
   my @extra_compiler_flags = $self->split_like_shell($p->{extra_compiler_flags});
+  my @cccdlflags = $self->split_like_shell($cf->{cccdlflags});
   my @ccflags = $self->split_like_shell($cf->{ccflags});
   my @optimize = $self->split_like_shell($cf->{optimize});
+  my @flags = (@include_dirs, @cccdlflags, @extra_compiler_flags, '-c', @ccflags, @optimize);
+  
   my @cc = $self->split_like_shell($cf->{cc});
   
-  $self->do_system(@cc, @include_dirs, @extra_compiler_flags, '-c', @ccflags, @optimize, '-o', $obj_file, $file)
+  $self->do_system(@cc, @flags, '-o', $obj_file, $file)
     or die "error building $cf->{dlext} file from '$file'";
 
   return $obj_file;
+}
+
+# Most platforms don't need prelinking stuff done
+sub need_prelink_c { 0 }
+
+sub prelink_c {
+  my ($self, $to, $file_base) = @_;
+  my ($p, $args) = ($self->{properties}, $self->{args});
+
+  $file_base =~ tr/"//d; # remove any quotes
+  my $basename = File::Basename::basename($file_base);
+
+  print "ExtUtils::Mksymlists::Mksymlists('$file_base')\n";
+
+  require ExtUtils::Mksymlists;
+  ExtUtils::Mksymlists::Mksymlists( # dl. abbrev for dynamic library
+    NAME     => $args->{dl_name}      || $p->{module_name},
+    DLBASE   => $args->{dl_base}      || $basename,
+    DL_VARS  => $args->{dl_vars}      || [],
+    DL_FUNCS => $args->{dl_funcs}     || {},
+    FUNCLIST => $args->{dl_func_list} || [],
+    IMPORTS  => $args->{dl_imports}   || {},
+    FILE     => $file_base,
+  );
+
+  # *One* of these will be created by Mksymlists depending on $^O
+  local $_;
+  $self->add_to_cleanup("$file_base.$_") for qw(ext def opt);
 }
 
 sub link_c {
@@ -1849,6 +1881,8 @@ sub link_c {
   my $objects = $p->{objects} || [];
   
   unless ($self->up_to_date(["$file_base$cf->{obj_ext}", @$objects], $lib_file)) {
+    $self->prelink_c($to, $file_base) if $self->need_prelink_c;
+
     my @linker_flags = $self->split_like_shell($p->{extra_linker_flags});
     my @lddlflags = $self->split_like_shell($cf->{lddlflags});
     my @shrp = $self->split_like_shell($cf->{shrpenv});
@@ -1857,6 +1891,8 @@ sub link_c {
 		     "$file_base$cf->{obj_ext}", @$objects, @linker_flags)
       or die "error building $file_base$cf->{obj_ext} from '$file_base.$cf->{dlext}'";
   }
+  
+  return $lib_file;
 }
 
 sub compile_xs {
@@ -1979,7 +2015,10 @@ sub do_system {
 
 sub copy_if_modified {
   my $self = shift;
-  my %args = @_ > 3 ? @_ : ( from => shift, to_dir => shift, flatten => shift );
+  my %args = (@_ > 3
+	      ? ( verbose => 1, @_ )
+	      : ( from => shift, to_dir => shift, flatten => shift )
+	     );
   
   my $file = $args{from};
   unless (defined $file and length $file) {
@@ -2002,7 +2041,7 @@ sub copy_if_modified {
   # Create parent directories
   File::Path::mkpath(File::Basename::dirname($to_path), 0, 0777);
   
-  print "$file -> $to_path\n";
+  print "$file -> $to_path\n" if $args{verbose};
   File::Copy::copy($file, $to_path) or die "Can't copy('$file', '$to_path'): $!";
   return $to_path;
 }
@@ -2055,7 +2094,7 @@ Please see the C<Module::Build> documentation for more details.
 
 =head1 AUTHOR
 
-Ken Williams, ken@forum.swarthmore.edu
+Ken Williams, ken@mathforum.org
 
 =head1 SEE ALSO
 

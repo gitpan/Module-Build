@@ -282,8 +282,9 @@ METHODS
 
         conflicts
             Modules listed in this section conflict in some serious way with
-            the given module. "Module::Build" will refuse to install the
-            given module if
+            the given module. "Module::Build" (or some higher-level tool)
+            will refuse to install the given module if the given
+            module/version is also installed.
 
         create_makefile_pl
             This parameter lets you use Module::Build::Compat during the
@@ -291,6 +292,14 @@ METHODS
             Makefile.PL for compatibility with ExtUtils::MakeMaker. The
             parameter's value should be one of the styles named in the
             Module::Build::Compat documentation.
+
+        create_readme
+            This parameter tells Module::Build to automatically create a
+            README file at the top level of your distribution. Currently it
+            will simply use "Pod::Text" on the file indicated by
+            "dist_version_from" and put the result in the README file. This
+            is by no means the only recommended style for writing a README,
+            but it seems to be one common one used on the CPAN.
 
         c_source
             An optional "c_source" argument specifies a directory which
@@ -429,8 +438,8 @@ METHODS
              my build = Module::Build->new(
                  module_name          => 'Spangly',
                  dynamic_config       => 1,
-                 extra_compiler_flags => `glib-config --cflags`,
-                 extra_linker_flags   => `glib-config --libs`,
+                 extra_compiler_flags => scalar `glib-config --cflags`,
+                 extra_linker_flags   => scalar `glib-config --libs`,
              );
 
         dist_author
@@ -783,14 +792,7 @@ ACTIONS
     "$self->{config}". If the user wishes to override any of the values in
     "Config.pm", she may specify them like so:
 
-      perl Build.PL config='cc=gcc ld=gcc'
-
-    Not the greatest interface, I'm looking for alternatives. Speak now!
-    Maybe:
-
-      perl Build.PL config=cc:gcc config=ld:gcc
-
-    or something.
+      perl Build.PL --config cc=gcc --config ld=gcc
 
     The following build actions are provided by default.
 
@@ -816,7 +818,8 @@ ACTIONS
         and ".pod" files from your "lib/" directory into the "blib/"
         directory. It also compiles any ".xs" files from "lib/" and places
         them in "blib/". Of course, you need a working C compiler (probably
-        the same one that built perl itself) for this to work properly.
+        the same one that built perl itself) for the compilation to work
+        properly.
 
         The "build" action also runs any ".PL" files in your lib/ directory.
         Typically these create other files, named the same but without the
@@ -1125,11 +1128,11 @@ ACTIONS
 
     On the command line, that would look like this:
 
-     perl Build.PL install_path=lib=/foo/lib install_path=arch=/foo/lib/arch
+     perl Build.PL --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
 
     or this:
 
-     Build install install_path=lib=/foo/lib install_path=arch=/foo/lib/arch
+     Build install --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
 
    install_base
 

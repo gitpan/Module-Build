@@ -1,6 +1,78 @@
 Revision history for Perl extension Module::Build.
 
-0.21
+0.21_01  Wed Dec 17 07:51:49 CST 2003
+
+(A snapshot just because it's been so long since anything has been released)
+
+ - Fixed a have_c_compiler() failure on some platforms, we now define
+   a boot_compilet() function (since we're compiling a library, not an
+   executable). [Randy Sims]
+
+ - Added a recipe to the Module::Build::Cookbook describing how to
+   maintain compatibility with older versions of CPAN.pm [Jim Cromie]
+
+ - Removed caveat about "looking for alternatives" in how hashes are
+   specified on the command line, since an alternative has been found.
+
+ - Previously most warnings about optional prerequisites looked like
+   they were actually error messages about required prerequisites.
+   This has been corrected. [Reported again by Sagar Shah]
+
+ - Added support for building XS (and C in general) stuff on AIX.
+   This was done by a small reorganization of prelink_c() method from
+   Windows.pm to Build.pm, and it is only invoked for the platforms
+   that need it invoked.  AIX also massages some very naughty bits in
+   $Config{lddlflags} that should never have been put there, but alas,
+   they're there.
+
+ - Added OS/2 ($^O = 'os2') to the list of Unix-like platforms.  This
+   basically means that most platform-specific operations will be done
+   in a Unix-like manner.
+
+ - Pass-through Makefiles will now die() when they're given a PREFIX
+   parameter, and suggest using 'destdir' or 'install_base' instead.
+   Previously they just ignored the parameter and tried to install to
+   the default location, which is clearly not what the user wanted.
+
+ - Updated my email address in the documentation to a more recent
+   variant.
+
+ - On some platforms it's common to have a $Config{make} defined, but
+   no 'make' utility available.  We now detect this and skip some
+   'make' compatibility tests. [Randy Sims]
+
+ - Add NetBSD to the list of Unix-like systems. [Adrian Bunk]
+
+ - Add SVR5 to the list of Unix-like systems. [Rafael Garcia-Suarez]
+
+ - Fixed a spurious testing failure on non-Unix platforms that
+   happened because we accidentally call localize_file_path() on empty
+   strings in the test suite. [Spotted by Randy Sims on Windows]
+
+ - Fixed a problem with creating the distribution tarball in which
+   permissions would usually be all read-only.  We now use our own
+   file-copying routines rather than those in ExtUtils::Manifest,
+   because those do some annoying extra permissions-setting stuff for
+   no apparent reason.  It makes me happy that this was a very very
+   easy patch to make.  [Reported by Thomas Klausner]
+
+ - The compile_c() method now includes $Config{cccdlflags} in its
+   command invocation.  It's usually empty, but not always, so we
+   didn't notice for a while. [Richard Clamp]
+
+ - The have_c_compiler() now also tests whether the linker seems to
+   work too.
+
+ - On Unixish platforms, the syntax "FOO=BAR /bin/baz arg arg" now
+   works when present in $Config{ld}.  This solves a problem on Mac OS
+   X 10.3. [Reported by Adam Foxson]
+
+ - We now use Pod::Parser to find the ABSTRACT and AUTHOR when it's
+   available on the system. [initial patch by Randy Sims]
+
+ - Fixed a little scalar/list buglet in a documentation example.
+
+0.21  Wed Oct 15 20:47:05 CDT 2003
 
  - Added a have_c_compiler() method.
 

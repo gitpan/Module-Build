@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: Module-Build
-version: 0.21
+version: 0.21_01
 license: perl
 distribution_type: module
 requires:
@@ -28,7 +28,7 @@ conflicts: {}
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: 0.21
+    version: 0.21_01
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
   Module::Build::Compat:
@@ -64,8 +64,14 @@ provides:
     file: lib/Module/Build/Platform/Windows.pm
   Module::Build::Platform::Windows::MSVC:
     file: lib/Module/Build/Platform/Windows.pm
+  Module::Build::Platform::aix:
+    file: lib/Module/Build/Platform/aix.pm
   Module::Build::Platform::cygwin:
     file: lib/Module/Build/Platform/cygwin.pm
   Module::Build::Platform::darwin:
     file: lib/Module/Build/Platform/darwin.pm
-generated_by: Module::Build version 0.21
+  Module::Build::Platform::os2:
+    file: lib/Module/Build/Platform/os2.pm
+  Module::Build::PodParser:
+    file: lib/Module/Build/PodParser.pm
+generated_by: Module::Build version 0.21_01

@@ -12,7 +12,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.21';
+$VERSION = '0.21_01';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -31,15 +31,17 @@ my %OSTYPES = qw(
 		 machten   Unix
 		 next      Unix
 		 openbsd   Unix
+		 netbsd    Unix
 		 dec_osf   Unix
 		 svr4      Unix
+		 svr5      Unix
 		 sco_sv    Unix
-		 svr4      Unix
 		 unicos    Unix
 		 unicosmk  Unix
 		 solaris   Unix
 		 sunos     Unix
 		 cygwin    Unix
+		 os2       Unix
 		 
 		 dos       Windows
 		 MSWin32   Windows
@@ -392,8 +394,9 @@ checking on binary/packaged distributions of the module.
 =item conflicts
 
 Modules listed in this section conflict in some serious way with the
-given module.  C<Module::Build> will refuse to install the given
-module if
+given module.  C<Module::Build> (or some higher-level tool) will
+refuse to install the given module if the given module/version is also
+installed.
 
 =item create_makefile_pl
 
@@ -402,6 +405,15 @@ C<distdir> (or C<dist>) action to automatically create a Makefile.PL
 for compatibility with ExtUtils::MakeMaker.  The parameter's value
 should be one of the styles named in the Module::Build::Compat
 documentation.
+
+=item create_readme
+
+This parameter tells Module::Build to automatically create a F<README>
+file at the top level of your distribution.  Currently it will simply
+use C<Pod::Text> on the file indicated by C<dist_version_from> and put
+the result in the F<README> file.  This is by no means the only
+recommended style for writing a README, but it seems to be one common
+one used on the CPAN.
 
 =item c_source
 
@@ -543,8 +555,8 @@ To link your XS code against glib you might write something like:
  my build = Module::Build->new(
      module_name          => 'Spangly',
      dynamic_config       => 1,
-     extra_compiler_flags => `glib-config --cflags`,
-     extra_linker_flags   => `glib-config --libs`,
+     extra_compiler_flags => scalar `glib-config --cflags`,
+     extra_linker_flags   => scalar `glib-config --libs`,
  );
 
 =item dist_author
@@ -933,14 +945,7 @@ all the key=value pairs in C<Config.pm> are available in
 C<< $self->{config} >>.  If the user wishes to override any of the
 values in C<Config.pm>, she may specify them like so:
 
-  perl Build.PL config='cc=gcc ld=gcc'
-
-Not the greatest interface, I'm looking for alternatives.  Speak now!
-Maybe:
-
-  perl Build.PL config=cc:gcc config=ld:gcc
-
-or something.
+  perl Build.PL --config cc=gcc --config ld=gcc
 
 The following build actions are provided by default.
 
@@ -970,8 +975,8 @@ This action builds your codebase.
 By default it just creates a C<blib/> directory and copies any C<.pm>
 and C<.pod> files from your C<lib/> directory into the C<blib/>
 directory.  It also compiles any C<.xs> files from C<lib/> and places
-them in C<blib/>.  Of course, you need a working C compiler
-(probably the same one that built perl itself) for this to work
+them in C<blib/>.  Of course, you need a working C compiler (probably
+the same one that built perl itself) for the compilation to work
 properly.
 
 The C<build> action also runs any C<.PL> files in your F<lib/>
@@ -1313,11 +1318,11 @@ individual entries by using the C<install_path> parameter:
 
 On the command line, that would look like this:
 
- perl Build.PL install_path=lib=/foo/lib install_path=arch=/foo/lib/arch
+ perl Build.PL --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
 
 or this:
 
- Build install install_path=lib=/foo/lib install_path=arch=/foo/lib/arch
+ Build install --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
 
 =head3 install_base
 

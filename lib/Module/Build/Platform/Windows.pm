@@ -55,7 +55,6 @@ sub compiler_type {
 	  : 'GCC');
 }
 
-
 sub compile_c {
   my ($self, $file) = @_;
   my $cf = $self->{config};
@@ -105,33 +104,7 @@ sub compile_c {
   return $spec{output};
 }
 
-
-# XXX need M::B::Base.pm to accept and pass through arguments for
-# Mksymlists.
-sub prelink_c {
-  my ($self, %spec) = @_;
-
-  # Explicitly derive output filename, so we know what to cleanup.
-  # EU::Mksymlists doesn't want the file extension & doesn't like quotes.
-  my $filename = $spec{def_file};
-  $filename =~ tr/"//d;
-  $filename =~ s/\.def$//i;
-
-  my $props = $self->{properties};
-
-  print "ExtUtils::Mksymlists::Mksymlists('$filename.def')\n";
-
-  require ExtUtils::Mksymlists;
-  ExtUtils::Mksymlists::Mksymlists(
-    DLBASE   => $props->{DLBASE}   || $spec{basename},
-    DL_FUNCS => $props->{DL_FUNCS} || {},
-    DL_VARS  => $props->{DL_VARS}  || [],
-    FUNCLIST => $props->{FUNCLIST} || [],
-    IMPORTS  => $props->{IMPORTS}  || {},
-    NAME     => $props->{NAME}     || $props->{module_name},
-    FILE     => $filename,
-  );
-}
+sub need_prelink_c { 1 }
 
 sub link_c {
   my ($self, $to, $file_base) = @_;
@@ -189,13 +162,14 @@ sub link_c {
     $self->normalize_filespecs( $spec{$opt} );
   }
 
-  $self->prelink_c( %spec );
+  $self->prelink_c( $to, $file_base );
 
   my @cmds = $self->format_linker_cmd(%spec);
   while ( my $cmd = shift @cmds ) {
     $self->do_system( @$cmd );
   }
 
+  return $spec{output};
 }
 
 # canonize & quote paths
@@ -673,7 +647,7 @@ defined by the L<Module::Build> documentation.
 
 =head1 AUTHOR
 
-Ken Williams <ken@forum.swarthmore.edu>
+Ken Williams <ken@mathforum.org>
 
 Most of the code here was written by Randy W. Sims <RandyS@ThePierianSpring.org>.
 
