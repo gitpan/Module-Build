@@ -1,6 +1,6 @@
 package Module::Build::Base;
 
-# $Id: Base.pm,v 1.32 2002/08/23 08:45:11 ken Exp $
+# $Id: Base.pm,v 1.38 2002/11/14 07:35:38 kwilliams Exp $
 
 use strict;
 use Config;
@@ -84,6 +84,50 @@ sub new {
 sub cwd {
   require Cwd;
   return Cwd::cwd;
+}
+
+sub prompt {
+  my $self = shift;
+  my ($mess, $def) = @_;
+  die "prompt() called without a prompt message" unless @_;
+
+  my $INTERACTIVE = -t STDIN && (-t STDOUT || !(-f STDOUT || -c STDOUT)) ;   # Pipe?
+  
+  ($def, my $dispdef) = defined $def ? ($def, "[$def] ") : ('', ' ');
+
+  {
+    local $|=1;
+    print "$mess $dispdef";
+  }
+  my $ans;
+  if ($INTERACTIVE) {
+    $ans = <STDIN>;
+    if ( defined $ans ) {
+      chomp $ans;
+    } else { # user hit ctrl-D
+      print "\n";
+    }
+  }
+  
+  unless (defined($ans) and length($ans)) {
+    print "$def\n";
+    $ans = $def;
+  }
+  
+  return $ans;
+}
+
+sub y_n {
+  my $self = shift;
+  die "y_n() called without a prompt message" unless @_;
+  
+  my $answer;
+  while (1) {
+    $answer = $self->prompt(@_);
+    return 1 if $answer =~ /^y/i;
+    return 0 if $answer =~ /^n/i;
+    print "Please answer 'y' or 'n'.\n";
+  }
 }
 
 sub resume {
@@ -268,6 +312,9 @@ sub write_config {
   my @items = qw(requires build_requires conflicts recommends);
   print $fh Data::Dumper::Dumper( { map {$_,$self->{properties}{$_}} @items } );
   close $fh;
+
+  $self->add_to_cleanup('blib');
+  $self->write_cleanup;
 }
 
 sub prereq_failures {
@@ -563,9 +610,15 @@ sub ACTION_test {
   
   $self->depends_on('build');
   
-  local $Test::Harness::switches = '-w -d' if $self->{properties}{debugger};
-  local $Test::Harness::verbose = $self->{properties}{verbose} || 0;
-  local $ENV{TEST_VERBOSE} = $self->{properties}{verbose} || 0;
+  # Do everything in our power to work with all versions of Test::Harness
+  local ($Test::Harness::switches,
+	 $Test::Harness::Switches,
+         $ENV{HARNESS_PERL_SWITCHES}) = ($self->{properties}{debugger} ? '-w -d' : '') x 3;
+
+  local ($Test::Harness::verbose,
+	 $Test::Harness::Verbose,
+	 $ENV{TEST_VERBOSE},
+         $ENV{HARNESS_VERBOSE}) = ($self->{properties}{verbose} || 0) x 4;
 
   # Make sure we test the module in blib/
   {
@@ -581,7 +634,7 @@ sub ACTION_test {
   if (@tests) {
     # Work around a Test::Harness bug that loses the particular perl we're running under
     local $^X = $self->{config}{perlpath} unless $Test::Harness::VERSION gt '2.01';
-    Test::Harness::runtests(@tests);
+    Test::Harness::runtests(sort @tests);
   } else {
     print("No tests defined.\n");
   }
@@ -621,7 +674,6 @@ sub ACTION_build {
 
   my $files = $self->rscan_dir('lib', qr{\.(pm|pod|xs)$});
   $self->lib_to_blib($files, 'blib');
-  $self->add_to_cleanup('blib');
 }
 
 sub process_PL_files {
@@ -763,7 +815,7 @@ sub write_metadata {
 		  generated_by => (ref($self) || $self) . " version " . $self->VERSION,
 		 );
   
-  foreach (qw(requires build_depends recommends conflicts dynamic_config)) {
+  foreach (qw(requires build_requires recommends conflicts dynamic_config)) {
     $metadata{$_} = $p->{$_} if exists $p->{$_};
   }
   

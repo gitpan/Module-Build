@@ -1,9 +1,11 @@
 ######################### We start with some black magic to print on failure.
 
 use Test;
-BEGIN { plan tests => 9 }
+BEGIN { plan tests => 11 }
 use Module::Build;
 ok(1);
+
+use File::Spec;
 
 ######################### End of black magic.
 
@@ -47,3 +49,38 @@ chdir 't';
   $m->dispatch('realclean');
 }
 
+# Test verbosity
+{
+  require Cwd;
+  my $cwd = Cwd::cwd();
+
+  chdir 'Sample';
+  my $m = new Module::Build(module_name => 'Sample');
+
+  # Use uc() so we don't confuse the current test output
+  ok uc(stdout_of( sub {$m->dispatch('test', verbose => 1)} )), '/OK 1/';
+  ok uc(stdout_of( sub {$m->dispatch('test', verbose => 0)} )), '/\.\.OK/';
+  
+  $m->dispatch('realclean');
+  chdir $cwd or die "Can't change back to $cwd: $!";
+}
+
+sub stdout_of {
+  my $subr = shift;
+  my $outfile = 'save_out';
+
+  local *SAVEOUT;
+  open SAVEOUT, ">&STDOUT" or die "Can't save STDOUT handle: $!";
+  open STDOUT, "> $outfile" or die "Can't create $outfile: $!";
+
+  $subr->();
+
+  open STDOUT, ">&SAVEOUT" or die "Can't restore STDOUT: $!";
+  return slurp($outfile);
+}
+
+sub slurp {
+  open my($fh), $_[0] or die "Can't open $_[0]: $!";
+  local $/;
+  return <$fh>;
+};
