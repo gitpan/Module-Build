@@ -2,7 +2,7 @@
 
 BEGIN { @INC = ('lib', '/sw/lib/perl5/darwin', '/sw/lib/perl5', '/System/Library/Perl/darwin', '/System/Library/Perl', '/Library/Perl/darwin', '/Library/Perl', '/Network/Library/Perl/darwin', '/Network/Library/Perl', '.') }
 
-chdir('/Users/ken/src/modules/Module-Build/Module-Build-0.07') or die 'Cannot chdir to /Users/ken/src/modules/Module-Build/Module-Build-0.07: '.$!;
+chdir('/Users/ken/src/modules/Module-Build/Module-Build-0.08') or die 'Cannot chdir to /Users/ken/src/modules/Module-Build/Module-Build-0.08: '.$!;
 use Module::Build;
 
 # This should have just enough arguments to be able to bootstrap the rest.
@@ -14,7 +14,7 @@ my $build = resume Module::Build (
 );
 eval {$build->dispatch};
 my $err = $@;
-chdir('/Users/ken/src/modules/Module-Build/Module-Build-0.07') or die 'Cannot chdir to /Users/ken/src/modules/Module-Build/Module-Build-0.07: '.$!;
+chdir('/Users/ken/src/modules/Module-Build/Module-Build-0.08') or die 'Cannot chdir to /Users/ken/src/modules/Module-Build/Module-Build-0.08: '.$!;
 $build->write_cleanup;  # Always write, even if error occurs
 die $err if $err;
 

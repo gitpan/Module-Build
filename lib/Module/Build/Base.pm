@@ -1,6 +1,6 @@
 package Module::Build::Base;
 
-# $Id: Base.pm,v 1.21 2002/06/09 05:35:24 ken Exp $
+# $Id: Base.pm,v 1.25 2002/06/26 09:51:13 ken Exp $
 
 use strict;
 use Config;
@@ -48,14 +48,21 @@ sub new {
 		    properties => {
 				   build_script => 'Build',
 				   config_dir => '_build',
-				   prereq => {},
-				   recommended => {},
+				   requires => {},
+				   recommends => {},
+				   build_requires => {},
+				   conflicts => {},
 				   PL_files => {},
 				   %input,
 				   %$cmd_properties,
 				  },
 		    new_cleanup => {},
 		   }, $package;
+
+  # Synonyms
+  for ($self->{properties}) {
+    $_->{requires} = delete $_->{prereq} if exists $_->{prereq};
+  }
 
   $self->check_manifest;
   $self->check_prereq;
@@ -82,8 +89,8 @@ sub resume {
        module_name
        module_version
        module_version_from
-       prereq
-       recommended
+       requires
+       recommends
        PL_files
        config_dir
        build_script
@@ -248,13 +255,13 @@ sub check_prereq {
   my $self = shift;
 
   my $pass = 1;
-  while (my ($modname, $spec) = each %{$self->{properties}{prereq}}) {
+  while (my ($modname, $spec) = each %{$self->{properties}{requires}}) {
     my $thispass = $self->check_installed_version($modname, $spec);
     warn "WARNING: $@\n" unless $thispass;
     $pass &&= $thispass;
   }
 
-  while (my ($modname, $spec) = each %{$self->{properties}{recommended}}) {
+  while (my ($modname, $spec) = each %{$self->{properties}{recommends}}) {
     warn "NOTE: $@\n" unless $self->check_installed_version($modname, $spec);
   }
 
@@ -301,7 +308,7 @@ sub check_installed_version {
   if ($spec =~ /^\s*([\w.]+)\s*$/) { # A plain number, maybe with dots, letters, and underscores
     @conditions = (">= $spec");
   } else {
-    @conditions = split /\s*,\s*/, $self->{properties}{prereq}{$modname};
+    @conditions = split /\s*,\s*/, $self->{properties}{requires}{$modname};
   }
   
   foreach (@conditions) {
@@ -634,8 +641,8 @@ sub ACTION_skipcheck {
 sub ACTION_distclean {
   my ($self) = @_;
   
-  $self->depends('realclean');
-  $self->depends('distcheck');
+  $self->depends_on('realclean');
+  $self->depends_on('distcheck');
 }
 
 sub ACTION_distdir {
@@ -688,7 +695,7 @@ sub write_metadata {
   my $p = $self->{properties};
 
   $p->{license} ||= 'unknown';
-  unless (grep /^$p->{license}$/, qw(perl gpl restrictive unknown)) {
+  unless (grep /^$p->{license}$/, qw(perl gpl restrictive artistic unknown)) {
     warn "Uknown license type '$p->{license}', setting to 'unknown'\n";
     $p->{license} = 'unknown';
   }
@@ -701,7 +708,6 @@ sub write_metadata {
 		  license => $p->{license},
 		 );
   
-  $metadata{requires} = $p->{prereq} if $p->{prereq}; # A synonym
   foreach (qw(requires build_depends recommends conflicts dynamic_config)) {
     $metadata{$_} = $p->{$_} if exists $p->{$_};
   }
@@ -810,6 +816,20 @@ sub compile_c {
   return $obj_file;
 }
 
+sub link_c {
+  my ($self, $archdir, $file_base) = @_;
+  my $cf = $self->{config}; # For convenience
+
+  my $lib_file = File::Spec->catfile($archdir, File::Basename::basename("$file_base.$cf->{dlext}"));
+  unless ($self->up_to_date("$file_base$cf->{obj_ext}", $lib_file)) {
+    my $linker_flags = $cf->{extra_linker_flags} || '';
+    my $objects = $self->{objects} || [];
+    $self->do_system("$cf->{shrpenv} $cf->{cc} $cf->{lddlflags} -o $lib_file ".
+		     "$file_base$cf->{obj_ext} @$objects $linker_flags")
+      or die "error building $file_base$cf->{obj_ext} from '$file_base.$cf->{dlext}'";
+  }
+}
+
 sub run_perl_script {
   my ($self, $script, $preargs, $postargs) = @_;
   $preargs ||= '';   $postargs ||= '';
@@ -861,14 +881,7 @@ sub process_xs {
   $self->copy_if_modified("$file_base.bs", $archdir, 1);
   
   # .o -> .(a|bundle)
-  my $lib_file = File::Spec->catfile($archdir, File::Basename::basename("$file_base.$cf->{dlext}"));
-  unless ($self->up_to_date("$file_base$cf->{obj_ext}", $lib_file)) {
-    my $linker_flags = $cf->{extra_linker_flags} || '';
-    my $objects = $self->{objects} || [];
-    $self->do_system("$cf->{shrpenv} $cf->{cc} $cf->{lddlflags} -o $lib_file ".
-		     "$file_base$cf->{obj_ext} @$objects $linker_flags")
-      or die "error building $file_base$cf->{obj_ext} from '$file_base.$cf->{dlext}'";
-  }
+  $self->link_c($archdir, $file_base);
 }
 
 sub do_system {

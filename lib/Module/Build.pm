@@ -1,6 +1,6 @@
 package Module::Build;
 
-# $Id: Build.pm,v 1.26 2002/06/09 05:35:55 ken Exp $
+# $Id: Build.pm,v 1.28 2002/06/26 10:14:35 ken Exp $
 
 # This module doesn't do much of anything itself, it inherits from the
 # modules that do the real work.  The only real thing it has to do is
@@ -14,7 +14,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.07';
+$VERSION = '0.08';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -192,12 +192,18 @@ Specifies the licensing terms of your distribution.  Valid options include:
 
 The distribution may be copied and redistributed under the same terms
 as perl itself (this is by far the most common licensing option for
-modules on CPAN).
+modules on CPAN).  This is a dual license, in which the user may
+choose between either the GPL or the Artistic license.
 
 =item * gpl
 
 The distribution is distributed under the terms of the Gnu Public
 License.
+
+=item * artistic
+
+The distribution is licensed under the Artistic License, as specified
+by the F<Artistic> file in the standard perl distribution.
 
 =item * restrictive
 
