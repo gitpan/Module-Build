@@ -628,6 +628,15 @@ METHODS
         keep the responsibility for registering temporary files close to the
         code that creates them.
 
+    new_from_context(%args)
+        When called from a directory containing a Build.PL script and a
+        META.yml file (in other words, the base directory of a
+        distribution), this method will run the Build.PL and return the
+        resulting "Module::Build" object to the caller. Any key-value
+        arguments given to "new_from_context()" are essentially like
+        command-line arguments given to the Build.PL script, so for example
+        you could pass "verbose => 1" to this method to turn on verbosity.
+
     resume()
         You'll probably never call this method directly, it's only called
         from the auto-generated "Build" script. The "new()" method is only

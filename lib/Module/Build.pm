@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.2602';
+$VERSION = '0.2603';
 $VERSION = eval $VERSION;
 
 # Okay, this is the brute-force method of finding out what kind of
@@ -766,6 +766,17 @@ than just use a static list of files named in the F<Build.PL>, because
 these static lists can get difficult to manage.  I usually prefer to
 keep the responsibility for registering temporary files close to the
 code that creates them.
+
+=item new_from_context(%args)
+
+When called from a directory containing a F<Build.PL> script and a
+F<META.yml> file (in other words, the base directory of a
+distribution), this method will run the F<Build.PL> and return the
+resulting C<Module::Build> object to the caller.  Any key-value
+arguments given to C<new_from_context()> are essentially like
+command-line arguments given to the F<Build.PL> script, so for example
+you could pass C<< verbose => 1 >> to this method to turn on
+verbosity.
 
 =item resume()
 
