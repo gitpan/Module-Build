@@ -1,6 +1,6 @@
 package Module::Build;
 
-# $Id: Build.pm,v 1.31 2002/08/07 09:34:38 ken Exp $
+# $Id: Build.pm,v 1.35 2002/08/23 08:41:15 ken Exp $
 
 # This module doesn't do much of anything itself, it inherits from the
 # modules that do the real work.  The only real thing it has to do is
@@ -14,7 +14,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.10';
+$VERSION = '0.11';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -159,28 +159,58 @@ stabilizes.
 =head2 $m = Module::Build->new(...)
 
 Creates a new Module::Build object.  Arguments to the new() method are
-listed below.  The only required argument is the C<module_name> argument.
+listed below.  Most arguments are optional, but you must provide
+either the C<module_name> argument, or C<dist_name> and one of
+C<dist_version> or C<dist_version_from>.  In other words, you must
+provide enough information to determine both a distribution name and
+version.
 
 =over 4
 
 =item * module_name
 
-The C<module_name> argument is required, and should be a string like
-C<'Your::Module'>.  We use it for several purposes, including finding
-the version string for this distribution, and creating a
-suitably-named distribution directory.
+The C<module_name> is a shortcut for setting default values of
+C<dist_name> and C<dist_version_from>, reflecting the fact that the
+majority of CPAN distributions are centered around one "main" module.
+For instance, if you set C<module_name> to C<Foo::Bar>, then
+C<dist_name> will default to C<Foo-Bar> and C<dist_version_from> will
+default to C<lib/Foo/Bar.pm>.  C<dist_version_from> will in turn be
+used to set C<dist_version>.
 
-=item * module_version
+Setting C<module_name> won't override a C<dist_*> parameter you
+specify explicitly.
 
-The C<module_version> argument is optional - if not explicitly
-provided, we'll look for the version string in the module specified by
-C<module_name>, parsing it out according to the same rules as
-C<ExtUtils::MakeMaker> and C<CPAN.pm>.
+=item * dist_name
 
-=item * module_version_from
+Specifies the name for this distribution.  Most authors won't need to
+set this directly, they can use C<module_name> to set C<dist_name> to
+a reasonable default.  However, some agglomerative distributions like
+C<libwww-perl> or C<bioperl> have names that don't correspond directly
+to a module name, so C<dist_name> can be set independently.
 
-Allows you to specify an alternate file for finding the module
-version, instead of looking in the file specified by C<module_name>.
+=item * dist_version
+
+Specifies a version number for the distribution.  See C<module_name>
+or C<dist_version_from> for ways to have this set automatically from a
+C<$VERSION> variable in a module.  One way or another, a version
+number needs to be set.
+
+=item * dist_version_from
+
+Specifies a file to look for the distribution version in.  Most
+authors won't need to set this directly, they can use C<module_name>
+to set it to a reasonable default.
+
+The version is extracted from the specified file according to the same
+rules as C<ExtUtils::MakeMaker> and C<CPAN.pm>.  It involves finding
+the first line that matches the regular expression
+
+   /([\$*])(([\w\:\']*)\bVERSION)\b.*\=/
+
+, eval()-ing that line, then checking the value of the C<$VERSION>
+variable.  Quite ugly, really, but all the modules on CPAN depend on
+this process, so there's no real opportunity to change to something
+better.
 
 =item * license
 
@@ -324,6 +354,15 @@ packaging, and convenience improvements.
 
 =back
 
+=head2 $m->create_build_script
+
+Creates an executable script called C<Build> in the current directory
+that will be used to execute further user actions.  This script is
+roughly analogous (in function, not in form) to the Makefile created
+by C<ExtUtils::MakeMaker>.  This method also creates some temporary
+data in a directory called C<_build/>.  Both of these will be removed
+when the C<realclean> action is performed.
+
 =head2 $m->add_to_cleanup
 
 A C<Module::Build> method may call C<< $self->add_to_cleanup(@files) >>
@@ -363,16 +402,84 @@ whatever is appropriate.  If you're running on an unknown platform, it
 will return C<undef> - there shouldn't be many unknown platforms
 though.
 
-=head2 $m->check_installed_version($module, $version)
+=head2 $m->prereq_failures
 
-This method returns true or false, depending on whether (at least)
-version C<$version> of module C<$module> is installed.  The C<$module>
-argument is given as a string like C<"Data::Dumper">, and the
+Returns a data structure containing information about any failed
+prerequisites (of any of the types described above), or C<undef> if
+all prerequisites are met.
+
+The data structure returned is a hash reference.  The top level keys
+are the type of prerequisite failed, one of "requires",
+"build_requires", "conflicts", or "recommends".  The associated values
+are hash references whose keys are the names of required (or
+conflicting) modules.  The associated values of those are hash
+references indicating some information about the failure.  For example:
+
+ {
+  have => '0.42',
+  need => '0.59',
+  message => 'Version 0.42 is installed, but we need version 0.59',
+ }
+
+or
+
+ {
+  have => '<none>',
+  need => '0.59',
+  message => 'Prerequisite Foo isn't installed',
+ }
+
+This hash has the same structure as the hash returned by the
+C<check_installed_status()> method, except that in the case of
+"conflicts" dependencies we change the "need" key to "conflicts" and
+construct a proper message.
+
+Examples:
+
+  # Check a required dependency on Foo::Bar
+  if ( $m->prereq_failures->{requires}{Foo::Bar} ) { ...
+
+  # Check whether there were any failures
+  if ( $m->prereq_failures ) { ...
+  
+  # Show messages for all failures
+  my $failures = $m->prereq_failures;
+  while (my ($type, $list) = each %$failures) {
+    while (my ($name, $hash) = each %$list) {
+      print "Failure for $name: $hash->{message}\n";
+    }
+  }
+
+=head2 $m->check_installed_status($module, $version)
+
+This method returns a hash reference indicating whether a version
+dependency on a certain module is satisfied.  The C<$module> argument
+is given as a string like C<"Data::Dumper"> or C<"perl">, and the
 C<$version> argument can take any of the forms described in L<prereq>
 above.  This allows very fine-grained version checking.
 
-If the check fails, we return false and set C<$@> to an informative
-error message.
+The returned hash reference has the following structure:
+
+ {
+  ok => $whether_the_dependency_is_satisfied,
+  have => $version_already_installed,
+  need => $version_requested, # Same as incoming $version argument
+  message => $informative_error_message,
+ }
+
+If no version of C<$module> is currently installed, the C<have> value
+will be the string C<< "<none>" >>.  Otherwise the C<have> value will
+simply be the version of the installed module.  Note that this means
+that if C<$module> is installed but doesn't define a version number,
+the C<have> value will be C<undef> - this is why we don't use C<undef>
+for the case when C<$module> isn't installed at all.
+
+
+=head2 $m->check_installed_version($module, $version)
+
+Like C<check_installed_status()>, but simply returns true or false
+depending on whether module C<$module> statisfies the dependency
+C<$version>.
 
 If the check succeeds, the return value is the actual version of
 C<$module> installed on the system.  This allows you to do the
@@ -385,11 +492,18 @@ following:
    die "Sorry, you must install DBI.\n";
  }
 
+If the check fails, we return false and set C<$@> to an informative
+error message.
+
 If C<$version> is any nontrue value (notably zero) and any version of
 C<$module> is installed, we return true.  In this case, if C<$module>
 doesn't define a version, or if its version is zero, we return the
 special value "0 but true", which is numerically zero, but logically
 true.
+
+In general you might prefer to use C<check_installed_status> if you
+need detailed information, or this method if you just need a yes/no
+answer.
 
 =head1 ACTIONS
 
