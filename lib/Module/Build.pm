@@ -15,7 +15,8 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.25_03';
+$VERSION = '0.26';
+$VERSION = eval $VERSION;
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -143,18 +144,19 @@ This illustrates initial configuration and the running of three
 'actions'.  In this case the actions run are 'build' (the default
 action), 'test', and 'install'.  Other actions defined so far include:
 
-  build                          fakeinstall   
-  clean                          help          
-  code                           install       
-  diff                           manifest      
-  dist                           ppd           
-  distcheck                      ppmdist       
-  distclean                      realclean     
-  distdir                        skipcheck     
-  distmeta                       test          
-  distsign                       testdb        
-  disttest                       versioninstall
-  docs
+  build                          fakeinstall 
+  config_data                    help        
+  clean                          html        
+  code                           install     
+  diff                           manifest    
+  dist                           ppd         
+  distcheck                      ppmdist     
+  distclean                      realclean   
+  distdir                        skipcheck   
+  distmeta                       test        
+  distsign                       testcover   
+  disttest                       testdb      
+  docs                           versioninstall
 
 You can run the 'help' action for a complete list of actions.
 
@@ -780,7 +782,7 @@ This method returns a reasonable faxsimile of the currently-executing
 C<Module::Build> object representing the current build.  You can use
 this object to query its C<notes()> method, inquire about installed
 modules, and so on.  This is a great way to share information between
-different parts of your building process.  For instance, you can ask
+different parts of your build process.  For instance, you can ask
 the user a question during C<perl Build.PL>, then use their answer
 during a regression test:
 
@@ -820,6 +822,12 @@ arguments, C<notes()> returns a reference to the entire hash of notes.
 With one argument, C<notes($key)> returns the value associated with
 the given key.  With two arguments, C<notes($key, $value)> sets the
 value associated with the given key to C<$value>.
+
+The lifetime of the C<notes> data is for "a build" - that is, the
+C<notes> hash is created when C<perl Build.PL> is run (or when the
+C<new()> method is run, if the Module::Build Perl API is being used
+instead of called from a shell), and lasts until C<perl Build.PL> is
+run again or the C<clean> action is run.
 
 =item config()
 
@@ -1110,16 +1118,16 @@ installed and configured.
 
 Features set in this way using the Module::Build object will be
 available for querying during the build/test process and after
-installation via the generated C<...::BuildConfig> module, as 
-C<< ...::BuildConfig->feature($name) >>.
+installation via the generated C<...::ConfigData> module, as 
+C<< ...::ConfigData->feature($name) >>.
 
-The C<feature()> and C<build_config()> methods represent
+The C<feature()> and C<config_data()> methods represent
 Module::Build's main support for configuration of installed modules.
 See also L<SAVING CONFIGURATION INFORMATION>.
 
-=item build_config($name)
+=item config_data($name)
 
-=item build_config($name => $value)
+=item config_data($name => $value)
 
 With a single argument, returns the value of the configuration
 variable C<$name>.  With two arguments, sets the given configuration
@@ -1132,10 +1140,10 @@ for C<< DBI->connect() >>.
 
 Configuration values set in this way using the Module::Build object
 will be available for querying during the build/test process and after
-installation via the generated C<...::BuildConfig> module, as 
-C<< ...::BuildConfig->config($name) >>.
+installation via the generated C<...::ConfigData> module, as 
+C<< ...::ConfigData->config($name) >>.
 
-The C<feature()> and C<build_config()> methods represent
+The C<feature()> and C<config_data()> methods represent
 Module::Build's main support for configuration of installed modules.
 See also L<SAVING CONFIGURATION INFORMATION>.
 
@@ -1274,6 +1282,12 @@ exercised during the tests.
 
 This is a synonym for the 'test' action with the C<debugger=1>
 argument.
+
+=item testpod
+
+This checks all the files described in the C<docs> action and 
+produces C<Test::Harness>-style output. If you are a module author,
+this is useful to run before creating a new release.
 
 =item clean
 
@@ -1629,14 +1643,14 @@ platform you're installing on.
 Module::Build provides a very convenient way to save configuration
 information that your installed modules (or your regression tests) can
 access.  If your Build process calls the C<feature()> or
-C<build_config()> methods, then a C<Foo::Bar::BuildConfig> module will
+C<config_data()> methods, then a C<Foo::Bar::ConfigData> module will
 automatically be created for you, where C<Foo::Bar> is the
 C<module_name> parameter as passed to C<new()>.  This module provides
 access to the data saved by these methods, and a way to update the
-values.  There is also a utility script called C<build_config>
+values.  There is also a utility script called C<config_data>
 distributed with Module::Build that provides a command-line interface
 to this same functionality.  See also the generated
-C<Foo::Bar::BuildConfig> documentation, and the C<build_config>
+C<Foo::Bar::ConfigData> documentation, and the C<config_data>
 script's documentation, for more information.
 
 

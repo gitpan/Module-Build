@@ -1,6 +1,6 @@
 Revision history for Perl extension Module::Build.
 
-0.26  (Pending, still in beta release)
+0.26 (pending, still in beta)
 
  - Removed some language from the Module::Build::Compat documentation
    that encouraged people to include a Build.PL without a Makefile.PL.
@@ -12,13 +12,15 @@ Revision history for Perl extension Module::Build.
    got the impression I was a little more truculent toward MakeMaker
    than I really am.
 
- - Added the formal concepts of "features" and "config notes" for
+ - Added the formal concepts of "features" and "config data" for
    distributions.  This allows the module author to define a certain
    set of features that the user can switch on and off (usually
    according to whether they have the proper prerequisites for them),
    and to save build-time configuration information in a standardized
    format.  See the main documentation of Module::Build for more
-   details.
+   details.  (Note that the name of this system was called
+   "BuildConfig" for a while in beta, but now it's called
+   "ConfigData".)
 
  - Added an 'auto_features' capability, which simplifies the process
    of defining features that depend on a set of prerequisites.
@@ -27,12 +29,38 @@ Revision history for Perl extension Module::Build.
    declare certain command-line arguments their Build.PL can accept
    [David Wheeler]
 
+ - Changed the split_like_shell() method to use the shellwords()
+   function from Text::ParseWords (a core module since 5.0), which
+   does a much better job than the split() we were using.
+
+ - Added a 'testpod' action, which checks the syntactic validity of
+   all POD files in the distribution using Test::Pod.  This eliminates
+   the need for doing so in a regression test. [Initial patch by Mark
+   Stosberg]
+
+ - Added a process_files_by_extension() method, which generalizes the
+   kind of processing (essentially just copying) that happens for .pm
+   and .pod files, and makes it available to other user-defined types
+   of files.  See the new cookbook entry.
+
+ - Improved compatibility with version.pm when authors are using
+   version objects as their $VERSION variables.  Now
+   version_from_file() can deal with these objects.  Currently we
+   stringify them right away, but perhaps in the future we will
+   preserve them as objects for a while.
+
  - During 'distdir' and 'distmeta' actions, die a bit more gracefully
    if there's no MANIFEST (i.e. explicitly say that a MANIFEST is
    required). [Spotted by Adrian Howard]
 
  - Eliminated a recursive dependency between creating the MANIFEST
    file and creating the META.yml file.  [Spotted by Dave Rolsky]
+
+ - On Win32, where a single directory might be known variously as
+   "Module-Build-0.25_03" or "MODULE~1.25_", we now use
+   Win32::GetShortPathName($cwd) to verify that the 'Build' script is
+   being run from the correct directory, rather than just a string
+   comparison.
 
  - The add_to_cleanup() method will now accept glob()-style patterns
    in addition to explicit filenames.  Also documented the fact that

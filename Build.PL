@@ -25,6 +25,7 @@ my $build = new Module::Build
 		'ExtUtils::Install' => 0,
 		'IO::File'       => 0,
 		'Cwd'            => 0,
+		'Text::ParseWords' => 0,
 	       },
    recommends => {
 		  'Archive::Tar' => '1.08',
@@ -49,6 +50,7 @@ my $build = new Module::Build
 		    },
 
    add_to_cleanup => ['t/Sample/pod2htm*'],
+   script_files => ['scripts/config_data'],
   );
 
 $build->create_build_script;

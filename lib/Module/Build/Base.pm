@@ -11,6 +11,7 @@ use File::Spec ();
 use File::Compare ();
 use Data::Dumper ();
 use IO::File ();
+use Text::ParseWords ();
 
 #################### Constructors ###########################
 sub new {
@@ -187,10 +188,9 @@ sub find_perl_interpreter {
     $thisperl .= $exe unless $thisperl =~ m/$exe$/i;
   }
   
-  my @candidates = map File::Spec->catfile($_, $thisperl), File::Spec->path();
-  push @candidates, $c->{perlpath};
-  
-  foreach my $perl (@candidates) {
+  foreach my $perl ( $c->{perlpath},
+		     map File::Spec->catfile($_, $thisperl), File::Spec->path()
+		   ) {
     return $perl if -f $perl and $proto->_perl_is_same($perl);
   }
   return;
@@ -252,12 +252,12 @@ sub _general_notes {
   return $self->_persistent_hash_read($type, $key) unless @_;
   
   my $value = shift;
-  $self->has_build_config(1) if $type =~ /^(build_config|features)$/;
+  $self->has_config_data(1) if $type =~ /^(config_data|features)$/;
   return $self->_persistent_hash_write($type, { $key => $value });
 }
 
 sub notes        { shift()->_general_notes('notes', @_) }
-sub build_config { shift()->_general_notes('build_config', @_) }
+sub config_data { shift()->_general_notes('config_data', @_) }
 sub feature      { shift()->_general_notes('features', @_) }
 
 sub add_build_element {
@@ -265,15 +265,16 @@ sub add_build_element {
   push @{$self->build_elements}, shift;
 }
 
-sub ACTION_build_config {
+sub ACTION_config_data {
   my $self = shift;
-  return unless $self->has_build_config;
+  return unless $self->has_config_data;
   
-  die "The build_config feature requires that 'module_name' be set" unless $self->module_name;
-  my $notes_name = $self->module_name . '::BuildConfig';
+  my $module_name = $self->module_name
+    or die "The config_data feature requires that 'module_name' be set";
+  my $notes_name = $module_name . '::ConfigData';
   my $notes_pm = File::Spec->catfile($self->blib, 'lib', split /::/, "$notes_name.pm");
 
-  return if $self->up_to_date([$self->config_file('build_config'), $self->config_file('features')], $notes_pm);
+  return if $self->up_to_date([$self->config_file('config_data'), $self->config_file('features')], $notes_pm);
 
   print "Writing config notes to $notes_pm\n";
   File::Path::mkpath(File::Basename::dirname($notes_pm));
@@ -283,7 +284,7 @@ sub ACTION_build_config {
 package %s;
 use strict;
 my $arrayref = eval do {local $/; <DATA>}
-  or die "Couldn't load BuildConfig data: $@";
+  or die "Couldn't load ConfigData data: $@";
 close DATA;
 my ($config, $features) = @$arrayref;
 
@@ -291,7 +292,7 @@ sub config { $config->{$_[1]} }
 sub feature { $features->{$_[1]} }
 
 sub set_config { $config->{$_[1]} = $_[2] }
-sub set_feature { $features->{$_[1]} = $_[2] }
+sub set_feature { $features->{$_[1]} = 0+!!$_[2] }
 
 sub feature_names { keys %%$features }
 sub config_names  { keys %%$config }
@@ -321,10 +322,93 @@ sub write {
 }
 
 EOF
-  print $fh "__DATA__\n";
+
+  printf $fh <<"EOF", $notes_name, $module_name;
+
+=head1 NAME
+
+$notes_name - Configuration for $module_name
+
+=head1 SYNOPSIS
+
+  use $notes_name;
+  \$value = $notes_name->config('foo');
+  \$value = $notes_name->feature('bar');
+  
+  \@names = $notes_name->config_names;
+  \@names = $notes_name->feature_names;
+  
+  $notes_name->set_config(foo => \$new_value);
+  $notes_name->set_feature(bar => \$new_value);
+  $notes_name->write;  # Save changes
+
+=head1 DESCRIPTION
+
+This module holds the configuration data for the C<$module_name>
+module.  It also provides a programmatic interface for getting or
+setting that configuration data.  Note that in order to actually make
+changes, you'll have to have write access to the C<$notes_name>
+module, and you should attempt to understand the repercussions of your
+actions.
+
+=head1 METHODS
+
+=over 4
+
+=item config(\$name)
+
+Given a string argument, returns the value of the configuration item
+by that name, or C<undef> if no such item exists.
+
+=item feature(\$name)
+
+Given a string argument, returns the value of the feature by that
+name, or C<undef> if no such feature exists.
+
+=item set_config(\$name, \$value)
+
+Sets the configuration item with the given name to the given value.
+The value may be any Perl scalar that will serialize correctly using
+C<Data::Dumper>.  This includes references, objects (usually), and
+complex data structures.  It probably does not include transient
+things like filehandles or sockets.
+
+=item set_feature(\$name, \$value)
+
+Sets the feature with the given name to the given boolean value.  The
+value will be converted to 0 or 1 automatically.
+
+=item config_names()
+
+Returns a list of all the names of config items currently defined in
+C<$notes_name>, or in scalar context the number of items.
+
+=item feature_names()
+
+Returns a list of all the names of features currently defined in
+C<$notes_name>, or in scalar context the number of features.
+
+=item write()
+
+Commits any changes from C<set_config()> and C<set_feature()> to disk.
+Requires write access to the C<$notes_name> module.
+
+=back
+
+=head1 AUTHOR
+
+C<$notes_name> was automatically created using C<Module::Build>.
+C<Module::Build> was written by Ken Williams, but he holds no
+authorship claim or copyright claim to the contents of C<$notes_name>.
+
+=cut
+
+__DATA__
+
+EOF
 
   local $Data::Dumper::Terse = 1;
-  print $fh Data::Dumper::Dumper([scalar $self->build_config, scalar $self->feature]);
+  print $fh Data::Dumper::Dumper([scalar $self->config_data, scalar $self->feature]);
 }
 
 {
@@ -351,7 +435,7 @@ EOF
        perl
        config_dir
        blib
-       has_build_config
+       has_config_data
        build_script
        build_elements
        install_sets
@@ -528,8 +612,20 @@ sub version_from_file {
 		 }; \$$var
 		};
   local $^W;
+
+  # version.pm will change the ->VERSION method, so we mitigate the
+  # potential effects here.  Unfortunately local(*UNIVERSAL::VERSION)
+  # will crash perl < 5.8.1.
+
+  my $old_version = \&UNIVERSAL::VERSION;
+  eval {require version};
   my $result = eval $eval;
+  *UNIVERSAL::VERSION = $old_version;
   warn "Error evaling version line '$eval' in $file: $@\n" if $@;
+
+  # Unbless it if it's a version.pm object
+  $result = "$result" if UNIVERSAL::isa( $result, 'version' );
+
   return $result;
 }
 
@@ -616,7 +712,7 @@ sub read_config {
   ($self->{args}, $self->{config}, $self->{properties}) = @$ref;
   close $fh;
 
-  for ('cleanup', 'notes', 'features', 'build_config') {
+  for ('cleanup', 'notes', 'features', 'config_data') {
     next unless -e $self->config_file($_);
     $self->_persistent_hash_restore($_);
   }
@@ -641,7 +737,7 @@ sub write_config {
   $self->_write_dumper('prereqs', { map { $_, $self->$_() } @items });
   $self->_write_dumper('build_params', [$self->{args}, $self->{config}, $self->{properties}]);
 
-  $self->_persistent_hash_write($_) foreach qw(notes cleanup features build_config);
+  $self->_persistent_hash_write($_) foreach qw(notes cleanup features config_data);
 }
 
 sub config         { shift()->{config} }
@@ -848,6 +944,7 @@ sub print_build_script {
   my $build_package = ref($self);
   
   my %q = map {$_, $self->$_()} qw(config_dir base_dir);
+  $q{base_dir} = Win32::GetShortPathName($q{base_dir}) if $^O eq 'MSWin32';
 
   my @myINC = @INC;
   for (@myINC, values %q) {
@@ -868,8 +965,10 @@ use File::Spec;
 BEGIN {
   \$^W = 1;  # Use warnings
   my \$curdir = File::Spec->canonpath( Cwd::cwd() );
-  unless (\$curdir eq '$q{base_dir}') {
-    die ('This script must be run from $q{base_dir}, not '."\$curdir\\n".
+  my \$is_same_dir = \$^O eq 'MSWin32' ? (Win32::GetShortPathName(\$curdir) eq '$q{base_dir}')
+                                       : (\$curdir eq '$q{base_dir}');
+  unless (\$is_same_dir) {
+    die ('This script must be run from $q{base_dir}, not '.\$curdir."\\n".
 	 "Please re-run the Build.PL script here.\\n");
   }
   \@INC = 
@@ -1288,16 +1387,28 @@ sub ACTION_code {
   
   foreach my $element (@{$self->build_elements}) {
     my $method = "process_${element}_files";
-    $self->$method();
+    $method = "process_files_by_extension" unless $self->can($method);
+    $self->$method($element);
   }
 
-  $self->depends_on('build_config');
+  $self->depends_on('config_data');
 }
 
 sub ACTION_build {
   my $self = shift;
   $self->depends_on('code');
   $self->depends_on('docs');
+}
+
+sub process_files_by_extension {
+  my ($self, $ext) = @_;
+  
+  my $method = "find_${ext}_files";
+  my $files = $self->can($method) ? $self->$method() : $self->_find_file_by_type($ext,  'lib');
+  
+  while (my ($file, $dest) = each %$files) {
+    $self->copy_if_modified(from => $file, to => File::Spec->catfile($self->blib, $dest) );
+  }
 }
 
 sub process_support_files {
@@ -1338,21 +1449,8 @@ sub process_xs_files {
   }
 }
 
-sub process_pod_files {
-  my $self = shift;
-  my $files = $self->find_pod_files;
-  while (my ($file, $dest) = each %$files) {
-    $self->copy_if_modified(from => $file, to => File::Spec->catfile($self->blib, $dest) );
-  }
-}
-
-sub process_pm_files {
-  my $self = shift;
-  my $files = $self->find_pm_files;
-  while (my ($file, $dest) = each %$files) {
-    $self->copy_if_modified(from => $file, to => File::Spec->catfile($self->blib, $dest) );
-  }
-}
+sub process_pod_files { shift()->process_files_by_extension(shift()) }
+sub process_pm_files  { shift()->process_files_by_extension(shift()) }
 
 sub process_script_files {
   my $self = shift;
@@ -1504,6 +1602,23 @@ eval 'exec $interpreter $arg -S \$0 \${1+"\$\@"}'
   }
 }
 
+
+sub ACTION_testpod {
+  my $self = shift;
+  $self->depends_on('docs');
+  
+  eval q{use Test::Pod 0.95; 1}
+    or die "The 'testpod' action requires Test::Pod version 0.95";
+
+  my @files = sort keys %{$self->_find_pods($self->libdoc_dirs)},
+		   keys %{$self->_find_pods($self->bindoc_dirs)}
+    or die "Couldn't find any POD files to test\n";
+
+  { package Module::Build::PodTester;  # Don't want to pollute the main namespace
+    Test::Pod->import( tests => scalar @files );
+    pod_file_ok($_) foreach @files;
+  }
+}
 
 sub ACTION_docs {
   my $self = shift;
@@ -2069,10 +2184,14 @@ sub ACTION_distmeta {
   $self->delete_filetree($self->{metafile});
 
   # Since we're building ourself, we have to do some special stuff
-  # here: the BuildConfig module is found in blib/lib.
-  local @INC = (@INC, File::Spec->catdir($self->blib, 'lib'));
-  require Module::Build::BuildConfig;  # Only works after the 'build'
-  unless (Module::Build::BuildConfig->feature('YAML_support')) {
+  # here: the ConfigData module is found in blib/lib.
+  local @INC = @INC;
+  if ($self->module_name eq 'Module::Build') {
+    $self->depends_on('config_data');
+    push @INC, File::Spec->catdir($self->blib, 'lib');
+  }
+  require Module::Build::ConfigData;  # Only works after the 'build'
+  unless (Module::Build::ConfigData->feature('YAML_support')) {
     warn <<EOM;
 \nCouldn't load YAML.pm, generating a minimal META.yml without it.
 Please check and edit the generated metadata, or consider installing YAML.pm.\n
@@ -2427,11 +2546,7 @@ sub split_like_shell {
   return () unless defined($string) && length($string);
   return @$string if UNIVERSAL::isa($string, 'ARRAY');
   
-  return $self->shell_split($string);
-}
-
-sub shell_split {
-  return split ' ', $_[1];  # XXX This is naive - needs a fix
+  return Text::ParseWords::shellwords($string);
 }
 
 sub stdout_to_file {

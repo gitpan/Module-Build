@@ -44,18 +44,19 @@ DESCRIPTION
     'actions'. In this case the actions run are 'build' (the default
     action), 'test', and 'install'. Other actions defined so far include:
 
-      build                          fakeinstall   
-      clean                          help          
-      code                           install       
-      diff                           manifest      
-      dist                           ppd           
-      distcheck                      ppmdist       
-      distclean                      realclean     
-      distdir                        skipcheck     
-      distmeta                       test          
-      distsign                       testdb        
-      disttest                       versioninstall
-      docs
+      build                          fakeinstall 
+      config_data                    help        
+      clean                          html        
+      code                           install     
+      diff                           manifest    
+      dist                           ppd         
+      distcheck                      ppmdist     
+      distclean                      realclean   
+      distdir                        skipcheck   
+      distmeta                       test        
+      distsign                       testcover   
+      disttest                       testdb      
+      docs                           versioninstall
 
     You can run the 'help' action for a complete list of actions.
 
@@ -640,9 +641,9 @@ METHODS
         currently-executing "Module::Build" object representing the current
         build. You can use this object to query its "notes()" method,
         inquire about installed modules, and so on. This is a great way to
-        share information between different parts of your building process.
-        For instance, you can ask the user a question during "perl
-        Build.PL", then use their answer during a regression test:
+        share information between different parts of your build process. For
+        instance, you can ask the user a question during "perl Build.PL",
+        then use their answer during a regression test:
 
          # In Build.PL:
          my $color = $build->prompt("What is your favorite color?");
@@ -677,6 +678,12 @@ METHODS
         notes. With one argument, "notes($key)" returns the value associated
         with the given key. With two arguments, "notes($key, $value)" sets
         the value associated with the given key to $value.
+
+        The lifetime of the "notes" data is for "a build" - that is, the
+        "notes" hash is created when "perl Build.PL" is run (or when the
+        "new()" method is run, if the Module::Build Perl API is being used
+        instead of called from a shell), and lasts until "perl Build.PL" is
+        run again or the "clean" action is run.
 
     config()
         Returns a hash reference containing the "Config.pm" hash, including
@@ -943,15 +950,15 @@ METHODS
 
         Features set in this way using the Module::Build object will be
         available for querying during the build/test process and after
-        installation via the generated "...::BuildConfig" module, as
-        "...::BuildConfig->feature($name)".
+        installation via the generated "...::ConfigData" module, as
+        "...::ConfigData->feature($name)".
 
-        The "feature()" and "build_config()" methods represent
+        The "feature()" and "config_data()" methods represent
         Module::Build's main support for configuration of installed modules.
         See also "SAVING CONFIGURATION INFORMATION".
 
-    build_config($name)
-    build_config($name => $value)
+    config_data($name)
+    config_data($name => $value)
         With a single argument, returns the value of the configuration
         variable $name. With two arguments, sets the given configuration
         variable to the given value. The value may be any perl scalar that's
@@ -963,10 +970,10 @@ METHODS
 
         Configuration values set in this way using the Module::Build object
         will be available for querying during the build/test process and
-        after installation via the generated "...::BuildConfig" module, as
-        "...::BuildConfig->config($name)".
+        after installation via the generated "...::ConfigData" module, as
+        "...::ConfigData->config($name)".
 
-        The "feature()" and "build_config()" methods represent
+        The "feature()" and "config_data()" methods represent
         Module::Build's main support for configuration of installed modules.
         See also "SAVING CONFIGURATION INFORMATION".
 
@@ -1095,6 +1102,11 @@ ACTIONS
     testdb
         This is a synonym for the 'test' action with the "debugger=1"
         argument.
+
+    testpod
+        This checks all the files described in the "docs" action and
+        produces "Test::Harness"-style output. If you are a module author,
+        this is useful to run before creating a new release.
 
     clean
         This action will clean up any files that the build process may have
@@ -1406,15 +1418,15 @@ ACTIONS
 SAVING CONFIGURATION INFORMATION
     Module::Build provides a very convenient way to save configuration
     information that your installed modules (or your regression tests) can
-    access. If your Build process calls the "feature()" or "build_config()"
-    methods, then a "Foo::Bar::BuildConfig" module will automatically be
+    access. If your Build process calls the "feature()" or "config_data()"
+    methods, then a "Foo::Bar::ConfigData" module will automatically be
     created for you, where "Foo::Bar" is the "module_name" parameter as
     passed to "new()". This module provides access to the data saved by
     these methods, and a way to update the values. There is also a utility
-    script called "build_config" distributed with Module::Build that
-    provides a command-line interface to this same functionality. See also
-    the generated "Foo::Bar::BuildConfig" documentation, and the
-    "build_config" script's documentation, for more information.
+    script called "config_data" distributed with Module::Build that provides
+    a command-line interface to this same functionality. See also the
+    generated "Foo::Bar::ConfigData" documentation, and the "config_data"
+    script's documentation, for more information.
 
 AUTOMATION
     One advantage of Module::Build is that since it's implemented as Perl
