@@ -194,6 +194,33 @@ sub normalize_filespecs {
   }
 }
 
+sub _generic_write_compiler_script {
+  my ($self, %spec) = @_;
+
+  my $script = File::Spec->catfile( $spec{srcdir},
+                                    $spec{basename} . '.ccs' );
+
+  $self->add_to_cleanup($script);
+
+  print "Generating script '$script'\n";
+
+  open( SCRIPT, ">$script" )
+    or die( "Could not create script '$script': $!" );
+
+  print SCRIPT join( "\n",
+    map { ref $_ ? @{$_} : $_ }
+    grep defined,
+    delete(
+      @spec{ qw(includes cflags optimize defines perlinc) } )
+  );
+
+  close SCRIPT;
+
+  push @{$spec{includes}}, qq{\@"$script"};
+
+  return %spec;
+}
+
 sub make_executable {
   my $self = shift;
   $self->SUPER::make_executable(@_);
@@ -273,30 +300,8 @@ sub format_compiler_cmd {
 }
 
 sub write_compiler_script {
-  my ($self, %spec) = @_;
-
-  my $script = File::Spec->catfile( $spec{srcdir},
-                                    $spec{basename} . '.ccs' );
-
-  $self->add_to_cleanup($script);
-
-  print "Generating script '$script'\n";
-
-  open( SCRIPT, ">$script" )
-    or die( "Could not create script '$script': $!" );
-
-  print SCRIPT join( "\n",
-    map { ref $_ ? @{$_} : $_ }
-    grep defined,
-    delete(
-      @spec{ qw(includes cflags optimize defines perlinc) } )
-  );
-
-  close SCRIPT;
-
-  push @{$spec{includes}}, '@"' . $script . '"';
-
-  return %spec;
+  my $self = shift;
+  $self->_generic_write_compiler_script(@_);
 }
 
 sub format_linker_cmd {
@@ -354,7 +359,7 @@ sub write_linker_script {
 
   close SCRIPT;
 
-  push @{$spec{lddlflags}}, '@"' . $script . '"';
+  push @{$spec{lddlflags}}, qq{\@"$script"};
 
   return %spec;
 }
@@ -383,30 +388,8 @@ sub format_compiler_cmd {
 }
 
 sub write_compiler_script {
-  my ($self, %spec) = @_;
-
-  my $script = File::Spec->catfile( $spec{srcdir},
-                                    $spec{basename} . '.ccs' );
-
-  $self->add_to_cleanup($script);
-
-  print "Generating script '$script'\n";
-
-  open( SCRIPT, ">$script" )
-    or die( "Could not create script '$script': $!" );
-
-  print SCRIPT join( "\n",
-    map { ref $_ ? @{$_} : $_ }
-    grep defined,
-    delete(
-      @spec{ qw(includes cflags optimize defines perlinc) } )
-  );
-
-  close SCRIPT;
-
-  push @{$spec{includes}}, '@"' . $script . '"';
-
-  return %spec;
+  my $self = shift;
+  $self->_generic_write_compiler_script(@_);
 }
 
 sub format_linker_cmd {
@@ -476,8 +459,8 @@ sub write_linker_script {
 
   close LD_LIBS;
 
-  push @{$spec{lddlflags}}, '@"' . $ld_script  . '"';
-  push @{$spec{perllibs}},  '@"' . $ld_libs    . '"';
+  push @{$spec{lddlflags}}, qq{\@"$ld_script"};
+  push @{$spec{perllibs}},  qq{\@"$ld_libs"};
 
   return %spec;
 }
