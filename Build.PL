@@ -27,7 +27,6 @@ my $build = new Module::Build
 		'Cwd'            => 0,
 	       },
    recommends => {
-		  'YAML' => ' >= 0.35, < 0.49 ',
 		  'Archive::Tar' => '1.08',
 		  'ExtUtils::Install' => 0.30,
 		  'ExtUtils::ParseXS' => 2.02,
@@ -40,12 +39,17 @@ my $build = new Module::Build
 		     },
    sign => 1,
    create_readme => 1,
+
+   auto_features => {
+		     YAML_support =>
+		     {
+		      description => "Can write fully-functional META.yml files",
+		      requires => { YAML => ' >= 0.35, < 0.49 ' },
+		     },
+		    },
+
+   add_to_cleanup => ['t/Sample/pod2htm*'],
   );
-
-my $failures = $build->prereq_failures();
-
-my $have_yaml = !$failures->{recommends}{YAML};
-$build->feature(YAML_support => $have_yaml);
 
 $build->create_build_script;
 $build->notes(foo => 'bar');   # We set this here and verify it in t/notes.t

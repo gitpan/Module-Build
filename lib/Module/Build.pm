@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.25_02';
+$VERSION = '0.25_03';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -615,9 +615,38 @@ it gets the distribution's version.  It looks for the first line
 matching C<$package\s-\s(.+)>, and uses the captured text as the
 abstract.
 
+=item auto_features
+
+This parameter supports the setting of features (see
+L<feature($name)>) automatically based on a set of prerequisites.  For
+instance, for a module that could optionally use either MySQL or
+PostgreSQL databases, you might use C<auto_features> like this:
+
+  my $b = Module::Build->new
+    (
+     ... other stuff here...
+     auto_features =>
+       {
+        pg_support =>
+        {
+           description => "Interface with Postgres databases",
+           requires => q{ DBD::Pg >= 23.3 && DateTime::Format::Pg },
+        },
+        mysql_support =>
+        {
+           description => "Interface with MySQL databases",
+           requires => q{ DBD::mysql >= 17.9 && DateTime::Format::Pg },
+        },
+     );
+
+For each feature named, the prerequisite options will be checked, and
+if there are no failures, the feature will be enabled (set to C<1>).
+Otherwise the failures will be displayed to the user and the feature
+will be disabled (set to C<0>).
+
 =item get_options
 
-You can pass arbitrary options to F<Build.PL> or F<Build>, and they will be
+You can pass arbitrary command-line options to F<Build.PL> or F<Build>, and they will be
 stored in the Module::Build object and can be accessed via the C<args()>
 method. However, sometimes you want more flexibility out of your argument
 processing than this allows. In such cases, use the C<get_options> parameter
@@ -634,7 +663,10 @@ The supported option specification hash keys are:
 
 The type of option. The types are those supported by Getopt::Long; consult
 its documentation for a complete list. Typical types are C<=s> for strings,
-C<+> for additive options, and C<!> for negatable options.
+C<+> for additive options, and C<!> for negatable options.  If the
+type is not specified, it will be considered a boolean, i.e. no
+argument is taken and a value of 1 will be assigned when the option is
+encountered.
 
 =item store
 
@@ -718,13 +750,20 @@ when the C<realclean> action is performed.
 
 =item add_to_cleanup(@files)
 
-You may call C<< $self->add_to_cleanup(@files) >>
-to tell C<Module::Build> that certain files should be removed when the
-user performs the C<Build clean> action.  I decided to provide a
-dynamic method, rather than just use a static list of files, because these
-static lists can get difficult to manage.  I usually prefer to keep
-the responsibility for registering temporary files close to the code
-that creates them.
+You may call C<< $self->add_to_cleanup(@patterns) >> to tell
+C<Module::Build> that certain files should be removed when the user
+performs the C<Build clean> action.  The arguments to the method are
+patterns suitable for passing to Perl's C<glob()> function, specified
+in either Unix format or the current machine's native format.  It's
+usually convenient to use Unix format when you hard-code the filenames
+(e.g. in F<Build.PL>) and the native format when the names are
+programmatically generated (e.g. in a testing script).
+
+I decided to provide a dynamic method of the C<$build> object, rather
+than just use a static list of files named in the F<Build.PL>, because
+these static lists can get difficult to manage.  I usually prefer to
+keep the responsibility for registering temporary files close to the
+code that creates them.
 
 =item resume()
 
@@ -1664,7 +1703,11 @@ Module::Build directly:
   use lib qw(/nonstandard/library/path);
   use My::Builder;  # Or whatever you want to call it
   
-  my $m = My::Builder->new(module_name => 'Next::Big::Thing');
+  my $m = My::Builder->new
+    (module_name=> 'Next::Big::Thing',  # All the regular args...
+     license=> 'perl',
+     dist_author=> 'A N Other <me@here.net.au>',
+     requires=> {Carp => 0});
   $m->create_build_script;
 
 This is relatively straightforward, and is the best way to do things
@@ -1692,7 +1735,11 @@ creating a separate file for your module:
      },
     );
   
-  my $m = $class->new(module_name => 'Module::Build');
+  my $m = $class->new
+    (module_name=> 'Next::Big::Thing',  # All the regular args...
+     license=> 'perl',
+     dist_author=> 'A N Other <me@here.net.au>',
+     requires=> {Carp => 0});
   $m->create_build_script;
 
 Behind the scenes, this actually does create a C<.pm> file, since the

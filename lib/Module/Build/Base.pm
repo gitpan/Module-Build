@@ -25,6 +25,7 @@ sub new {
   $self->dist_name;
   $self->check_manifest;
   $self->check_prereq;
+  $self->set_autofeatures;
   $self->dist_version;
 
   return $self;
@@ -41,7 +42,7 @@ sub resume {
 	 "   but we are now using '$perl'.\n");
   }
   
-  my $mb_version = Module::Build->VERSION;
+  my $mb_version = $Module::Build::VERSION;
   die(" * ERROR: Configuration was initially created with Module::Build version '$self->{properties}{mb_version}',\n".
       "   but we are now using version '$mb_version'.  Please re-run the Build.PL or Makefile.PL script.\n")
     unless $mb_version eq $self->{properties}{mb_version};
@@ -88,7 +89,7 @@ sub _construct {
 				   recommends      => {},
 				   build_requires  => {},
 				   conflicts       => {},
-				   mb_version      => Module::Build->VERSION,
+				   mb_version      => $Module::Build::VERSION,
 				   build_elements  => [qw( PL support pm xs pod script )],
 				   installdirs     => 'site',
 				   install_path    => {},
@@ -275,7 +276,7 @@ sub ACTION_build_config {
   return if $self->up_to_date([$self->config_file('build_config'), $self->config_file('features')], $notes_pm);
 
   print "Writing config notes to $notes_pm\n";
-  
+  File::Path::mkpath(File::Basename::dirname($notes_pm));
   my $fh = IO::File->new("> $notes_pm") or die "Can't create '$notes_pm': $!";
 
   printf $fh <<'EOF', $notes_name;
@@ -589,7 +590,7 @@ sub _persistent_hash_restore {
 
 sub add_to_cleanup {
   my $self = shift;
-  my %files = map {$_, 1} @_;
+  my %files = map {$self->localize_file_path($_), 1} @_;
   $self->_persistent_hash_write('cleanup', \%files);
 }
 
@@ -650,14 +651,41 @@ sub recommends     { shift()->{properties}{recommends} }
 sub build_requires { shift()->{properties}{build_requires} }
 sub conflicts      { shift()->{properties}{conflicts} }
 
-sub prereq_failures {
-  my $self = shift;
+sub set_autofeatures {
+  my ($self) = @_;
+  my $features = delete $self->{properties}{auto_features}
+    or return;
+  
+  while (my ($name, $info) = each %$features) {
+    my $failures = $self->prereq_failures($info);
+    if ($failures) {
+      warn "Feature '$name' disabled because of the following prerequisite failures:\n";
+      foreach my $type (qw(requires build_requires conflicts recommends)) {
+	next unless $failures->{$type};
+	while (my ($module, $status) = each %{$failures->{$type}}) {
+	  warn " * $status->{message}\n";
+	}
+	warn "\n";
+      }
+      $self->feature($name => 0);
+    } else {
+      warn "Feature '$name' enabled.\n\n";
+      $self->feature($name => 1);
+    }
+  }
+}
 
+sub prereq_failures {
+  my ($self, $info) = @_;
   my @types = qw(requires recommends build_requires conflicts);
+
+  $info ||= {map {$_, $self->$_()} @types};
+
   my $out;
 
   foreach my $type (@types) {
-    while ( my ($modname, $spec) = each %{$self->$type()} ) {
+    my $prereqs = $info->{$type};
+    while ( my ($modname, $spec) = each %$prereqs ) {
       my $status = $self->check_installed_status($modname, $spec);
       
       if ($type eq 'conflicts') {
@@ -732,7 +760,7 @@ sub check_installed_status {
   if ($modname eq 'perl') {
     $status{have} = $self->perl_version;
   
-  } elsif (eval { $status{have} = $modname->VERSION }) {
+  } elsif (eval { no strict; $status{have} = ${"${modname}::VERSION"} }) {
     # Don't try to load if it's already loaded
     
   } else {
@@ -1394,8 +1422,7 @@ sub find_test_files {
 	      map glob,
 	      $self->split_like_shell($files)];
     
-    # Always given as a Unix file spec.  Values in the hash are
-    # meaningless, but we preserve if present.
+    # Always given as a Unix file spec.
     return [ map $self->localize_file_path($_), @$files ];
     
   } else {
@@ -1418,13 +1445,14 @@ sub _find_file_by_type {
   return {} unless -d $dir;
   return { map {$_, $_}
 	   map $self->localize_file_path($_),
+	   grep !/\.\#/,
 	   @{ $self->rscan_dir($dir, qr{\.$type$}) } };
 }
 
 sub localize_file_path {
   my ($self, $path) = @_;
   return $path unless $path =~ m{/};
-  return File::Spec->catfile( split qr{/}, $path );
+  return File::Spec->catfile( split m{/}, $path );
 }
 
 sub fix_shebang_line { # Adapted from fixin() in ExtUtils::MM_Unix 1.35
@@ -1591,7 +1619,7 @@ sub _htmlify_pod {
   my ($self, %args) = @_;
   require Pod::Html;
 
-  $self->add_to_cleanup('pod2htmd.x~~', 'pod2htmi.x~~');
+  $self->add_to_cleanup('pod2htm*');
   
   my ($name, $path) = File::Basename::fileparse($args{rel_path}, qr{\..*});
   my @dirs = File::Spec->splitdir($path);
@@ -1630,7 +1658,7 @@ sub _htmlify_pod {
 	      "--outfile=$outfile",
 	      "--podroot=$blib",
 	      "--htmlroot=$htmlroot",
-	      Pod::Html->VERSION >= 1.03 ? ('--header', "--backlink=$args{backlink}") : (),
+	      eval {Pod::Html->VERSION(1.03); 1} ? ('--header', "--backlink=$args{backlink}") : (),
 	     );
   push @opts, "--css=$path2root/$args{css}" if $args{css};
     
@@ -1670,6 +1698,10 @@ sub ACTION_diff {
   $self->depends_on('build');
   my $local_lib = File::Spec->rel2abs('lib');
   my @myINC = grep {$_ ne $local_lib} @INC;
+
+  # The actual install destination might not be in @INC, so check there too.
+  push @myINC, map $self->install_destination($_), qw(lib arch);
+
   my @flags = @{$self->{args}{ARGV}};
   @flags = $self->split_like_shell($self->{args}{flags} || '') unless @flags;
   
@@ -1735,7 +1767,7 @@ sub ACTION_versioninstall {
 
 sub ACTION_clean {
   my ($self) = @_;
-  foreach my $item ($self->cleanup) {
+  foreach my $item (map glob($_), $self->cleanup) {
     $self->delete_filetree($item);
   }
 }
@@ -1784,6 +1816,10 @@ sub ACTION_distcheck {
 sub _add_to_manifest {
   my ($self, $manifest, $lines) = @_;
   $lines = [$lines] unless ref $lines;
+
+  my $existing_files = $self->_read_manifest($manifest);
+  @$lines = grep {!exists $existing_files->{$_}} @$lines
+    or return;
 
   my $mode = (stat $manifest)[2];
   chmod($mode | 0222, $manifest) or die "Can't make $manifest writable: $!";
@@ -1871,7 +1907,8 @@ sub ACTION_distdir {
   $self->do_create_makefile_pl if $self->create_makefile_pl;
   $self->do_create_readme if $self->create_readme;
   
-  my $dist_files = $self->_read_manifest('MANIFEST');
+  my $dist_files = $self->_read_manifest('MANIFEST')
+    or die "Can't create distdir without a MANIFEST file - run 'manifest' action first";
   delete $dist_files->{SIGNATURE};  # Don't copy, create a fresh one
   die "No files found in MANIFEST - try running 'manifest' action?\n"
     unless ($dist_files and keys %$dist_files);
@@ -1936,6 +1973,7 @@ sub _write_default_maniskip {
 
 # Avoid temp and backup files.
 ~$
+\.tmp$
 \.old$
 \.bak$
 \#$
@@ -1948,9 +1986,6 @@ EOF
 sub ACTION_manifest {
   my ($self) = @_;
 
-  my $metafile = $self->{metafile} || 'META.yml';
-  $self->depends_on('distmeta') unless -e $metafile;
-
   my $maniskip = 'MANIFEST.SKIP';
   unless ( -e 'MANIFEST' || -e $maniskip ) {
     warn "File '$maniskip' does not exist: Creating a default '$maniskip'\n";
@@ -1960,6 +1995,8 @@ sub ACTION_manifest {
   require ExtUtils::Manifest;  # ExtUtils::Manifest is not warnings clean.
   local ($^W, $ExtUtils::Manifest::Quiet) = (0,1);
   ExtUtils::Manifest::mkmanifest();
+
+  $self->_add_to_manifest('MANIFEST', $self->{metafile} || 'META.yml');
 }
 
 sub dist_dir {
@@ -2007,7 +2044,7 @@ author:
 @{[ join "\n", map "  - $_", @{$self->dist_author} ]}
 abstract: @{[ $self->dist_abstract ]}
 license: $p->{license}
-generated_by: Module::Build version @{[ Module::Build->VERSION ]}, without YAML.pm
+generated_by: Module::Build version $Module::Build::VERSION, without YAML.pm
 END_OF_META
 
   $fh->close();
@@ -2061,7 +2098,7 @@ EOM
   $node->{dynamic_config} = $p->{dynamic_config} if exists $p->{dynamic_config};
   $node->{provides} = $self->find_dist_packages;
 
-  $node->{generated_by} = "Module::Build version " . Module::Build->VERSION;
+  $node->{generated_by} = "Module::Build version $Module::Build::VERSION";
   
   # YAML API changed after version 0.30
   my $yaml_sub = $YAML::VERSION le '0.30' ? \&YAML::StoreFile : \&YAML::DumpFile;
@@ -2084,10 +2121,13 @@ sub find_dist_packages {
   # Only include things in the MANIFEST, not things in developer's
   # private stock.
 
+  my $manifest = $self->_read_manifest('MANIFEST')
+    or die "Can't find dist packages without a MANIFEST file - run 'manifest' action first";
+
   # Localize
   my %dist_files = (map
 		    {$self->localize_file_path($_) => $_}
-		    keys %{ $self->_read_manifest('MANIFEST') });
+		    keys %$manifest);
 
   my @pm_files = grep {exists $dist_files{$_}} keys %{ $self->find_pm_files };
   

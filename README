@@ -486,16 +486,45 @@ METHODS
             first line matching "$package\s-\s(.+)", and uses the captured
             text as the abstract.
 
+        auto_features
+            This parameter supports the setting of features (see
+            feature($name)) automatically based on a set of prerequisites.
+            For instance, for a module that could optionally use either
+            MySQL or PostgreSQL databases, you might use "auto_features"
+            like this:
+
+              my $b = Module::Build->new
+                (
+                 ... other stuff here...
+                 auto_features =>
+                   {
+                    pg_support =>
+                    {
+                       description => "Interface with Postgres databases",
+                       requires => q{ DBD::Pg >= 23.3 && DateTime::Format::Pg },
+                    },
+                    mysql_support =>
+                    {
+                       description => "Interface with MySQL databases",
+                       requires => q{ DBD::mysql >= 17.9 && DateTime::Format::Pg },
+                    },
+                 );
+
+            For each feature named, the prerequisite options will be
+            checked, and if there are no failures, the feature will be
+            enabled (set to 1). Otherwise the failures will be displayed to
+            the user and the feature will be disabled (set to 0).
+
         get_options
-            You can pass arbitrary options to Build.PL or Build, and they
-            will be stored in the Module::Build object and can be accessed
-            via the "args()" method. However, sometimes you want more
-            flexibility out of your argument processing than this allows. In
-            such cases, use the "get_options" parameter to pass in a hash
-            reference of argument specifications, and the list of arguments
-            to Build.PL or Build will be processed according to those
-            specifications before they're passed on to "Module::Build"'s own
-            argument processing.
+            You can pass arbitrary command-line options to Build.PL or
+            Build, and they will be stored in the Module::Build object and
+            can be accessed via the "args()" method. However, sometimes you
+            want more flexibility out of your argument processing than this
+            allows. In such cases, use the "get_options" parameter to pass
+            in a hash reference of argument specifications, and the list of
+            arguments to Build.PL or Build will be processed according to
+            those specifications before they're passed on to
+            "Module::Build"'s own argument processing.
 
             The supported option specification hash keys are:
 
@@ -503,7 +532,10 @@ METHODS
                 The type of option. The types are those supported by
                 Getopt::Long; consult its documentation for a complete list.
                 Typical types are "=s" for strings, "+" for additive
-                options, and "!" for negatable options.
+                options, and "!" for negatable options. If the type is not
+                specified, it will be considered a boolean, i.e. no argument
+                is taken and a value of 1 will be assigned when the option
+                is encountered.
 
             store
                 A reference to a scalar in which to store the value passed
@@ -580,12 +612,20 @@ METHODS
         when the "realclean" action is performed.
 
     add_to_cleanup(@files)
-        You may call "$self->add_to_cleanup(@files)" to tell "Module::Build"
-        that certain files should be removed when the user performs the
-        "Build clean" action. I decided to provide a dynamic method, rather
-        than just use a static list of files, because these static lists can
-        get difficult to manage. I usually prefer to keep the responsibility
-        for registering temporary files close to the code that creates them.
+        You may call "$self->add_to_cleanup(@patterns)" to tell
+        "Module::Build" that certain files should be removed when the user
+        performs the "Build clean" action. The arguments to the method are
+        patterns suitable for passing to Perl's "glob()" function, specified
+        in either Unix format or the current machine's native format. It's
+        usually convenient to use Unix format when you hard-code the
+        filenames (e.g. in Build.PL) and the native format when the names
+        are programmatically generated (e.g. in a testing script).
+
+        I decided to provide a dynamic method of the $build object, rather
+        than just use a static list of files named in the Build.PL, because
+        these static lists can get difficult to manage. I usually prefer to
+        keep the responsibility for registering temporary files close to the
+        code that creates them.
 
     resume()
         You'll probably never call this method directly, it's only called
@@ -1435,7 +1475,11 @@ SUBCLASSING
       use lib qw(/nonstandard/library/path);
       use My::Builder;  # Or whatever you want to call it
   
-      my $m = My::Builder->new(module_name => 'Next::Big::Thing');
+      my $m = My::Builder->new
+        (module_name=> 'Next::Big::Thing',  # All the regular args...
+         license=> 'perl',
+         dist_author=> 'A N Other <me@here.net.au>',
+         requires=> {Carp => 0});
       $m->create_build_script;
 
     This is relatively straightforward, and is the best way to do things if
@@ -1463,7 +1507,11 @@ SUBCLASSING
          },
         );
   
-      my $m = $class->new(module_name => 'Module::Build');
+      my $m = $class->new
+        (module_name=> 'Next::Big::Thing',  # All the regular args...
+         license=> 'perl',
+         dist_author=> 'A N Other <me@here.net.au>',
+         requires=> {Carp => 0});
       $m->create_build_script;
 
     Behind the scenes, this actually does create a ".pm" file, since the

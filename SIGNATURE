@@ -14,23 +14,23 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 3121208636c4eaec8e2527e0a660e1620bc4f26a Build.PL
-SHA1 91768fde6651d1159066e654e873d18adcc164b9 Changes
+SHA1 796795f92e93ccbc3f1a07f1e1ad4e73a05f3295 Build.PL
+SHA1 e518535814df24c39b99fd754d49de171951e422 Changes
 SHA1 7ffbdcf27feba9f2ea5e3800f378835b0c3154a2 INSTALL
-SHA1 93fdd445dac6ec86232e0ce0975e3b41bef66ac7 MANIFEST
-SHA1 98b507eeda0b34480124765021cbe535ff8ec4bb META.yml
+SHA1 5ecfb1222977fb8ba90f6b421ea0cabc92a7c7f7 MANIFEST
+SHA1 f06e14d94c702e2d032513a0c1e436f518fadfb5 META.yml
 SHA1 709de66c0beb8832da066b9f865d8693db5eb504 Makefile.PL
-SHA1 28aea25873fcab04c84f74c0d559acc93b4018b1 README
-SHA1 10a011802848731f35a246852edada2aaa3b592f lib/Module/Build.pm
-SHA1 01d6f7b806f9d1ae539f91488271b4887eaa839a lib/Module/Build/Base.pm
-SHA1 cc2fbf3e850bab00992990dcea8c37b0dd27c79e lib/Module/Build/Compat.pm
+SHA1 46cc831f5ba2e53cbd892e7c9cb5e77faa7ed281 README
+SHA1 5493bdd558901279dd2d3c10a25d5727069fabb4 lib/Module/Build.pm
+SHA1 e971fa29075005750c6112892893f57228f1a3a1 lib/Module/Build/Base.pm
+SHA1 55f1e27c6b82f31b510d1271647fa84a5fc78b3e lib/Module/Build/Compat.pm
 SHA1 2381b172fa9d56f74cb1df4d0bcaf129e4e9cefd lib/Module/Build/Cookbook.pm
 SHA1 e2a65156b998f3c778140eb0dbd0d6d06861eb2c lib/Module/Build/PPMMaker.pm
 SHA1 1fe1ca7ad1f147c90cfa1b7bafde1a4517994d78 lib/Module/Build/Platform/Amiga.pm
 SHA1 1413589413096217b3e0d6dd1993f82a1f95216c lib/Module/Build/Platform/Default.pm
 SHA1 e62cd8b2c99ccc4d615fb9343910b25c2ec1b74c lib/Module/Build/Platform/EBCDIC.pm
 SHA1 2a7723e3030e25f3862865722f1c4822e08e00c1 lib/Module/Build/Platform/MPEiX.pm
-SHA1 b29f474409d67edf65b37a40f880e1c7ccf96163 lib/Module/Build/Platform/MacOS.pm
+SHA1 c5ac437b03654d01c83dd8adbedf03b521502aa7 lib/Module/Build/Platform/MacOS.pm
 SHA1 8f70f897d4f6fe8e3a826e2109a2e7f551a07933 lib/Module/Build/Platform/RiscOS.pm
 SHA1 441cfc4b3a9ff6093ce7a356d4f20ace06a7435b lib/Module/Build/Platform/Unix.pm
 SHA1 6d61a37998276e77fbe00c52d1e23cb6cbb8738e lib/Module/Build/Platform/VMS.pm
@@ -44,7 +44,7 @@ SHA1 d96829791ad1b6a4ef961290b2516f70b6ff42ab lib/Module/Build/PodParser.pm
 SHA1 da39a3ee5e6b4b0d3255bfef95601890afd80709 t/MANIFEST
 SHA1 e4a8fef58cb2ae43255ec6c5770b65af9904d29a t/Sample/Build.PL
 SHA1 62c8cb035cdc7856bb22c17ebabe5dee996741f8 t/Sample/MANIFEST
-SHA1 7782953f4569d2392a93307ff5a75c754b6f576f t/Sample/META.yml
+SHA1 29ddb44bafe5613fe150d58d4e388da526741f5b t/Sample/META.yml
 SHA1 3312164e04d55d9673543d4fa5ed5762568a88ab t/Sample/bin/sample.pl
 SHA1 db0fe43e93fc01be595fd3205ef00d724fbbf7e1 t/Sample/lib/Sample.pm
 SHA1 5214d81ceb135e0733bd4debd6b0c02c4e4842c6 t/Sample/lib/Sample/Docs.pod
@@ -61,7 +61,7 @@ SHA1 98e43d9dee0f872f6f042b96c97b0b07bafc380e t/XSTest/lib/XSTest.pm
 SHA1 5b17992beebce3b487042e0b451f33bf531dab87 t/XSTest/lib/XSTest.xs
 SHA1 37ca8c729834b94e8393c402044239a4082ff0fa t/XSTest/test.pl
 SHA1 8307d531aac20cff32869245f0d642ea08e02286 t/basic.t
-SHA1 ce37334f5a0ac19ffc9cbf7ad1eddc58dd541d25 t/common.pl
+SHA1 1048f5619cbf61882705b152626edc902bf3a679 t/common.pl
 SHA1 59fe17c5343d62cdf67dd8afad1dd59678611fe8 t/compat.t
 SHA1 10fdd5d033f04cd7226779312817d876145fd90a t/extend.t
 SHA1 7d024a7f641ff0d5dbeec5271348695d55a08f97 t/files.t
@@ -69,6 +69,7 @@ SHA1 af543db80cfea89a881964cd2120cb31f42e9079 t/install.t
 SHA1 75f5be100d04180c615b416d9b1e3db77ceef7cd t/lib/ModuleBuildOne.pm
 SHA1 6af002e0d9c1524be070b057c54cbb18edab22c5 t/manifypods.t
 SHA1 63df98ad5834ece0e11aa88a5d6220956c7bac15 t/notes.t
+SHA1 a45ff5ec3e96b84f2d327a09f5d2524d3230822e t/pod_parser.t
 SHA1 b7443fc5456e768fa8c110fc8a2704032fa0817e t/runthrough.t
 SHA1 ed9501549fc52aa2affc146b8e1afe3d225a85d8 t/signature.t
 SHA1 9450412529e8857c3cb68b7f36cb9ddde9c0b87f t/versions.t
@@ -76,7 +77,7 @@ SHA1 08a3d4730b676656e58b693e2838191aaec077a6 t/xs.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.2.2 (Darwin)
 
-iD8DBQFBA+UOgrvMBLfvlHYRAnH5AKCcRLSdRYyMa+roAFO5e2ePJe63SwCfSVh5
-fgHULhDbVl8Q8fT/rUUZMaA=
-=n3si
+iD8DBQFBO6bIgrvMBLfvlHYRAujCAJ9ewtNmz3Wkwkw8OFkkB7yhOyb28gCghEqC
+GU/zUUw2wkUi7dJ+nB0tlfc=
+=D9o1
 -----END PGP SIGNATURE-----
