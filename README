@@ -879,7 +879,7 @@ METHODS
         "process_foo_files()".
 
         See also "Adding new elements to the build process" in
-        Module::Build::Compat.
+        Module::Build::Cookbook.
 
     copy_if_modified(%parameters)
         Takes the file in the "from" parameter and copies it to the file in

@@ -1,6 +1,16 @@
 Revision history for Perl extension Module::Build.
 
-0.2604  Wed Nov 17 14:32:42 CST 2004
+0.2605 (Bug fix for 0.26)   Tue Nov 30 07:16:13 CST 2004
+
+ - Fixed a bug in which zero-length arguments for hash-valued
+   parameters (e.g. " --config foo= ") weren't being allowed.
+
+ - The tests now play better with environments in which version.pm is
+   pre-loaded, like in bleadperl. [John Peacock & Michael Schwern]
+
+ - Fixed a syntax error in one of the tests under perl 5.005.
+
+0.2604 (Bug fix for 0.26)   Wed Nov 17 14:32:42 CST 2004
 
  - Fixed a split_like_shell() bug introduced in 0.2603 for Windows, in
    which an array reference passed as an argument was returned as an
@@ -40,7 +50,7 @@ Revision history for Perl extension Module::Build.
    creating an empty word, manifesting as something like "gcc - no
    such file or directory" during tests. [Spotted by Warren L. Dodge]
 
-0.26 Sat Oct  9 17:51:01 CDT 2004
+0.26  Sat Oct  9 17:51:01 CDT 2004
 
  - Removed some language from the Module::Build::Compat documentation
    that encouraged people to include a Build.PL without a Makefile.PL.

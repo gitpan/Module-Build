@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: Module-Build
-version: 0.2604
+version: 0.2605
 author:
   - Ken Williams, kwilliams@cpan.org
   - |-
@@ -34,7 +34,7 @@ build_requires:
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: 0.2604
+    version: 0.2605
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
   Module::Build::Compat:
@@ -82,4 +82,4 @@ provides:
     file: lib/Module/Build/PodParser.pm
   Module::Build::PodTester:
     file: lib/Module/Build/Base.pm
-generated_by: Module::Build version 0.2604
+generated_by: Module::Build version 0.2605
