@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: Module-Build
-version: 0.18_03
+version: 0.18_04
 license: perl
 distribution_type: module
 requires:
@@ -17,7 +17,7 @@ requires:
   IO::File: 0
   perl: 5.005_03
 recommends:
-  Archive::Tar: 0.23
+  Archive::Tar: 1.00
   ExtUtils::Install: 0.3
   ExtUtils::ParseXS: 2.02
   Module::Info: 0
@@ -28,7 +28,7 @@ conflicts: {}
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: 0.18_03
+    version: 0.18_04
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
     version: ~
@@ -80,4 +80,4 @@ provides:
   Module::Build::Platform::darwin:
     file: lib/Module/Build/Platform/darwin.pm
     version: ~
-generated_by: Module::Build version 0.18_03
+generated_by: Module::Build version 0.18_04
