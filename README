@@ -592,6 +592,13 @@ METHODS
             }
           }
 
+    requires()
+    build_requires()
+    recommends()
+    conflicts()
+        Each of these methods returns a hash reference indicating the
+        prerequisites that were passed to the "new()" method.
+
     check_installed_status($module, $version)
         This method returns a hash reference indicating whether a version
         dependency on a certain module is satisfied. The "$module" argument
@@ -717,12 +724,27 @@ METHODS
         arguments, no shell will get involved and the command will be
         executed directly.
 
+    have_c_compiler()
+        Returns true if the current system seems to have a working C
+        compiler. We currently determine this by attempting to compile a
+        simple C source file and reporting whether the attempt was
+        successful.
+
     base_dir()
         Returns a string containing the root-level directory of this build,
         i.e. where the "Build.PL" script and the "lib" directory can be
         found. This is usually the same as the current working directory,
         because the "Build" script will "chdir()" into this directory as
         soon as it begins execution.
+
+    dist_name()
+        Returns the name of the current distribution, as passed to the
+        "new()" method in a "dist_name" or modified "module_name" parameter.
+
+    dist_version()
+        Returns the version of the current distribution, as determined by
+        the "new()" method from a "dist_version", "dist_version_from", or
+        "module_name" parameter.
 
     up_to_date($source_file, $derived_file)
     up_to_date(\@source_files, \@derived_files)
@@ -783,14 +805,18 @@ ACTIONS
 
     build
         If you run the "Build" script without any arguments, it runs the
-        "build" action.
+        "build" action, which in turn runs the "code" and "docs" actions.
 
-        This is analogous to the MakeMaker 'make all' target. By default it
-        just creates a "blib/" directory and copies any ".pm" and ".pod"
-        files from your "lib/" directory into the "blib/" directory. It also
-        compiles any ".xs" files from "lib/" and places them in "blib/". Of
-        course, you need a working C compiler (probably the same one that
-        built perl itself) for this to work properly.
+        This is analogous to the MakeMaker 'make all' target.
+
+    code
+        This action builds your codebase.
+
+        By default it just creates a "blib/" directory and copies any ".pm"
+        and ".pod" files from your "lib/" directory into the "blib/"
+        directory. It also compiles any ".xs" files from "lib/" and places
+        them in "blib/". Of course, you need a working C compiler (probably
+        the same one that built perl itself) for this to work properly.
 
         The "build" action also runs any ".PL" files in your lib/ directory.
         Typically these create other files, named the same but without the
@@ -816,6 +842,13 @@ ACTIONS
 
         The ".xs" support is currently in alpha. Please let me know whether
         it works for you.
+
+    docs
+        This will generate documentation (ie: Unix man pages) for any binary
+        and library files under blib/ that contain POD. If there are no
+        "bindoc" or "libdoc" installation targets defined (as will be the
+        case on systems that don't support Unix manpages) this action does
+        nothing.
 
     test
         This will use "Test::Harness" to run any regression tests and report

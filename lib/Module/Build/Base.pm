@@ -95,6 +95,7 @@ sub _construct {
 				   conflicts       => {},
 				   perl            => $perl,
 				   mb_version      => Module::Build->VERSION,
+				   build_elements  => [qw( PL support pm xs pod script )],
 				   install_types   => [qw( lib arch script bindoc libdoc )],
 				   installdirs     => 'site',
 				   include_dirs    => [],
@@ -252,6 +253,7 @@ sub notes {
        config_dir
        blib
        build_script
+       build_elements
        install_types
        install_sets
        install_path
@@ -395,6 +397,7 @@ sub dist_abstract {
     last if ($result) = /^(?:$package\s-\s)(.*)/;
   }
   
+  $result =~ s/\s+$//;
   return $p->{dist_abstract} = $result;
 }
 
@@ -555,7 +558,7 @@ sub write_config {
   $self->_write_dumper('prereqs', { map { $_, $self->$_() } @items });
   $self->_write_dumper('build_params', [$self->{args}, $self->{config}, $self->{properties}]);
 
-  $self->_persistent_hash_write('cleanup');
+  $self->_persistent_hash_write($_) foreach qw(notes cleanup);
 }
 
 sub requires       { shift()->{properties}{requires} }
@@ -719,6 +722,8 @@ sub make_executable {
   }
 }
 
+sub _startperl { shift()->{config}{startperl} }
+
 sub print_build_script {
   my ($self, $fh) = @_;
   
@@ -733,9 +738,12 @@ sub print_build_script {
   }
 
   my $quoted_INC = join ",\n", map "     '$_'", @myINC;
+  my $shebang = $self->_startperl;
 
   print $fh <<EOF;
-$self->{config}{startperl}
+$shebang
+
+use strict;
 
 BEGIN {
   \$^W = 1;  # Use warnings
@@ -749,8 +757,12 @@ $quoted_INC
 
 use $build_package;
 
+if (-e 'Build.PL' and not $build_package->up_to_date("Build.PL", \$0)) {
+   warn "Warning: Build.PL has been altered.  You may need to run 'perl Build.PL' again.\n";
+}
+
 # This should have just enough arguments to be able to bootstrap the rest.
-my \$build = resume $build_package (
+my \$build = $build_package->resume (
   properties => {
     config_dir => '$q{config_dir}',
   },
@@ -782,6 +794,8 @@ sub create_build_script {
 }
 
 sub check_manifest {
+  return unless -e 'MANIFEST';
+  
   # Stolen nearly verbatim from MakeMaker.  But ExtUtils::Manifest
   # could easily be re-written into a modern Perl dialect.
 
@@ -821,7 +835,7 @@ sub _call_action {
   return if $self->{_completed_actions}{$action}++;
   local $self->{action} = $action;
   my $method = "ACTION_$action";
-  die "No action '$action' defined" unless $self->can($method);
+  die "No action '$action' defined, try running the 'help' action.\n" unless $self->can($method);
   return $self->$method();
 }
 
@@ -864,7 +878,7 @@ sub cull_args {
     $args{$_} = [ $args{$_} ] unless ref $args{$_};
     foreach my $arg ( @{$args{$_}} ) {
       $arg =~ /(\w+)=(.+)/
-	or die "Malformed '$_' argument: '$arg'";
+	or die "Malformed '$_' argument: '$arg' should be something like 'foo=bar'";
       $hash{$1} = $2;
     }
     $args{$_} = \%hash;
@@ -993,10 +1007,11 @@ sub ACTION_test {
   $self->depends_on('code');
   
   # Do everything in our power to work with all versions of Test::Harness
-  local ($Test::Harness::switches,
-	 $Test::Harness::Switches,
-         $ENV{HARNESS_PERL_SWITCHES}) = ($p->{debugger} ? '-w -d' : '') x 3;
-
+  my $harness_switches = $p->{debugger} ? ' -w -d' : '';
+  local $Test::Harness::switches    = ($Test::Harness::switches    || '') . $harness_switches;
+  local $Test::Harness::Switches    = ($Test::Harness::Switches    || '') . $harness_switches;
+  local $ENV{HARNESS_PERL_SWITCHES} = ($ENV{HARNESS_PERL_SWITCHES} || '') . $harness_switches;
+  
   local ($Test::Harness::verbose,
 	 $Test::Harness::Verbose,
 	 $ENV{TEST_VERBOSE},
@@ -1065,18 +1080,12 @@ sub ACTION_code {
   $self->add_to_cleanup($blib);
   File::Path::mkpath( File::Spec->catdir($blib, 'arch') );
   
-  if ($self->{properties}{autosplit}) {
-    $self->autosplit_file($self->{properties}{autosplit}, $blib);
+  $self->autosplit_file($self->autosplit, $blib) if $self->autosplit;
+  
+  foreach my $element (@{$self->build_elements}) {
+    my $method = "process_${element}_files";
+    $self->$method();
   }
-  
-  $self->process_PL_files;
-  
-  $self->compile_support_files;
-  
-  $self->process_pm_files;
-  $self->process_xs_files;
-  $self->process_pod_files;
-  $self->process_script_files;
 }
 
 sub ACTION_build {
@@ -1085,7 +1094,7 @@ sub ACTION_build {
   $self->depends_on('docs');
 }
 
-sub compile_support_files {
+sub process_support_files {
   my $self = shift;
   my $p = $self->{properties};
   return unless $p->{c_source};
@@ -1104,7 +1113,7 @@ sub process_PL_files {
   
   while (my ($file, $to) = each %$files) {
     unless ($self->up_to_date( $file, $to )) {
-      $self->run_perl_script($file);
+      $self->run_perl_script($file, [], [@$to]);
       $self->add_to_cleanup(@$to);
     }
   }
@@ -1159,7 +1168,7 @@ sub find_PL_files {
     # 'PL_files' is given as a Unix file spec, so we localize_file_path().
     
     if (UNIVERSAL::isa($files, 'ARRAY')) {
-      return { map {$_, /^(.*)\.PL$/}
+      return { map {$_, [/^(.*)\.PL$/]}
 	       map $self->localize_file_path($_),
 	       @$files };
 
@@ -1177,12 +1186,12 @@ sub find_PL_files {
   }
   
   return unless -d 'lib';
-  return { map {$_, /^(.*)\.PL$/} @{ $self->rscan_dir('lib', qr{\.PL$}) } };
+  return { map {$_, [/^(.*)\.PL$/]} @{ $self->rscan_dir('lib', qr{\.PL$}) } };
 }
 
-sub find_pm_files { shift->_find_file_by_type('pm') }
-sub find_pod_files { shift->_find_file_by_type('pod') }
-sub find_xs_files { shift->_find_file_by_type('xs') }
+sub find_pm_files  { shift->_find_file_by_type('pm',  'lib') }
+sub find_pod_files { shift->_find_file_by_type('pod', 'lib') }
+sub find_xs_files  { shift->_find_file_by_type('xs',  'lib') }
 
 sub find_script_files {
   my $self = shift;
@@ -1199,14 +1208,15 @@ sub find_script_files {
 }
 
 sub _find_file_by_type {
-  my ($self, $type) = @_;
+  my ($self, $type, $dir) = @_;
+  
   if (my $files = $self->{properties}{"${type}_files"}) {
     # Always given as a Unix file spec
     return { map $self->localize_file_path($_), %$files };
   }
   
-  return unless -d 'lib';
-  return { map {$_, $_} @{ $self->rscan_dir('lib', qr{\.$type$}) } };
+  return {} unless -d $dir;
+  return { map {$_, $_} @{ $self->rscan_dir($dir, qr{\.$type$}) } };
 }
 
 sub localize_file_path {
@@ -1299,8 +1309,8 @@ sub manify_lib_pods {
   my $mandir = File::Spec->catdir( $self->blib, 'libdoc' );
   File::Path::mkpath( $mandir, 0, 0777 );
 
-  foreach my $file (keys %$files) {
-    my $manpage = $self->man3page_name( $file ) . '.' . $self->{config}{man3ext};
+  while (my ($file, $relfile) = each %$files) {
+    my $manpage = $self->man3page_name( $relfile ) . '.' . $self->{config}{man3ext};
     my $outfile = File::Spec->catfile( $mandir, $manpage);
     next if $self->up_to_date( $file, $outfile );
     print "Manifying $file -> $outfile\n";
@@ -1315,7 +1325,7 @@ sub _find_pods {
   foreach my $spec (@$dirs) {
     my $dir = $self->localize_file_path($spec);
     next unless -e $dir;
-    do { $files{$_} = $_ if $self->contains_pod( $_ ) }
+    do { $files{$_} = File::Spec->abs2rel($_, $dir) if $self->contains_pod( $_ ) }
       for @{ $self->rscan_dir( $dir ) };
   }
   return \%files;
@@ -1345,17 +1355,13 @@ sub man1page_name {
 #    -spurkis
 sub man3page_name {
   my $self = shift;
-  my $file = File::Spec->canonpath( shift ); # clean up file path
-  my @dirs = File::Spec->splitdir( $file );
-
-  # more clean up - assume all man3 pods are under 'blib/lib' or 'blib/arch'
-  # to avoid the complexity found in Pod::Man::begin_pod()
-  shift @dirs while ($dirs[0] =~ /^(?:blib|lib|arch)$/i);
-
-  # remove known exts from the base name
-  $dirs[-1] =~ s/\.p(?:od|m|l)\z//i;
-
-  return join( $self->manpage_separator, @dirs );
+  my ($vol, $dirs, $file) = File::Spec->splitpath( shift );
+  my @dirs = File::Spec->splitdir( File::Spec->canonpath($dirs) );
+  
+  # Remove known exts from the base name
+  $file =~ s/\.p(?:od|m|l)\z//i;
+  
+  return join( $self->manpage_separator, @dirs, $file );
 }
 
 sub manpage_separator {
@@ -1373,6 +1379,7 @@ sub ACTION_diff {
   
   my $installmap = $self->install_map;
   delete $installmap->{read};
+  delete $installmap->{write};
 
   my $text_suffix = qr{\.(pm|pod)$};
 
@@ -1394,10 +1401,10 @@ sub ACTION_diff {
       next if $status == 0;  # Files are the same
       die "Can't compare $installed and $file: $!" if $status == -1;
       
-      if ($file !~ /$text_suffix/) {
-	print "Binary files $file and $installed differ\n";
-      } else {
+      if ($file =~ $text_suffix) {
 	$self->do_system('diff', @flags, $installed, $file);
+      } else {
+	print "Binary files $file and $installed differ\n";
       }
     }
   }
@@ -1633,11 +1640,7 @@ sub ACTION_distmeta {
     $node->{$_} = $p->{$_} if exists $p->{$_};
   }
   
-  $node->{provides} = $self->find_dist_packages
-    or do {
-      warn "Module::Info was not available, no 'provides' will be created in $self->{metafile}";
-      delete $node->{provides};
-    };
+  $node->{provides} = $self->find_dist_packages;
 
   $node->{generated_by} = "Module::Build version " . Module::Build->VERSION;
   
@@ -1798,6 +1801,19 @@ sub autosplit_file {
   require AutoSplit;
   my $dir = File::Spec->catdir($to, 'lib', 'auto');
   AutoSplit::autosplit($file, $dir);
+}
+
+sub have_c_compiler {
+  my ($self) = @_;
+  return $self->{properties}{have_compiler} if defined $self->{properties}{have_compiler};
+  
+  my $tmpfile = $self->config_file('compilet.c');
+  {
+    my $fh = IO::File->new("> $tmpfile") or die "Can't create $tmpfile: $!";
+    print $fh "int main() { return 0; }\n";
+  }
+
+  return $self->{properties}{have_compiler} = 0 + eval { $self->compile_c($tmpfile); 1 };
 }
 
 sub compile_c {
@@ -2023,13 +2039,13 @@ Module::Build::Base - Default methods for Module::Build
 
 =head1 SYNOPSIS
 
-  please see the Module::Build documentation
+  Please see the Module::Build documentation.
 
 =head1 DESCRIPTION
 
 The C<Module::Build::Base> module defines the core functionality of
 C<Module::Build>.  Its methods may be overridden by any of the
-platform-independent modules in the C<Module::Build::Platform::>
+platform-dependent modules in the C<Module::Build::Platform::>
 namespace, but the intention here is to make this base module as
 platform-neutral as possible.  Nicely enough, Perl has several core
 tools available in the C<File::> namespace for doing this, so the task

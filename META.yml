@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: Module-Build
-version: 0.20_02
+version: 0.21
 license: perl
 distribution_type: module
 requires:
@@ -20,6 +20,7 @@ recommends:
   Archive::Tar: 1.00
   ExtUtils::Install: 0.3
   ExtUtils::ParseXS: 2.02
+  Pod::Text: 0
   YAML: 0.35
 build_requires:
   Test: 0
@@ -27,7 +28,7 @@ conflicts: {}
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: 0.20_02
+    version: 0.21
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
   Module::Build::Compat:
@@ -63,6 +64,8 @@ provides:
     file: lib/Module/Build/Platform/Windows.pm
   Module::Build::Platform::Windows::MSVC:
     file: lib/Module/Build/Platform/Windows.pm
+  Module::Build::Platform::cygwin:
+    file: lib/Module/Build/Platform/cygwin.pm
   Module::Build::Platform::darwin:
     file: lib/Module/Build/Platform/darwin.pm
-generated_by: Module::Build version 0.20_02
+generated_by: Module::Build version 0.21

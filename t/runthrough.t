@@ -1,7 +1,7 @@
 use strict;
 
 use Test; 
-BEGIN { plan tests => 25 }
+BEGIN { plan tests => 27 }
 use Module::Build;
 use File::Spec;
 use File::Path;
@@ -49,6 +49,9 @@ my $output = eval {
 ok $@, '';
 ok $output, qr/all tests successful/i;
 
+# This is the output of lib/Sample/Script.PL
+ok -e $build->localize_file_path('lib/Sample/Script');
+
 
 # We prefix all lines with "| " so Test::Harness doesn't get confused.
 print "vvvvvvvvvvvvvvvvvvvvv Sample/test.pl output vvvvvvvvvvvvvvvvvvvvv\n";
@@ -56,7 +59,7 @@ $output =~ s/^/| /mg;
 print $output;
 print "^^^^^^^^^^^^^^^^^^^^^ Sample/test.pl output ^^^^^^^^^^^^^^^^^^^^^\n";
 
-if ($build->check_installed_status('YAML', 0)) {
+if ($build->check_installed_version('YAML', 0)) {
   eval {$build->dispatch('disttest')};
   ok $@, '';
   
@@ -80,6 +83,16 @@ if ($build->check_installed_status('YAML', 0)) {
   
 } else {
   skip "skip YAML.pm is not installed", 1 for 1..6;
+}
+
+if ($build->check_installed_status('Archive::Tar', 0)
+    or $build->isa('Module::Build::Platform::Unix')) {
+  $build->add_to_cleanup($build->dist_dir . ".tar.gz");
+  eval {$build->dispatch('dist')};
+  ok $@, '';
+  
+} else {
+  skip "skip not sure if we can create a tarball on this platform", 1;
 }
 
 {

@@ -12,7 +12,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.20_02';
+$VERSION = '0.21';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -721,6 +721,17 @@ Examples:
     }
   }
 
+=item requires()
+
+=item build_requires()
+
+=item recommends()
+
+=item conflicts()
+
+Each of these methods returns a hash reference indicating the
+prerequisites that were passed to the C<new()> method.
+
 =item check_installed_status($module, $version)
 
 This method returns a hash reference indicating whether a version
@@ -853,6 +864,12 @@ characters will do their special things.  If you supply multiple
 arguments, no shell will get involved and the command will be executed
 directly.
 
+=item have_c_compiler()
+
+Returns true if the current system seems to have a working C compiler.
+We currently determine this by attempting to compile a simple C source
+file and reporting whether the attempt was successful.
+
 =item base_dir()
 
 Returns a string containing the root-level directory of this build,
@@ -860,6 +877,18 @@ i.e. where the C<Build.PL> script and the C<lib> directory can be
 found.  This is usually the same as the current working directory,
 because the C<Build> script will C<chdir()> into this directory as
 soon as it begins execution.
+
+=item dist_name()
+
+Returns the name of the current distribution, as passed to the
+C<new()> method in a C<dist_name> or modified C<module_name>
+parameter.
+
+=item dist_version()
+
+Returns the version of the current distribution, as determined by the
+C<new()> method from a C<dist_version>, C<dist_version_from>, or
+C<module_name> parameter.
 
 =item up_to_date($source_file, $derived_file)
 
@@ -930,9 +959,14 @@ find for that action.
 =item build
 
 If you run the C<Build> script without any arguments, it runs the
-C<build> action.
+C<build> action, which in turn runs the C<code> and C<docs> actions.
 
 This is analogous to the MakeMaker 'make all' target.
+
+=item code
+
+This action builds your codebase.
+
 By default it just creates a C<blib/> directory and copies any C<.pm>
 and C<.pod> files from your C<lib/> directory into the C<blib/>
 directory.  It also compiles any C<.xs> files from C<lib/> and places
@@ -965,6 +999,13 @@ C<new()>.
 
 The C<.xs> support is currently in alpha.  Please let me know whether
 it works for you.
+
+=item docs
+
+This will generate documentation (ie: Unix man pages) for any binary and
+library files under B<blib/> that contain POD.  If there are no C<bindoc> or
+C<libdoc> installation targets defined (as will be the case on systems that
+don't support Unix manpages) this action does nothing.
 
 =item test
 

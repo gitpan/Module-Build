@@ -20,6 +20,7 @@ lib/Module/Build/Platform/Unix.pm
 lib/Module/Build/Platform/VMS.pm
 lib/Module/Build/Platform/VOS.pm
 lib/Module/Build/Platform/Windows.pm
+lib/Module/Build/Platform/cygwin.pm
 lib/Module/Build/Platform/darwin.pm
 t/MANIFEST
 t/Sample/Build.PL
@@ -29,6 +30,7 @@ t/Sample/bin/sample.pl
 t/Sample/lib/Sample.pm
 t/Sample/lib/Sample/Docs.pod
 t/Sample/lib/Sample/NoPod.pm
+t/Sample/lib/Sample/Script.PL
 t/Sample/script
 t/Sample/test.pl
 t/XSTest/Build.PL
