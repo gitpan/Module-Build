@@ -1,5 +1,29 @@
 Revision history for Perl extension Module::Build.
 
+0.2608  Wed Jan 26 19:46:09 CST 2005
+
+ - Add workaround for test files because Devel::Cover causes
+   require to fail when the argument to require is an expression
+   involving File::Spec. We now assign the result of the File::Spec
+   call to a variable and then call require with that variable.
+
+ - Tilde-expansion is now performed on arguments passed to a
+   compatibility-Makefile.PL [Spotted by Sam Vilain]
+
+ - We now run the 'gzip' and 'tar' values through split_like_shell()
+   when running the 'dist' action, so that e.g. the 'gzip' value can
+   be set to something like "gzip -f --best" and it'll work
+   correctly. [Spotted by Chris Dolan]
+
+ - Work around some bad mojo between Fedora Core [with its very long
+   @INC] and old versions of Test::Harness [with its propensity to
+   compound the number of @INC entries] that produced an "argument
+   list too long" error during testing.  [assisted by Ville Skytta,
+   David Golden, & Randy Sims]
+
+ - Killed an infinite loop that would happen in y_n() in interactive
+   mode if the author provided no default value. [Max Maischein]
+
 0.2607 (Bug fix release in 0.26 series)  Sat Dec 18 14:14:09 CST 2004
 
  - Instead of freezing @INC in the 'Build' script to the value it had
