@@ -1,6 +1,73 @@
 Revision history for Perl extension Module::Build.
 
-0.24
+0.24_01
+
+ - During the 'distdir' action, if no MANIFEST.SKIP file exists, we
+   will now create a reasonable default one. [Randy Sims]
+
+ - Added support for the 'LIB' parameter to passthrough
+   Makefile.PLs. [Spotted by Jesse Erlbaum]
+
+ - Passing a 'PREFIX' parameter to a passthrough Makefile.PL was
+   supposed to make it die with a helpful error message, but instead
+   it just ignored it and blindly tried to install to the wrong place.
+   This is now fixed.  [Spotted by Jesse Erlbaum]
+
+ - The regression tests now make sure that several pass-through
+   Makefile.PL parameters are dealt with correctly.
+
+ - Added an extra_compiler_flags() accessor method.
+
+ - If the 'recursive_test_files' option was turned on, the test files
+   weren't sorted, but returned in an apparently random order.  Now
+   they're sorted.  [Martyn Peck]
+
+ - Documented the 'tar' and 'gzip' parameters to the 'dist' and
+   'ppmdist' actions.
+
+ - The generation of HTML documentation now works (it was accidentally
+   partially implemented with an itchy patch-application finger in
+   0.24).  [Randy Kobes]
+
+ - Fixed some incorrect error messages that occurred when
+   compiling/linking C sources went awry.
+
+ - If the author uses a custom builder subclass, that subclass will
+   now be loaded in the passthrough Makefile.PL if the author uses the
+   'small' or 'passthrough' Makefile.PL options in
+   Module::Build::Compat. [Martyn Peck and Jaap Karssenberg]
+
+ - Fixed minor error in the POD structure of Module::Build and
+   Module::Build::Platform::VMS docs.
+
+ - The install_types() method will now return any additional types
+   given as 'install_path' arguments, as well as all elements of the
+   current 'install_sets' entry.  This makes it easier to add new
+   types of installable objects to the mix.
+
+ - As a consequence of the previous change, there is no longer any
+   need to have an explicit 'install_types' data member, so it has
+   been removed.
+
+ - If the author uses a custom builder subclass created dynamically
+   through the subclass() method, passthrough Makefile.PLs (of type
+   'passthrough' or 'small') didn't work properly, because the custom
+   builder module wouldn't be loaded at the right time.  This has been
+   fixed.  [Reported by Toby Ovod-Everett]
+
+ - Fixed a fatal bug when building META.yml with YAML.pm and
+   'dynamic_config' is set. [Reported by Jaap Karssenberg]
+
+ - In the second example code for the Module::Build->subclass()
+   method, the Module::Build module needed to be loaded before calling
+   its methods. [John Peacock]
+
+ - In Makefile compatibility mode, some arguments (like UNINST,
+   TEST_VERBOSE, etc.) given to 'make' are now recognized and passed
+   through to Module::Build. [Randy Sims]
+
+
+0.24  Wed Feb 25 15:57:00 CST 2004
 
  - Fixed a problem with incude_dirs not being propagated to the 'ccs'
    file when compiling XS files on Win32. [Randy Sims and Steve Hay]

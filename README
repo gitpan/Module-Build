@@ -29,8 +29,8 @@ DESCRIPTION
     perl 5.6.0, and it works fine on perl 5.005 if you can install a few
     additional modules.
 
-    See the MOTIVATIONS manpage for more comparisons between
-    "ExtUtils::MakeMaker" and "Module::Build".
+    See "MOTIVATIONS" for more comparisons between "ExtUtils::MakeMaker" and
+    "Module::Build".
 
     To install "Module::Build", and any other module that uses
     "Module::Build" for its installation process, do the following:
@@ -100,8 +100,8 @@ DESCRIPTION
     whatever".
 
     For information on providing backward compatibility with
-    "ExtUtils::MakeMaker", see the Module::Build::Compat manpage and
-    http://www.makemaker.org/wiki/index.cgi?ModuleBuildConversionGuide.
+    "ExtUtils::MakeMaker", see Module::Build::Compat and
+    <http://www.makemaker.org/wiki/index.cgi?ModuleBuildConversionGuide>.
 
 METHODS
     I list here some of the most important methods in "Module::Build".
@@ -141,7 +141,7 @@ METHODS
         dist_version
             Specifies a version number for the distribution. See
             "module_name" or "dist_version_from" for ways to have this set
-            automatically from a "$VERSION" variable in a module. One way or
+            automatically from a $VERSION variable in a module. One way or
             another, a version number needs to be set.
 
         dist_version_from
@@ -156,10 +156,10 @@ METHODS
 
                /([\$*])(([\w\:\']*)\bVERSION)\b.*\=/
 
-            , eval()-ing that line, then checking the value of the
-            "$VERSION" variable. Quite ugly, really, but all the modules on
-            CPAN depend on this process, so there's no real opportunity to
-            change to something better.
+            , eval()-ing that line, then checking the value of the $VERSION
+            variable. Quite ugly, really, but all the modules on CPAN depend
+            on this process, so there's no real opportunity to change to
+            something better.
 
         license
             Specifies the licensing terms of your distribution. Valid
@@ -231,10 +231,10 @@ METHODS
                           perl => '5.6.0'},
 
             These four version specifiers have different effects. The value
-            "'2.4'" means that at least version 2.4 of "Foo::Module" must be
-            installed. The value "0" means that any version of "Bar::Module"
+            '2.4' means that at least version 2.4 of "Foo::Module" must be
+            installed. The value 0 means that any version of "Bar::Module"
             is acceptable, even if "Bar::Module" doesn't define a version.
-            The more verbose value "'>= 1.2, != 1.5, < 2.0'" means that
+            The more verbose value '>= 1.2, != 1.5, < 2.0' means that
             "Ken::Module"'s version must be at least 1.2, less than 2.0, and
             not equal to 1.5. The list of criteria is separated by commas,
             and all criteria must be satisfied.
@@ -488,8 +488,8 @@ METHODS
 
     subclass()
         This creates a new "Module::Build" subclass on the fly, as described
-        in the the SUBCLASSING manpage section. The caller must provide
-        either a "class" or "code" parameter, or both. The "class" parameter
+        in the "SUBCLASSING" section. The caller must provide either a
+        "class" or "code" parameter, or both. The "class" parameter
         indicates the name to use for the new subclass, and defaults to
         "MyModuleBuilder". The "code" parameter specifies Perl code to use
         as the body of the subclass.
@@ -538,10 +538,10 @@ METHODS
          ...
 
         The way the "current()" method is currently implemented, there may
-        be slight differences between the "$build" object in Build.PL and
-        the one in "t/colortest.t". It is our goal to minimize these
-        differences in future releases of Module::Build, so please report
-        any anomalies you find.
+        be slight differences between the $build object in Build.PL and the
+        one in "t/colortest.t". It is our goal to minimize these differences
+        in future releases of Module::Build, so please report any anomalies
+        you find.
 
     notes()
     notes($key)
@@ -555,7 +555,7 @@ METHODS
         arguments, "notes()" returns a reference to the entire hash of
         notes. With one argument, "notes($key)" returns the value associated
         with the given key. With two arguments, "notes($key, $value)" sets
-        the value associated with the given key to "$value".
+        the value associated with the given key to $value.
 
     config()
         Returns a hash reference containing the "Config.pm" hash, including
@@ -569,14 +569,14 @@ METHODS
         list, then calls the appropriate routine to handle the action.
         Currently (though this may change), an action "foo" will invoke the
         "ACTION_foo" method. All arguments (including everything mentioned
-        in the ACTIONS manpage below) are contained in the "$self->{args}"
-        hash reference.
+        in "ACTIONS" below) are contained in the "$self->{args}" hash
+        reference.
 
     os_type()
         If you're subclassing Module::Build and some code needs to alter its
         behavior based on the current platform, you may only need to know
         whether you're running on Windows, Unix, MacOS, VMS, etc. and not
-        the fine-grained value of Perl's "$^O" variable. The "os_type()"
+        the fine-grained value of Perl's $^O variable. The "os_type()"
         method will return a string like "Windows", "Unix", "MacOS", "VMS",
         or whatever is appropriate. If you're running on an unknown
         platform, it will return "undef" - there shouldn't be many unknown
@@ -639,11 +639,10 @@ METHODS
 
     check_installed_status($module, $version)
         This method returns a hash reference indicating whether a version
-        dependency on a certain module is satisfied. The "$module" argument
-        is given as a string like ""Data::Dumper"" or ""perl"", and the
-        "$version" argument can take any of the forms described in the
-        requires manpage above. This allows very fine-grained version
-        checking.
+        dependency on a certain module is satisfied. The $module argument is
+        given as a string like "Data::Dumper" or "perl", and the $version
+        argument can take any of the forms described in requires above. This
+        allows very fine-grained version checking.
 
         The returned hash reference has the following structure:
 
@@ -654,12 +653,12 @@ METHODS
           message => $informative_error_message,
          }
 
-        If no version of "$module" is currently installed, the "have" value
-        will be the string ""<none>"". Otherwise the "have" value will
-        simply be the version of the installed module. Note that this means
-        that if "$module" is installed but doesn't define a version number,
-        the "have" value will be "undef" - this is why we don't use "undef"
-        for the case when "$module" isn't installed at all.
+        If no version of $module is currently installed, the "have" value
+        will be the string "<none>". Otherwise the "have" value will simply
+        be the version of the installed module. Note that this means that if
+        $module is installed but doesn't define a version number, the "have"
+        value will be "undef" - this is why we don't use "undef" for the
+        case when $module isn't installed at all.
 
         This method may be called either as an object method
         ("$build->check_installed_status($module, $version)") or as a class
@@ -667,11 +666,11 @@ METHODS
 
     check_installed_version($module, $version)
         Like "check_installed_status()", but simply returns true or false
-        depending on whether module "$module" statisfies the dependency
-        "$version".
+        depending on whether module $module statisfies the dependency
+        $version.
 
         If the check succeeds, the return value is the actual version of
-        "$module" installed on the system. This allows you to do the
+        $module installed on the system. This allows you to do the
         following:
 
          my $installed = $m->check_installed_version('DBI', '1.15');
@@ -681,11 +680,11 @@ METHODS
            die "Sorry, you must install DBI.\n";
          }
 
-        If the check fails, we return false and set "$@" to an informative
+        If the check fails, we return false and set $@ to an informative
         error message.
 
-        If "$version" is any nontrue value (notably zero) and any version of
-        "$module" is installed, we return true. In this case, if "$module"
+        If $version is any nontrue value (notably zero) and any version of
+        $module is installed, we return true. In this case, if $module
         doesn't define a version, or if its version is zero, we return the
         special value "0 but true", which is numerically zero, but logically
         true.
@@ -697,9 +696,9 @@ METHODS
     prompt($message, $default)
         Asks the user a question and returns their response as a string. The
         first argument specifies the message to display to the user (for
-        example, ""Where do you keep your money?""). The second argument,
+        example, "Where do you keep your money?"). The second argument,
         which is optional, specifies a default answer (for example,
-        ""wallet""). The user will be asked the question once.
+        "wallet"). The user will be asked the question once.
 
         If the current session doesn't seem to be interactive (i.e. if
         "STDIN" and "STDOUT" look like they're attached to files or
@@ -714,11 +713,11 @@ METHODS
         until they give an answer that looks like "yes" or "no".
 
         The first argument specifies the message to display to the user (for
-        example, ""Shall I invest your money for you?""), and the second
-        argument specifies the default answer (for example, ""y"").
+        example, "Shall I invest your money for you?"), and the second
+        argument specifies the default answer (for example, "y").
 
-        Note that the default is specified as a string like ""y"" or ""n"",
-        and the return value is a Perl boolean value like 1 or 0. I thought
+        Note that the default is specified as a string like "y" or "n", and
+        the return value is a Perl boolean value like 1 or 0. I thought
         about this for a while and this seemed like the most useful way to
         do it.
 
@@ -947,12 +946,11 @@ ACTIONS
 
     install
         This action will use "ExtUtils::Install" to install the files from
-        "blib/" into the system. See the How Installation Paths are
-        Determined entry elsewhere in this document for details about how
-        Module::Build determines where to install things, and how to
-        influence this process.
+        "blib/" into the system. See "How Installation Paths are Determined"
+        for details about how Module::Build determines where to install
+        things, and how to influence this process.
 
-        If you want the installation process to look around in "@INC" for
+        If you want the installation process to look around in @INC for
         other versions of the stuff you're installing and try to delete it,
         you can use the "uninst" parameter, which tells "ExtUtils::Install"
         to do so:
@@ -1015,20 +1013,30 @@ ACTIONS
            ^MANIFEST\.SKIP$
            CVS
 
-        See the the distcheck manpage and the skipcheck manpage actions if
-        you want to find out what the "manifest" action would do, without
-        actually doing anything.
+        See the distcheck and skipcheck actions if you want to find out what
+        the "manifest" action would do, without actually doing anything.
 
     dist
         This action is helpful for module authors who want to package up
-        their module for distribution through a medium like CPAN. It will
-        create a tarball of the files listed in MANIFEST and compress the
-        tarball using GZIP compression.
+        their module for source distribution through a medium like CPAN. It
+        will create a tarball of the files listed in MANIFEST and compress
+        the tarball using GZIP compression.
+
+        By default, this action will use the external "tar" and "gzip"
+        executables on Unix-like platforms, and the "Archive::Tar" module
+        elsewhere. However, you can force it to use whatever executable you
+        want by supplying an explicit "tar" (and optional "gzip") parameter:
+
+         perl Build dist --tar C:\path\to\tar.exe --gzip C:\path\to\zip.exe
 
     ppmdist
         Generates a PPM binary distribution and a PPD description file. This
         action also invokes the 'ppd' action, so it can accept the same
         "codebase" argument described under that action.
+
+        This uses the same mechanism as the "dist" action to tar & zip its
+        output, so you can supply "tar" and/or "gzip" parameters to affect
+        the result.
 
     distsign
         Uses "Module::Signature" to create a SIGNATURE file for your
@@ -1040,12 +1048,11 @@ ACTIONS
 
     distcheck
         Reports which files are in the build directory but not in the
-        MANIFEST file, and vice versa. (See the manifest manpage for
-        details)
+        MANIFEST file, and vice versa. (See manifest for details)
 
     skipcheck
         Reports which files are skipped due to the entries in the
-        MANIFEST.SKIP file (See the manifest manpage for details)
+        MANIFEST.SKIP file (See manifest for details)
 
     distclean
         Performs the 'realclean' action and then the 'distcheck' action.
@@ -1082,7 +1089,6 @@ ACTIONS
          perl Build ppd codebase="MSWin32-x86-multi-thread/Module-Build-0.21.tar.gz"
 
   How Installation Paths are Determined
-
     When you invoke Module::Build's "build" action, it needs to figure out
     where to install things. The nutshell version of how this works is that
     default installation locations are determined from Config.pm, and they
@@ -1121,7 +1127,6 @@ ACTIONS
         belonging to the 'man1' category.
 
    installdirs
-
     The default destinations for these installable things come from entries
     in your system's "Config.pm". You can select from three different sets
     of default locations by setting the "installdirs" parameter as follows:
@@ -1160,7 +1165,6 @@ ACTIONS
     start using those.)
 
    install_path
-
     Once the defaults have been set, you can override them. You can set
     individual entries by using the "install_path" parameter:
 
@@ -1178,7 +1182,6 @@ ACTIONS
      Build install --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
 
    install_base
-
     You can also set the whole bunch of installation paths by supplying the
     "install_base" parameter to point to a directory on your system. For
     instance, if you set "install_base" to "/home/ken" on a Linux system,
@@ -1202,7 +1205,6 @@ ACTIONS
     try to do the "sensible" thing on each platform.
 
    destdir
-
     If you want to install everything into a temporary directory first (for
     instance, if you want to create a directory tree that a package manager
     like "rpm" or "dpkg" could create a package from), you can use the
@@ -1284,7 +1286,7 @@ SUBCLASSING
     This is relatively straightforward, and is the best way to do things if
     your My::Builder class contains lots of code. The
     "create_build_script()" method will ensure that the current value of
-    "@INC" (including the "/nonstandard/library/path") is propogated to the
+    @INC (including the "/nonstandard/library/path") is propogated to the
     Build script, so that My::Builder can be found when running build
     actions.
 
@@ -1295,6 +1297,7 @@ SUBCLASSING
       ------ in Build.PL: ----------
       #!/usr/bin/perl
   
+      use Module::Build;
       my $class = Module::Build->subclass
         (
          class => 'My::Builder',
@@ -1380,14 +1383,16 @@ TO DO
     signature or the like, if available. See "cons" for an example.
 
     - append to perllocal.pod - write .packlist in appropriate location
-    (needed for un-install)
+    (needed for un-install) - add a 'plugin' functionality
 
 AUTHOR
     Ken Williams, kwilliams@cpan.org
 
     Development questions, bug reports, and patches should be sent to the
     Module-Build mailing list at module-build-general@lists.sourceforge.net
-    . Bug reports are also welcome at
+    .
+
+    Bug reports are also welcome at
     http://rt.cpan.org/NoAuth/Bugs.html?Dist=Module-Build .
 
     An anonymous CVS repository containing the latest development version is

@@ -11,8 +11,11 @@ use File::Spec ();
 use File::Path ();
 use File::Basename ();
 
+use Module::Build::Base;
+
 use vars qw($VERSION @ISA);
-$VERSION = '0.24';
+@ISA = qw(Module::Build::Base);
+$VERSION = '0.24_01';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -59,25 +62,30 @@ my %OSTYPES = qw(
 		 mpeix     MPEiX
 		);
 
-# We only use this once - don't waste a symbol table entry on it.
-# More importantly, don't make it an inheritable method.
-my $load = sub {
-  my $mod = shift;
-  #warn "Using $mod";
+sub _interpose_module {
+  my ($self, $mod) = @_;
   eval "use $mod";
   die $@ if $@;
+
+  no strict 'refs';
+  my $top_class = $mod;
+  while (@{"${top_class}::ISA"}) {
+    last if ${"${top_class}::ISA"}[0] eq $ISA[0];
+    $top_class = ${"${top_class}::ISA"}[0];
+  }
+
+  @{"${top_class}::ISA"} = @ISA;
   @ISA = ($mod);
-};
+}
 
 if (grep {-e File::Spec->catfile($_, qw(Module Build Platform), $^O) . '.pm'} @INC) {
-  $load->("Module::Build::Platform::$^O");
+  __PACKAGE__->_interpose_module("Module::Build::Platform::$^O");
 
 } elsif (exists $OSTYPES{$^O}) {
-  $load->("Module::Build::Platform::$OSTYPES{$^O}");
+  __PACKAGE__->_interpose_module("Module::Build::Platform::$OSTYPES{$^O}");
 
 } else {
   warn "Unknown OS type '$^O' - using default settings\n";
-  $load->("Module::Build::Platform::Default");
 }
 
 sub os_type { $OSTYPES{$^O} }
@@ -120,7 +128,7 @@ platforms like MacOS (traditional) can use it fairly easily.  Its only
 prerequisites are modules that are included with perl 5.6.0, and it
 works fine on perl 5.005 if you can install a few additional modules.
 
-See L<MOTIVATIONS> for more comparisons between C<ExtUtils::MakeMaker>
+See L<"MOTIVATIONS"> for more comparisons between C<ExtUtils::MakeMaker>
 and C<Module::Build>.
 
 To install C<Module::Build>, and any other module that uses
@@ -612,7 +620,7 @@ abstract.
 =item subclass()
 
 This creates a new C<Module::Build> subclass on the fly, as described
-in the L<SUBCLASSING> section.  The caller must provide either a
+in the L<"SUBCLASSING"> section.  The caller must provide either a
 C<class> or C<code> parameter, or both.  The C<class> parameter
 indicates the name to use for the new subclass, and defaults to
 C<MyModuleBuilder>.  The C<code> parameter specifies Perl code to use
@@ -703,7 +711,7 @@ It parses the command-line arguments into an action and an argument
 list, then calls the appropriate routine to handle the action.
 Currently (though this may change), an action C<foo> will invoke the
 C<ACTION_foo> method.  All arguments (including everything mentioned
-in L<ACTIONS> below) are contained in the C<< $self->{args} >> hash
+in L<"ACTIONS"> below) are contained in the C<< $self->{args} >> hash
 reference.
 
 =item os_type()
@@ -1190,15 +1198,26 @@ what the C<manifest> action would do, without actually doing anything.
 =item dist
 
 This action is helpful for module authors who want to package up their
-module for distribution through a medium like CPAN.  It will create a
+module for source distribution through a medium like CPAN.  It will create a
 tarball of the files listed in F<MANIFEST> and compress the tarball using
 GZIP compression.
+
+By default, this action will use the external C<tar> and C<gzip>
+executables on Unix-like platforms, and the C<Archive::Tar> module
+elsewhere.  However, you can force it to use whatever executable you
+want by supplying an explicit C<tar> (and optional C<gzip>) parameter:
+
+ perl Build dist --tar C:\path\to\tar.exe --gzip C:\path\to\zip.exe
 
 =item ppmdist
 
 Generates a PPM binary distribution and a PPD description file.  This
 action also invokes the 'ppd' action, so it can accept the same
 C<codebase> argument described under that action.
+
+This uses the same mechanism as the C<dist> action to tar & zip its
+output, so you can supply C<tar> and/or C<gzip> parameters to affect
+the result.
 
 =item distsign
 
@@ -1494,6 +1513,7 @@ creating a separate file for your module:
   ------ in Build.PL: ----------
   #!/usr/bin/perl
   
+  use Module::Build;
   my $class = Module::Build->subclass
     (
      class => 'My::Builder',
@@ -1605,6 +1625,7 @@ signature or the like, if available.  See C<cons> for an example.
 
 - append to perllocal.pod
 - write .packlist in appropriate location (needed for un-install)
+- add a 'plugin' functionality
 
 =head1 AUTHOR
 
@@ -1612,6 +1633,7 @@ Ken Williams, kwilliams@cpan.org
 
 Development questions, bug reports, and patches should be sent to the
 Module-Build mailing list at module-build-general@lists.sourceforge.net .
+
 Bug reports are also welcome at
 http://rt.cpan.org/NoAuth/Bugs.html?Dist=Module-Build .
 

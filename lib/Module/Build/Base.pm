@@ -48,6 +48,7 @@ sub resume {
   
   $self->cull_args(@ARGV);
   $self->{action} ||= 'build';
+  $self->_set_install_paths;
   
   return $self;
 }
@@ -90,8 +91,8 @@ sub _construct {
 				   conflicts       => {},
 				   mb_version      => Module::Build->VERSION,
 				   build_elements  => [qw( PL support pm xs pod script )],
-				   install_types   => [qw( lib arch script bindoc libdoc )],
 				   installdirs     => 'site',
+				   install_path    => {},
 				   include_dirs    => [],
 				   %input,
 				  },
@@ -116,12 +117,6 @@ sub _construct {
 
   $self->add_to_cleanup( @{delete $p->{add_to_cleanup}} )
     if $p->{add_to_cleanup};
-
-  # perl 5.8.1-RC[1-3] had some broken %Config entries, and
-  # unfortunately Red Hat 9 shipped it like that.  Fix 'em up here.
-  for (qw(siteman1 siteman3 vendorman1 vendorman3)) {
-    $c->{"install${_}dir"} ||= $c->{"install${_}"};
-  }
   
   return $self;
 }
@@ -132,6 +127,8 @@ sub _set_install_paths {
   my $self = shift;
   my $c = $self->{config};
 
+  my @html = $c->{installhtmldir} ? (html => $c->{installhtmldir}) : ();
+
   $self->{properties}{install_sets} =
     {
      core   => {
@@ -141,6 +138,7 @@ sub _set_install_paths {
 		script  => $c->{installscript},
 		bindoc  => $c->{installman1dir},
 		libdoc  => $c->{installman3dir},
+		@html,
 	       },
      site   => {
 		lib     => $c->{installsitelib},
@@ -149,6 +147,7 @@ sub _set_install_paths {
 		script  => $c->{installsitescript} || $c->{installsitebin} || $c->{installscript},
 		bindoc  => $c->{installsiteman1dir} || $c->{installman1dir},
 		libdoc  => $c->{installsiteman3dir} || $c->{installman3dir},
+		@html,
 	       },
      vendor => {
 		lib     => $c->{installvendorlib},
@@ -157,6 +156,7 @@ sub _set_install_paths {
 		script  => $c->{installvendorscript} || $c->{installvendorbin} || $c->{installscript},
 		bindoc  => $c->{installvendorman1dir} || $c->{installman1dir},
 		libdoc  => $c->{installvendorman3dir} || $c->{installman3dir},
+		@html,
 	       },
     };
 }
@@ -281,8 +281,8 @@ my ($notes, $features) = @$arrayref;
 sub get { $notes->{$_[1]} }
 sub feature { $features->{$_[1]} }
 
-__DATA__
 EOF
+  print $fh "__DATA__\n";
 
   local $Data::Dumper::Terse = 1;
   print $fh Data::Dumper::Dumper([scalar $self->build_config, scalar $self->features]);
@@ -308,13 +308,13 @@ EOF
        scripts
        script_files
        test_files
+       recursive_test_files
        perl
        config_dir
        blib
        has_build_config
        build_script
        build_elements
-       install_types
        install_sets
        install_path
        install_base
@@ -327,6 +327,7 @@ EOF
        create_makefile_pl
        create_readme
        pollute
+       extra_compiler_flags
        include_dirs
        bindoc_dirs
        libdoc_dirs
@@ -344,6 +345,13 @@ EOF
           return $self->{properties}{$property};
       };
   }
+}
+
+sub extra_compiler_flags {
+  my $self = shift;
+  my $p = $self->{properties};
+  $p->{extra_compiler_flags} = [@_] if @_;
+  return ref($p->{extra_compiler_flags}) ? $p->{extra_compiler_flags} : [$p->{extra_compiler_flags}];
 }
 
 # XXX Problem - if Module::Build is loaded from a different directory,
@@ -416,16 +424,7 @@ sub dist_version {
   return $p->{dist_version} = $self->version_from_file($version_from);
 }
 
-sub dist_author {
-  my $self = shift;
-  my $p = $self->{properties};
-  
-  $self->_pod_parse('author');
-  $p->{dist_author} = [ $p->{dist_author} ] unless ref $p->{dist_author};
-
-  return $p->{dist_author};
-}
-
+sub dist_author   { shift->_pod_parse('author')   }
 sub dist_abstract { shift->_pod_parse('abstract') }
 
 sub _pod_parse {
@@ -813,7 +812,7 @@ $quoted_INC
 use $build_package;
 
 if (-e 'Build.PL' and not $build_package->up_to_date("Build.PL", \$0)) {
-   warn "Warning: Build.PL has been altered.  You may need to run 'perl Build.PL' again.\n";
+   warn "Warning: Build.PL has been altered.  You may need to run 'perl Build.PL' again.\\n";
 }
 
 # This should have just enough arguments to be able to bootstrap the rest.
@@ -939,13 +938,18 @@ sub read_args {
     $args{$_} = \%hash;
   }
   
+  if ($args{makefile_env_macros}) {
+    require Module::Build::Compat;
+    %args = (%args, Module::Build::Compat->makefile_to_build_macros);
+  }
+  
   return \%args, $action;
 }
 
 sub merge_args {
   my ($self, $action, %args) = @_;
   my %additive = (config => $self->{config},
-		  install_path => $self->{properties}{install_path} ||= {});
+		  install_path => $self->{properties}{install_path});
 
   $self->{action} = $action if defined $action;
 
@@ -1129,7 +1133,7 @@ sub test_files {
 
 sub expand_test_dir {
   my ($self, $dir) = @_;
-  return @{$self->rscan_dir($dir, qr{\.t$})} if $self->{properties}{recursive_test_files};
+  return sort @{$self->rscan_dir($dir, qr{\.t$})} if $self->recursive_test_files;
   return sort glob File::Spec->catfile($dir, "*.t");
 }
 
@@ -1376,6 +1380,7 @@ sub ACTION_docs {
   require Pod::Man;
   $self->manify_bin_pods() if $self->install_destination('bindoc');
   $self->manify_lib_pods() if $self->install_destination('libdoc');
+  $self->htmlify_pods()    if $self->install_destination('html');
 }
 
 sub manify_bin_pods {
@@ -1442,73 +1447,91 @@ sub contains_pod {
 
 sub ACTION_html {
   my $self = shift;
-  $self->depends_on('build');
-  
+  $self->depends_on('code');
+  $self->htmlify_pods;
+}
+
+sub htmlify_pods {
+  my $self = shift;
   require Pod::Html;
   require Module::Build::PodParser;
   
-  my $html_base = $Config{installhtmldir} ?
-    File::Basename::basename($Config{installhtmldir}) : 'html';
-  
   my $blib = $self->blib;
-  my $html = File::Spec::Unix->catdir($blib, $html_base);
+  my $html = File::Spec::Unix->catdir($blib, 'html');
   my $script = File::Spec::Unix->catdir($blib, 'script');
+  
   unless (-d $html) {
     File::Path::mkpath($html, 1, 0755) or die "Couldn't mkdir $html: $!";
   }
-
-  my $pods = $self->_find_pods($self->blib);
-  my %pods = Pod::Find::pod_find({-verbose => 1}, $self->blib);
+  
+  my $pods = $self->_find_pods([$self->blib]);
   if (-d $script) {
-    File::Find::finddepth( sub
-                           {$pods{$File::Find::name} =
-                              "script::" . basename($File::Find::name)
+    File::Find::finddepth( sub 
+                           {$pods->{$File::Find::name} = 
+                              "script::" . File::Basename::basename($File::Find::name) 
                                 if (-f $_ and not /\.bat$/ and $self->contains_pod($_));
                           }, $script);
   }
-
-  my $backlink = '__top';
-  my $css = ($^O =~ /Win32/) ? 'Active.css' : '';
-  foreach my $pod (keys %pods){
-    my @dirs = split /::/, $pods{$pod};
-    my $isbin = $dirs[0] eq 'script';
-    my $infile = File::Spec::Unix->abs2rel($pod);
-    my $outfile = "$dirs[-1].html";
-
-    my @rootdirs  = $isbin? ('bin') : ('site', 'lib');
-    my $path2root = "../" x (@rootdirs+@dirs);
-    $path2root =~ s!/$!!;
-
-    my $fulldir = File::Spec::Unix->catfile($html, @rootdirs, @dirs);
-    unless (-d $fulldir){
-      File::Path::mkpath($fulldir, 1, 0755)
-          or die "Couldn't mkdir $fulldir: $!";
-    }
-    $outfile = File::Spec::Unix->catfile($fulldir, $outfile);
-
-    my $htmlroot = File::Spec::Unix->catdir($path2root, 'site', 'lib');
-    my $podpath = join ":" => map { File::Spec::Unix->catdir($blib, $_) }
-      ($isbin ? qw(bin lib) : qw(lib));
-    (my $package = $pods{$pod}) =~ s!^(lib|script)::!!;
-
-    my $parser = Module::Build::PodParser->new(file => $infile);
-    my $abstract = $parser->get_abstract;
-    my $title =  $abstract ? "$package - $abstract" : $package;
-    my @opts = (
-		'--header',
-                '--flush',
-                "--backlink=__top",
-		"--title=$title",
-                "--podpath=$podpath",
-		"--infile=$infile",
-		"--outfile=$outfile",
-		"--podroot=$blib",
-		"--htmlroot=$htmlroot",
-	       );
-    push @opts, "--css=$path2root/$css" if $css;
-    print "pod2html @opts\n";
-    Pod::Html::pod2html(@opts);# or warn "pod2html @opts failed: $!";
+  
+  foreach my $pod (keys %$pods){
+    $self->_htmlify_pod(
+			path => $pod,
+			rel_path => $pods->{$pod},
+			htmldir => $html,
+			backlink => '__top',
+			css => ($^O =~ /Win32/) ? 'Active.css' : '',
+		       );
   }
+}
+
+sub _htmlify_pod {
+  my ($self, %args) = @_;
+  
+  my ($name, $path) = File::Basename::fileparse($args{rel_path}, qr{\..*});
+  my @dirs = File::Spec->splitdir($path);
+  my $isbin = shift @dirs eq 'script';
+  my $infile = File::Spec::Unix->abs2rel($args{path});
+    
+  my @rootdirs  = $isbin? ('bin') : ('site', 'lib');
+  
+  my $fulldir = File::Spec::Unix->catfile($args{htmldir}, @rootdirs, @dirs);
+  my $outfile = File::Spec::Unix->catfile($fulldir, $name . '.html');
+
+  return if $self->up_to_date($infile, $outfile);
+    
+  unless (-d $fulldir){
+    File::Path::mkpath($fulldir, 1, 0755) 
+	or die "Couldn't mkdir $fulldir: $!";  
+  }
+    
+  my $path2root = "../" x (@rootdirs+@dirs-1);
+  my $htmlroot = File::Spec::Unix->catdir($path2root, 'site');
+  my $podpath = join ":" => ($isbin ? qw(bin lib) : qw(lib));
+  my $title = join('::', @dirs) . $name;
+    
+  {
+    my $fh = IO::File->new($infile);
+    my $abstract = Module::Build::PodParser->new(fh => $fh)->get_abstract();
+    $title .= " - $abstract" if $abstract;
+  }
+    
+  my $blib = $self->blib;
+  my @opts = (
+	      '--header',
+	      '--flush',
+	      "--backlink=$args{backlink}",
+	      "--title=$title",
+	      "--podpath=$podpath",
+	      "--infile=$infile",
+	      "--outfile=$outfile",
+	      "--podroot=$blib",
+	      "--htmlroot=$htmlroot",
+	     );
+  push @opts, "--css=$path2root/$args{css}" if $args{css};
+    
+  print "Creating $outfile\n";
+  print "pod2html @opts\n" if $self->verbose;
+  Pod::Html::pod2html(@opts);	# or warn "pod2html @opts failed: $!";
 }
 
 # Adapted from ExtUtils::MM_Unix
@@ -1767,9 +1790,56 @@ sub ACTION_disttest {
   chdir $start_dir;
 }
 
+sub _write_default_maniskip {
+  my $self = shift;
+  my $file = shift || 'MANIFEST.SKIP';
+  my $fh = IO::File->new("> $file")
+    or die "Can't open $file: $!";
+
+  # This is pretty much straight out of
+  # MakeMakers default MANIFEST.SKIP file
+  print $fh <<'EOF';
+# Avoid version control files.
+\bRCS\b
+\bCVS\b
+,v$
+\B\.svn\b
+
+# Avoid Makemaker generated and utility files.
+\bMakefile$
+\bblib
+\bMakeMaker-\d
+\bpm_to_blib$
+\bblibdirs$
+^MANIFEST\.SKIP$
+
+# Avoid Module::Build generated and utility files.
+\bBuild$
+\b_build
+
+# Avoid temp and backup files.
+~$
+\.old$
+\.bak$
+\#$
+\b\.#
+EOF
+
+  $fh->close();
+}
+
 sub ACTION_manifest {
   my ($self) = @_;
-  
+
+  my $metafile = $self->{metafile} || 'META.yml';
+  $self->depends_on('distmeta') unless -e $metafile;
+
+  my $maniskip = 'MANIFEST.SKIP';
+  unless ( -e 'MANIFEST' || -e $maniskip ) {
+    warn "File '$maniskip' does not exist: Creating a default '$maniskip'\n";
+    $self->_write_default_maniskip($maniskip);
+  }
+
   require ExtUtils::Manifest;  # ExtUtils::Manifest is not warnings clean.
   local ($^W, $ExtUtils::Manifest::Quiet) = (0,1);
   ExtUtils::Manifest::mkmanifest();
@@ -1808,10 +1878,11 @@ sub _write_minimal_metadata {
   my $self = shift;
   my $p = $self->{properties};
 
-  open META, "> $self->{metafile}"
-    or die "Can't write $self->{metafile}: $!\n";
+  my $file = $self->{metafile};
+  my $fh = IO::File->new("> $file")
+    or die "Can't open $file: $!";
 
-  print META <<"END_OF_META";
+  print $fh <<"END_OF_META";
 --- #YAML:1.0
 name: $p->{dist_name}
 version: $p->{dist_version}
@@ -1822,7 +1893,7 @@ license: $p->{license}
 generated_by: Module::Build version @{[ Module::Build->VERSION ]}, without YAML.pm
 END_OF_META
 
-  close META;
+  $fh->close();
 }
 
 sub ACTION_distmeta {
@@ -1860,10 +1931,11 @@ EOM
     $node->{$name} = $self->$_();
   }
 
-  foreach (qw(requires recommends build_requires conflicts dynamic_config)) {
+  foreach (qw(requires recommends build_requires conflicts)) {
     $node->{$_} = $p->{$_} if exists $p->{$_} and keys %{ $p->{$_} };
   }
   
+  $node->{dynamic_config} = $p->{dynamic_config} if exists $p->{dynamic_config};
   $node->{provides} = $self->find_dist_packages;
 
   $node->{generated_by} = "Module::Build version " . Module::Build->VERSION;
@@ -1965,7 +2037,9 @@ sub install_destination {
 
 sub install_types {
   my $self = shift;
-  return @{ $self->{properties}{install_types} }
+  my $p = $self->{properties};
+  my %types = (%{$p->{install_path}}, %{ $p->{install_sets}{$p->{installdirs}} });
+  return sort keys %types;
 }
 
 sub install_map {
@@ -2090,7 +2164,7 @@ sub compile_c {
   my @cc = $self->split_like_shell($cf->{cc});
   
   $self->do_system(@cc, @flags, '-o', $obj_file, $file)
-    or die "error building $cf->{dlext} file from '$file'";
+    or die "error building $cf->{obj_ext} file from '$file'";
 
   return $obj_file;
 }
@@ -2127,11 +2201,12 @@ sub link_c {
   my ($self, $to, $file_base) = @_;
   my ($cf, $p) = ($self->{config}, $self->{properties}); # For convenience
 
+  my $obj_file = "$file_base$cf->{obj_ext}";
   my $lib_file = File::Spec->catfile($to, File::Basename::basename("$file_base.$cf->{dlext}"));
   $self->add_to_cleanup($lib_file);
   my $objects = $p->{objects} || [];
   
-  unless ($self->up_to_date(["$file_base$cf->{obj_ext}", @$objects], $lib_file)) {
+  unless ($self->up_to_date([$obj_file, @$objects], $lib_file)) {
     $self->prelink_c($to, $file_base) if $self->need_prelink_c;
 
     my @linker_flags = $self->split_like_shell($p->{extra_linker_flags});
@@ -2139,8 +2214,8 @@ sub link_c {
     my @shrp = $self->split_like_shell($cf->{shrpenv});
     my @ld = $self->split_like_shell($cf->{ld});
     $self->do_system(@shrp, @ld, @lddlflags, '-o', $lib_file,
-		     "$file_base$cf->{obj_ext}", @$objects, @linker_flags)
-      or die "error building $file_base$cf->{obj_ext} from '$file_base.$cf->{dlext}'";
+		     $obj_file, @$objects, @linker_flags)
+      or die "error building .$cf->{dlext} file from '$obj_file'";
   }
   
   return $lib_file;
