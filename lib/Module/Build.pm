@@ -1,6 +1,6 @@
 package Module::Build;
 
-# $Id: Build.pm,v 1.28 2002/06/26 10:14:35 ken Exp $
+# $Id: Build.pm,v 1.30 2002/06/28 01:06:43 ken Exp $
 
 # This module doesn't do much of anything itself, it inherits from the
 # modules that do the real work.  The only real thing it has to do is
@@ -14,7 +14,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.08';
+$VERSION = '0.09';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -108,10 +108,10 @@ C<ExtUtils::MakeMaker>.
 To install C<Module::Build>, and any other module that uses
 C<Module::Build> for its installation process, do the following:
 
-   perl Build.PL
-   Build             # this script is created by 'perl Build.PL'
-   Build test
-   Build install
+  perl Build.PL       # 'Build.PL' script creates the 'Build' script
+  ./Build             # Need ./ to ensure we're using this "Build" script
+  ./Build test        # and not another one that happens to be in the PATH
+  ./Build install
 
 This illustrates initial configuration and the running of three
 'actions'.  In this case the actions run are 'build' (the default

@@ -9,6 +9,7 @@ recommends:
  YAML: 0.3
 requires:
  Config: 0
+ Cwd: 0
  Data::Dumper: 0
  File::Basename: 0
  File::Copy: 0
@@ -16,4 +17,4 @@ requires:
  File::Path: 0
  File::Spec: 0
  perl: '5.6.0'
-version: 0.08
+version: 0.09
