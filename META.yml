@@ -1,8 +1,10 @@
 --- #YAML:1.0
 name: Module-Build
-version: 0.21_02
+version: 0.22
+author:
+  - Ken Williams, ken@mathforum.org
+abstract: Build and install Perl modules
 license: perl
-distribution_type: module
 requires:
   Config: 0
   Cwd: 0
@@ -17,7 +19,7 @@ requires:
   IO::File: 0
   perl: 5.005_03
 recommends:
-  Archive::Tar: 1.00
+  Archive::Tar: 1.08
   ExtUtils::Install: 0.3
   ExtUtils::ParseXS: 2.02
   Pod::Text: 0
@@ -28,7 +30,7 @@ conflicts: {}
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: 0.21_02
+    version: 0.22
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
   Module::Build::Compat:
@@ -74,4 +76,4 @@ provides:
     file: lib/Module/Build/Platform/os2.pm
   Module::Build::PodParser:
     file: lib/Module/Build/PodParser.pm
-generated_by: Module::Build version 0.21_02
+generated_by: Module::Build version 0.22

@@ -49,6 +49,7 @@ ok $@, '';
   my $ppd = slurp('XSTest.ppd');
 
   my $perl_version = Module::Build::PPMMaker->_ppd_version($m->perl_version);
+  my $varchname = Module::Build::PPMMaker->_varchname($m->config);
 
   # This test is quite a hack since with XML you don't really want to
   # do a strict string comparison, but absent an XML parser it's the
@@ -60,8 +61,8 @@ ok $@, '';
     <AUTHOR>A. U. Thor, a.u.thor\@a.galaxy.far.far.away</AUTHOR>
     <IMPLEMENTATION>
         <PERLCORE VERSION="$perl_version" />
-        <OS VALUE="$^O" />
-        <ARCHITECTURE NAME="$Config{archname}" />
+        <OS NAME="$^O" />
+        <ARCHITECTURE NAME="$varchname" />
         <CODEBASE HREF="/path/to/codebase-xs" />
     </IMPLEMENTATION>
 </SOFTPKG>

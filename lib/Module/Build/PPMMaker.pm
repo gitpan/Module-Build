@@ -6,6 +6,8 @@ use strict;
 # few tweaks based on the PPD spec at
 # http://www.xav.com/perl/site/lib/XML/PPD.html
 
+# The PPD spec is based on <http://www.w3.org/TR/NOTE-OSD>
+
 sub new {
   my $package = shift;
   return bless {@_}, $package;
@@ -31,17 +33,20 @@ sub make_ppd {
   }
   $dist{version} = $self->_ppd_version($dist{version});
 
-  $self->_simple_xml_escape($_) foreach (@dist{'abstract', 'author'});
+  $self->_simple_xml_escape($_) foreach $dist{abstract}, @{$dist{author}};
 
-  # could add <LICENSE HREF=...> tag if we knew what the URLs were for
+  # TODO: could add <LICENSE HREF=...> tag if we knew what the URLs were for
   # various licenses
-  my $ppd = sprintf(<<'EOF', @dist{qw(name version name abstract author)});
-<SOFTPKG NAME="%s" VERSION="%s">
-    <TITLE>%s</TITLE>
-    <ABSTRACT>%s</ABSTRACT>
-    <AUTHOR>%s</AUTHOR>
+  my $ppd = <<"PPD";
+<SOFTPKG NAME=\"$dist{name}\" VERSION=\"$dist{version}\">
+    <TITLE>$dist{name}</TITLE>
+    <ABSTRACT>$dist{abstract}</ABSTRACT>
+@{[ join "\n", map "    <AUTHOR>$_</AUTHOR>", @{$dist{author}} ]}
     <IMPLEMENTATION>
-EOF
+PPD
+
+  # TODO: We could set <IMPLTYPE VALUE="PERL" /> or maybe
+  # <IMPLTYPE VALUE="PERL/XS" /> ???
 
   # We don't include recommended dependencies because PPD has no way
   # to distinguish them from normal dependencies.  We don't include
@@ -83,9 +88,9 @@ EOF
   # uses XS.
   if (keys %{$build->find_xs_files}) {
     my $perl_version = $self->_ppd_version($build->perl_version);
-    $ppd .= sprintf(<<'EOF', $perl_version, $^O, $self->{archname});
+    $ppd .= sprintf(<<'EOF', $perl_version, $^O, $self->_varchname($build->config) );
         <PERLCORE VERSION="%s" />
-        <OS VALUE="%s" />
+        <OS NAME="%s" />
         <ARCHITECTURE NAME="%s" />
 EOF
   }
@@ -118,6 +123,15 @@ sub _ppd_version {
   return join ',', (split(/\./, $version), (0)x4)[0..3];
 }
 
+sub _varchname {  # Copied from PPM.pm
+  my ($self, $config) = @_;
+  my $varchname = $config->{archname};
+  # Append "-5.8" to architecture name for Perl 5.8 and later
+  if (length($^V) && ord(substr($^V,1)) >= 8) {
+    $varchname .= sprintf("-%d.%d", ord($^V), ord(substr($^V,1)));
+  }
+  return $varchname;
+}
 
 {
   my %escapes = (

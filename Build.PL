@@ -1,6 +1,6 @@
 use strict;
 
-# On some platforms (*ahem*, MacOS 5.6.1) "use lib qw(lib);" doesn't
+# On some platforms (*ahem*, MacPerl 5.6.1) "use lib qw(lib);" doesn't
 # find the local "lib" directory, so we use File::Spec to do it properly.
 use File::Spec;
 use lib File::Spec->catdir('lib');
@@ -28,7 +28,7 @@ my $build = new Module::Build
 	       },
    recommends => {
 		  'YAML' => 0.35,
-		  'Archive::Tar' => '1.00',
+		  'Archive::Tar' => '1.08',
 		  'ExtUtils::Install' => 0.30,
 		  'ExtUtils::ParseXS' => 2.02,
 		  'Pod::Text' => 0,
