@@ -82,6 +82,7 @@ sub _construct {
 		    args => {%$args},
 		    config => {%Config, %$config},
 		    properties => {
+				   module_name     => '',
 				   build_script    => 'Build',
 				   base_dir        => $package->cwd,
 				   config_dir      => '_build',
@@ -537,8 +538,8 @@ sub dist_version {
   
   return $p->{dist_version} if exists $p->{dist_version};
   
-  if (exists $p->{module_name}) {
-    $p->{dist_version_from} ||= join( '/', 'lib', split '::', $p->{module_name} ) . '.pm';
+  if ($self->module_name) {
+    $p->{dist_version_from} ||= join( '/', 'lib', split '::', $self->module_name ) . '.pm';
   }
   
   die ("Can't determine distribution version, must supply either 'dist_version',\n".
@@ -1344,7 +1345,7 @@ sub test_files {
 
 sub expand_test_dir {
   my ($self, $dir) = @_;
-  return sort @{$self->rscan_dir($dir, qr{\.t$})} if $self->recursive_test_files;
+  return sort @{$self->rscan_dir($dir, qr{^[^.].*\.t$})} if $self->recursive_test_files;
   return sort glob File::Spec->catfile($dir, "*.t");
 }
 
