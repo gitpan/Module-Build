@@ -25,9 +25,10 @@ my $build = new Module::Build
 	       },
    recommends => {
 		  YAML => 0.35,
-		  Archive::Tar => 0.22,
+		  Archive::Tar => 0.23,
 		  ExtUtils::Install => 0.30,
 		  ExtUtils::ParseXS => 0,
+		  # Module::Signature => 0.21,  # Our support isn't good enough yet
 		 },
    build_requires => {
 		      Test => 0,

@@ -4,6 +4,7 @@ use Module::Build;
 use File::Spec;
 use File::Path;
 my $HAVE_YAML = eval {require YAML; 1};
+my $HAVE_SIGNATURE = eval {require Module::Signature; 1};
 
 ok(1);
 require File::Spec->catfile('t', 'common.pl');
@@ -24,6 +25,7 @@ ok $build;
 eval {$build->create_build_script};
 ok $@, '';
 
+$build->add_to_cleanup('save_out');
 my $output = eval {
   stdout_of( sub { $build->dispatch('test', verbose => 1) } )
 };
@@ -60,6 +62,20 @@ if ($HAVE_YAML) {
   
 } else {
   skip "skip YAML.pm is not installed", 1 for 1..6;
+}
+
+if (0 && $HAVE_SIGNATURE) {
+  my $sigfile = File::Spec->catdir('Sample-0.01', 'SIGNATURE');
+  $build->add_to_cleanup( $sigfile );
+
+  chdir 'Sample-0.01' or warn "Couldn't chdir to Sample-0.01: $!";
+  eval {$build->dispatch('distsign')};
+  ok $@, '';
+  chdir $goto;
+
+  ok -e $sigfile;
+} else {
+  # skip "skip Module::Signature is not installed", 1 for 1..2;
 }
 
 eval {$build->dispatch('realclean')};

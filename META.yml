@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: Module-Build
-version: 0.15
+version: 0.16
 license: perl
 distribution_type: module
 requires:
@@ -16,11 +16,11 @@ requires:
   File::Spec: 0
   perl: 5.6.0
 recommends:
-  Archive::Tar: 0.22
+  Archive::Tar: 0.23
   ExtUtils::Install: 0.3
   ExtUtils::ParseXS: 0
   YAML: 0.35
 build_requires:
   Test: 0
 conflicts: {}
-generated_by: Module::Build version 0.15
+generated_by: Module::Build version 0.16

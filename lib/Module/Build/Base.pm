@@ -1,6 +1,6 @@
 package Module::Build::Base;
 
-# $Id: Base.pm,v 1.56 2003/01/17 20:53:11 kwilliams Exp $
+# $Id: Base.pm,v 1.68 2003/02/24 19:00:44 kwilliams Exp $
 
 use strict;
 use Config;
@@ -26,7 +26,7 @@ sub new {
   my $cmd_config;
   if ($cmd_args->{config}) {
     # XXX need to hashify this string better (deal with quoted whitespace)
-    $cmd_config->{$1} = $2 while $cmd_args->{config} =~ /(\w+)=(\S+)/;
+    $cmd_config->{$1} = $2 while $cmd_args->{config} =~ /(\w+)=(\S+)/g;
   } else {
     $cmd_config = {};
   }
@@ -55,6 +55,8 @@ sub new {
 				   build_requires => {},
 				   conflicts => {},
 				   PL_files => {},
+				   scripts => [],
+				   perl => $^X,
 				   %input,
 				   %$cmd_properties,
 				  },
@@ -81,7 +83,7 @@ sub new {
 
 sub cwd {
   require Cwd;
-  return Cwd::cwd;
+  return Cwd::cwd();
 }
 
 sub base_dir { shift()->{properties}{base_dir} }
@@ -149,8 +151,11 @@ sub resume {
        requires
        recommends
        PL_files
+       scripts
+       perl
        config_dir
        build_script
+       destdir
        debugger
        verbose
        c_source
@@ -347,8 +352,8 @@ sub check_prereq {
     }
   }
   
-  warn "ERRORS/WARNINGS FOUND IN PREREQUISITES.  You may wish to install the versions ".
-       "of the modules indicated above before proceeding with this installation.\n";
+  warn "ERRORS/WARNINGS FOUND IN PREREQUISITES.  You may wish to install the versions\n".
+       " of the modules indicated above before proceeding with this installation.\n\n";
   return 0;
 }
 
@@ -467,6 +472,9 @@ my \$build = resume $build_package (
     build_script => '$build_script',
   },
 );
+warn "WARNING: '\$0' script was created with \$build->{properties}{perl}, but\\n".
+     "we are now using \$^X\\n" unless \$^X eq \$build->{properties}{perl};
+
 \$build->dispatch;
 EOF
 }
@@ -675,13 +683,28 @@ sub ACTION_build {
 
   $self->process_PL_files('lib');
 
-  $self->add_to_cleanup('blib');
+  my $blib = 'blib';
+  $self->add_to_cleanup($blib);
+  File::Path::mkpath($blib);
+  
   my $files = $self->rscan_dir('lib', qr{\.(pm|pod|xs)$});
-  $self->lib_to_blib($files, 'blib');
+  $self->lib_to_blib($files, $blib);
+  
+  if (@{$self->{properties}{scripts}}) {
+    my $script_dir = File::Spec->catdir($blib, 'script');
+    File::Path::mkpath( $script_dir );
+
+    foreach my $file (@{$self->{properties}{scripts}}) {
+      my $result = $self->copy_if_modified($file, $script_dir, 'flatten');
+      $self->make_executable($result) if $result;
+    }
+  }
+
 }
 
 sub ACTION_manifypods {
   my $self = shift;
+  warn "Sorry, the 'manifypods' action is not yet implemented.\n"; return;
   require Pod::Man;
   
   my $p = Pod::Man->new(section => 3);
@@ -751,14 +774,27 @@ sub ACTION_install {
   my ($self) = @_;
   require ExtUtils::Install;
   $self->depends_on('build');
-  ExtUtils::Install::install($self->install_map('blib'), 1, 0);
+  ExtUtils::Install::install($self->install_map('blib'), 1, 0, $self->{args}{uninst}||0);
 }
 
 sub ACTION_fakeinstall {
   my ($self) = @_;
   require ExtUtils::Install;
   $self->depends_on('build');
-  ExtUtils::Install::install($self->install_map('blib'), 1, 1);
+  ExtUtils::Install::install($self->install_map('blib'), 1, 1, $self->{args}{uninst}||0);
+}
+
+sub ACTION_versioninstall {
+  my ($self) = @_;
+  
+  die "You must have only.pm 0.25 or greater installed for this operation: $@\n"
+    unless eval { require only; 'only'->VERSION(0.25); 1 };
+  
+  $self->depends_on('build');
+  
+  my %onlyargs = map {exists($self->{args}{$_}) ? ($_ => $self->{args}{$_}) : ()}
+    qw(version versionlib);
+  only::install::install(%onlyargs);
 }
 
 sub ACTION_clean {
@@ -777,6 +813,7 @@ sub ACTION_realclean {
 sub ACTION_dist {
   my ($self) = @_;
   
+  $self->depends_on('distsign') if $self->{properties}{sign};
   $self->depends_on('distdir');
   
   my $dist_dir = $self->dist_dir;
@@ -792,6 +829,19 @@ sub ACTION_distcheck {
   local $^W; # ExtUtils::Manifest is not warnings clean.
   ExtUtils::Manifest::fullcheck();
 }
+
+sub ACTION_distsign {
+  my ($self) = @_;
+  
+  unless (eval { require Module::Signature; 1 }) {
+    warn "Couldn't load Module::Signature for 'distsign' action:\n $@\n";
+    return;
+  }
+  
+  Module::Signature::sign();
+}
+
+
 
 sub ACTION_skipcheck {
   my ($self) = @_;
@@ -833,9 +883,9 @@ sub ACTION_disttest {
   my $dist_dir = $self->dist_dir;
   chdir $dist_dir or die "Cannot chdir to $dist_dir: $!";
   # XXX could be different names for scripts
-  $self->do_system($^X, 'Build.PL') or die "Error executing '$^X Build.PL' in dist directory: $!";
-  $self->do_system('./Build') or die "Error executing './Build' in dist directory: $!";
-  $self->do_system('./Build', 'test') or die "Error executing './Build test' in dist directory: $!";
+  $self->run_perl_script('Build.PL') or die "Error executing 'Build.PL' in dist directory: $!";
+  $self->run_perl_script('Build') or die "Error executing 'Build' in dist directory: $!";
+  $self->run_perl_script('Build', [], ['test']) or die "Error executing 'Build test' in dist directory";
   chdir $self->base_dir;
 }
 
@@ -850,6 +900,14 @@ sub ACTION_manifest {
 sub dist_dir {
   my ($self) = @_;
   return "$self->{properties}{dist_name}-$self->{properties}{dist_version}";
+}
+
+sub scripts {
+  my $self = shift;
+  if (@_) {
+    $self->{properties}{scripts} = ref($_[0]) ? $_[0] : [@_];
+  }
+  return $self->{properties}{scripts};
 }
 
 sub write_metadata {
@@ -899,11 +957,23 @@ sub make_tarball {
 
 sub install_map {
   my ($self, $blib) = @_;
-  my $lib  = File::Spec->catfile($blib,'lib');
-  my $arch = File::Spec->catfile($blib,'arch');
-  return {$lib  => $self->{config}{sitelib},
-	  $arch => $self->{config}{sitearch},
-	  read  => ''};  # To keep ExtUtils::Install quiet
+  my $lib     = File::Spec->catfile($blib,'lib');
+  my $arch    = File::Spec->catfile($blib,'arch');
+  my $script  = File::Spec->catfile($blib,'script');
+  
+  my %map = ($lib  => $self->{config}{sitelib},
+	     $arch => $self->{config}{sitearch});
+  
+  $map{$script} = $self->{config}{installscript}
+    if @{$self->{properties}{scripts}};
+  
+  if (length(my $destdir = $self->{properties}{destdir} || '')) {
+    $_ = File::Spec->catdir($destdir, $_) foreach values %map;
+  }
+  
+  $map{read} = '';  # To keep ExtUtils::Install quiet
+  
+  return \%map;
 }
 
 sub depends_on {
@@ -1137,6 +1207,7 @@ sub copy_if_modified {
   
   print "$file -> $to_path\n";
   File::Copy::copy($file, $to_path) or die "Can't copy('$file', '$to_path'): $!";
+  return $to_path;
 }
 
 sub up_to_date {

@@ -12,7 +12,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.15';
+$VERSION = '0.16';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -90,12 +90,20 @@ Module::Build - Build and install Perl modules
 
 =head1 SYNOPSIS
 
- Standard process for building & installing modules:
+Standard process for building & installing modules:
  
    perl Build.PL
    ./Build
    ./Build test
    ./Build install
+
+Or, if you're on a platform (like DOS or Windows) that doesn't like
+the "./" notation, you can do this:
+
+   perl Build.PL
+   perl Build
+   perl Build test
+   perl Build install
 
 =head1 DESCRIPTION
 
@@ -115,14 +123,16 @@ This illustrates initial configuration and the running of three
 'actions'.  In this case the actions run are 'build' (the default
 action), 'test', and 'install'.  Actions defined so far include:
 
-  build                          fakeinstall 
-  clean                          help        
-  diff                           install     
-  dist                           manifest    
+  build                          help        
+  clean                          install     
+  diff                           manifest    
+  dist                           manifypods  
   distcheck                      realclean   
   distclean                      skipcheck   
   distdir                        test        
-  disttest                       testdb      
+  distsign                       testdb      
+  disttest                       versioninstall
+  fakeinstall
 
 You can run the 'help' action for a complete list of actions.
 
@@ -359,6 +369,11 @@ files in the directory will be compiled to object files.  The
 directory will be added to the search path during the compilation and
 linking phases of any C or XS files.
 
+=item scripts
+
+An array reference containing a list of files that should be installed
+as perl scripts when the module is installed.
+
 =item autosplit
 
 An optional C<autosplit> argument specifies a file which should be run
@@ -380,6 +395,14 @@ Currently C<Module::Build> doesn't actually do anything with this flag
 - it's probably going to be up to tools like C<CPAN.pm> to do
 something useful with it.  It can potentially bring lots of security,
 packaging, and convenience improvements.
+
+=item sign
+
+If a true value is specified for this parameter, C<Module::Signature>
+will be used (via the 'distsign' action) to create a SIGNATURE file
+for your distribution during the 'distdir' action.  The default is
+false.  In the future, the default may change to true if you have
+C<Module::Signature> installed on your system.
 
 =back
 
@@ -562,6 +585,13 @@ and the return value is a Perl boolean value like 1 or 0.  I thought
 about this for a while and this seemed like the most useful way to do
 it.
 
+=item scripts()
+
+Returns an array reference specifying the perl script files to be
+installed.  This corresponds to the C<scripts> parameter to the
+C<new()> method.  With an optional argument, this parameter may be set
+dynamically.
+
 =item base_dir()
 
 Returns a string containing the root-level directory of this build,
@@ -725,13 +755,65 @@ the C<Build.PL> script:
  perl Build.PL sitelib=/my/secret/place/
 
 Under normal circumstances, you'll need superuser privileges to
-install into the default C<sitelib> directory.
+install into your system's default C<sitelib> directory.
+
+If you want to install everything into a temporary directory first
+(for instance, if you want to create a directory tree that a package
+manager like C<rpm> or C<dpkg> could create a package from), you can
+use the C<destdir> parameter:
+
+ perl Build.PL destdir=/tmp/foo
+
+or
+
+ Build install destdir=/tmp/foo
+
+This will effectively install to "$destdir/$sitelib",
+"$destdir/$sitearch", and the like, except that it will use
+C<File::Spec> to make the pathnames work correctly on whatever
+platform you're installing on.
+
+If you want the installation process to look around in C<@INC> for
+other versions of the stuff you're installing and try to delete it,
+you can use the C<uninst> parameter:
+
+ Build install uninst=1
+
+This can be a good idea, as it helps prevent multiple versions of a
+module from being present on your system, which can be a confusing
+situation indeed.
 
 =item fakeinstall
 
 This is just like the C<install> action, but it won't actually do
 anything, it will just report what it I<would> have done if you had
 actually run the C<install> action.
+
+=item versioninstall
+
+** Note: since C<only.pm> is so new, and since we just recently added
+support for it here too, this feature is to be considered
+experimental. **
+
+If you have the C<only.pm> module installed on your system, you can
+use this action to install a module into the version-specific library
+trees. This means that you can have several versions of the same
+module installed and C<use> a specific one like this:
+
+ use only MyModule => 0.55;
+
+To override the default installation libraries in C<only::config>,
+specify the C<versionlib> parameter when you run the C<Build.PL> script:
+
+ perl Build.PL versionlib=/my/version/place/
+
+To override which version the module is installed as, specify the
+C<versionlib> parameter when you run the C<Build.PL> script:
+
+ perl Build.PL version=0.50
+
+See the C<only.pm> documentation for more information on
+version-specific installs.
 
 =item manifest
 
@@ -764,6 +846,11 @@ This action is helpful for module authors who want to package up their
 module for distribution through a medium like CPAN.  It will create a
 tarball of the files listed in F<MANIFEST> and compress the tarball using
 GZIP compression.
+
+=item distsign
+
+Uses C<Module::Signature> to create a SIGNATURE file for your
+distribution.
 
 =item distcheck
 
@@ -984,6 +1071,13 @@ whether the dynamic declaration of dependencies is a good idea.
 =head1 AUTHOR
 
 Ken Williams, ken@mathforum.org
+
+Development questions, bug reports, and patches should be sent to the
+Module-Build mailing list at module-build-general@lists.sourceforge.net .
+
+An anonymous CVS repository containing the latest development version
+is available; see http://sourceforge.net/cvs/?group_id=45731 for the
+details of how to access it.
 
 =head1 SEE ALSO
 

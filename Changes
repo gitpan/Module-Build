@@ -1,5 +1,43 @@
 Revision history for Perl extension Module::Build.
 
+0.16  Mon Feb 24 13:06:47 CST 2003
+
+ - All three C compilers that perl supports on Windows environments
+   (MSVC, BCC, and GCC) are now supported by Module::Build.  We now
+   reportedly pass all tests on Windows.  [Randy W. Sims]
+
+ - The test t/xs.t, which tests building of XS modules, will be
+   skipped if no C compiler is found. [suggested by Randy W. Sims]
+
+ - The "install" action accepts new "destdir" [motivated by Michael
+   Schwern and Chip Salzenberg] and "uninst" parameters [by Dave
+   Rolsky].  The former prepends an arbitrary directory to all
+   installation paths (useful for package management), and the latter
+   will tell ExtUtils::Install to remove any differing files that are
+   "shadowing" the stuff you're installing from a different location,
+   just like MakeMaker's "make install UNINST=1" command will do.
+
+ - Made changes to the generated Makefile in Module::Build::Compat
+   that much better support Windows platforms [after suggestions by
+   James Freeman]
+
+ - Added experimental support for creating distribution SIGNATURE
+   files via Module::Signature. [Dave Rolsky]
+
+ - Added experimental support for installing via the "only.pm" module,
+   which allows loading specific versions of modules.  Since this
+   module is so new, the interface may still be changing. [Brian
+   Ingerson]
+
+ - Added support for installing executable scripts, via the 'scripts'
+   parameter to new(), and the scripts() accessor method.
+
+ - Fix an infinite loop that occurred when doing 'perl Build.PL
+   config="foo=bar"'
+
+ - Fix up the formatting of the error message the user gets when
+   prereqs aren't satisfied.
+
 0.15  Fri Jan 17 15:00:24 CST 2003
 
  - In link_c(), extra object files were mistakenly being treated as

@@ -37,15 +37,17 @@ sub run_build_pl {
 }
 
 sub fake_makefile {
-  my $out = "THISFILE = $_[1]\n";
-  return $out . <<'EOF';
+  my $makefile = $_[1];
+  my $build = File::Spec->catfile( '.', 'Build' );
+
+  return <<"EOF";
 all :
-	./Build
+	$^X $build
 realclean :
-	./Build realclean
-	rm -f $(THISFILE)
+	$^X $build realclean
+	$^X -e unlink -e shift $makefile
 .DEFAULT :
-	./Build $@
+	$^X $build \$@
 .PHONY   : install manifest
 EOF
 }
