@@ -1,5 +1,50 @@
 Revision history for Perl extension Module::Build.
 
+0.21_02  Tue Dec 23 17:05:11 CST 2003
+
+ - During testing, if YAML.pm isn't installed, then we won't try
+   making a tarball with Archive::Tar either, since this would invoke
+   YAML to create the META.yml file.
+
+ - Fixed a problem with chmod() being called incorrectly on MacOS
+   (i.e. MacPerl, not Mac OS X).  [Spotted by Paul Sanford Toney]
+
+ - Fixed a problem with the --config flag not being treated properly
+   (essentially ignored) on the command line for 'perl Build.PL' or
+   'Build <action>'. [Spotted by Jakub Bogusz]
+
+ - Added a new config() method to get at the Build object's notion of
+   the %Config hash.
+
+ - Test::Harness is starting to contend for the Most Crotchety Module
+   Award.  Work around a few of its nits when setting harness
+   switches. [Spotted by Diab Jerius]
+
+ - Changed the manpage separator on OS/2 to '.'. [Randy Sims]
+
+ - Now the Build script will die() if we're run from the wrong
+   directory, rather than trying to chdir() to the right directory and
+   do its work there.  See
+   https://rt.cpan.org/Ticket/Display.html?id=4039 . [Chris Dolan]
+
+ - On OS/2, disable C compilation, since apparently it isn't working
+   there. [Reported by Ilya Zakharevich]
+
+ - Inserted a comment into auto-generated Makefile.PLs saying it was
+   auto-generated. [Randy Sims]
+
+ - Fixed some annoying behavior in generated passthrough Makefile.PLs
+   when the user chose not to install Module::Build, or if
+   installation failed. [Reported by Ilya Zakharevich and Richard
+   Clamp]
+
+ - Moved the documentation for 'codebase' to the section where it's
+   relevant. [Randy Sims, Glenn Linderman]
+
+ - Made the 'name', 'abstract', 'author', and 'version' properties
+   required when building a PPD file. [Spotted by Randy Sims, Dave
+   Rolsky, & Glenn Linderman]
+
 0.21_01  Wed Dec 17 07:51:49 CST 2003
 
 (A snapshot just because it's been so long since anything has been released)

@@ -2,11 +2,12 @@
 
 use strict;
 use Test;
-BEGIN { plan tests => 19 }
+BEGIN { plan tests => 23 }
 use Module::Build;
 ok(1);
 
 use File::Spec;
+use Cwd;
 require File::Spec->catfile('t', 'common.pl');
 
 ######################### End of black magic.
@@ -75,9 +76,23 @@ chdir 't';
   print "# $info->{message}\n" if $info->{message};
 }
 
+{
+  # Make sure the correct warning message is generated when an
+  # optional prereq isn't installed
+
+  my $flagged = 0;
+  local $SIG{__WARN__} = sub { $flagged = 1 if $_[0] =~ /ModuleBuildNonExistent isn't installed/};
+
+  my $m = new Module::Build
+    (
+     module_name => 'ModuleBuildOne',
+     recommends => {ModuleBuildNonExistent => 3},
+    );
+  ok $flagged;
+}
+
 # Test verbosity
 {
-  require Cwd;
   my $cwd = Cwd::cwd();
 
   chdir 'Sample';
@@ -90,4 +105,18 @@ chdir 't';
   
   $m->dispatch('realclean');
   chdir $cwd or die "Can't change back to $cwd: $!";
+}
+
+# Make sure 'config' entries are respected on the command line
+{
+  my $cwd = Cwd::cwd();
+  use Config;
+  
+  chdir 'Sample';
+  eval {Module::Build->run_perl_script('Build.PL', [], ['--config', "foocakes=barcakes"])};
+  ok $@, '';
+  
+  my $b = Module::Build->resume();
+  ok $b->config->{cc}, $Config{cc};
+  ok $b->config->{foocakes}, 'barcakes';
 }

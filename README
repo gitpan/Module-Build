@@ -457,12 +457,6 @@ METHODS
             matching "$package\s-\s(.+)", and uses the captured text as the
             abstract.
 
-        codebase
-            This can be either a single scalar string, or an array reference
-            of strings. It is required when creating PPD files. It should be
-            a URL, or URLs, to be used as the value for the "<CODEBASE>" tag
-            in the generated PPD.
-
     subclass()
         This creates a new "Module::Build" subclass on the fly, as described
         in the the SUBCLASSING manpage section. The caller must provide
@@ -533,6 +527,12 @@ METHODS
         notes. With one argument, "notes($key)" returns the value associated
         with the given key. With two arguments, "notes($key, $value)" sets
         the value associated with the given key to "$value".
+
+    config()
+        Returns a hash reference containing the "Config.pm" hash, including
+        any changes the author or user has specified. This is a reference to
+        the actual internal hash we use, so you probably shouldn't modify
+        stuff there.
 
     dispatch($action, %args)
         This method is also called from the auto-generated "Build" script.
@@ -1037,6 +1037,15 @@ ACTIONS
         in that directory.
 
     ppd Build a PPD file for your distribution.
+
+        This action takes an optional argument "codebase" which is used in
+        the generated ppd file to specify the (usually relative) URL of the
+        distribution. By default, this value is the distribution name
+        without any path information.
+
+        Example:
+
+         perl Build ppd codebase="MSWin32-x86-multi-thread/Module-Build-0.21.tar.gz"
 
   How Installation Paths are Determined
 

@@ -534,6 +534,8 @@ sub write_config {
   $self->_persistent_hash_write($_) foreach qw(notes cleanup);
 }
 
+sub config         { shift()->{config} }
+
 sub requires       { shift()->{properties}{requires} }
 sub recommends     { shift()->{properties}{recommends} }
 sub build_requires { shift()->{properties}{build_requires} }
@@ -556,9 +558,9 @@ sub prereq_failures {
 
       } elsif ($type eq 'recommends') {
 	next if $status->{ok};
-	$status->{message} = ($status->{have}
-			      ? "Version $status->{have} is installed, but we prefer to have $spec"
-			      : "Optional prerequisite $modname isn't installed");
+	$status->{message} = ($status->{have} eq '<none>'
+			      ? "Optional prerequisite $modname isn't installed"
+			      : "Version $status->{have} of $modname is installed, but we prefer to have $spec");
       } else {
 	next if $status->{ok};
       }
@@ -712,7 +714,7 @@ sub print_build_script {
 
   my @myINC = @INC;
   for (@myINC, values %q) {
-    $_ = File::Spec->rel2abs($_);
+    $_ = File::Spec->canonpath( File::Spec->rel2abs($_) );
     s/([\\\'])/\\$1/g;
   }
 
@@ -723,11 +725,16 @@ sub print_build_script {
 $shebang
 
 use strict;
+use Cwd;
+use File::Spec;
 
 BEGIN {
   \$^W = 1;  # Use warnings
-  my \$start_dir = '$q{base_dir}';
-  chdir(\$start_dir) or die "Cannot chdir to \$start_dir: \$!";
+  my \$curdir = File::Spec->canonpath( Cwd::cwd() );
+  unless (\$curdir eq '$q{base_dir}') {
+    die ('This script must be run from $q{base_dir}, not '."\$curdir\\n".
+	 "Please re-run the Build.PL script here.\\n");
+  }
   \@INC = 
     (
 $quoted_INC
@@ -847,11 +854,12 @@ sub cull_args {
   $args{ARGV} = \@argv;
 
   # 'config' and 'install_path' are additive by hash key
-  my %additive = (config => 1,
-		  install_path => 1);
+  my %additive = (config => $self->{config},
+		  install_path => $self->{properties}{install_path} ||= {});
 
   # Hashify these parameters
   for (keys %additive) {
+    next unless exists $args{$_};
     my %hash;
     $args{$_} ||= [];
     $args{$_} = [ $args{$_} ] unless ref $args{$_};
@@ -867,13 +875,15 @@ sub cull_args {
   $self->{action} = $action if defined $action;
 
   # Extract our 'properties' from $cmd_args, the rest are put in 'args'.
-  foreach my $key (keys %args) {
-    my $add_to = $self->valid_property($key) ? $self->{properties} : $self->{args};
+  while (my ($key, $val) = each %args) {
+    my $add_to = ($additive{$key} ? $additive{$key}
+		  : $self->valid_property($key) ? $self->{properties}
+		  : $self->{args});
 
     if ($additive{$key}) {
-      $add_to->{$key}{$_} = $args{$key}{$_} foreach keys %{$args{$key}};
+      $add_to->{$_} = $val->{$_} foreach keys %$val;
     } else {
-      $add_to->{$key} = $args{$key};
+      $add_to->{$key} = $val;
     }
   }
 
@@ -986,10 +996,14 @@ sub ACTION_test {
   $self->depends_on('code');
   
   # Do everything in our power to work with all versions of Test::Harness
-  my $harness_switches = $p->{debugger} ? ' -w -d' : '';
-  local $Test::Harness::switches    = ($Test::Harness::switches    || '') . $harness_switches;
-  local $Test::Harness::Switches    = ($Test::Harness::Switches    || '') . $harness_switches;
-  local $ENV{HARNESS_PERL_SWITCHES} = ($ENV{HARNESS_PERL_SWITCHES} || '') . $harness_switches;
+  my @harness_switches = $p->{debugger} ? qw(-w -d) : ();
+  local $Test::Harness::switches    = join ' ', grep defined, $Test::Harness::switches, @harness_switches;
+  local $Test::Harness::Switches    = join ' ', grep defined, $Test::Harness::Switches, @harness_switches;
+  local $ENV{HARNESS_PERL_SWITCHES} = join ' ', grep defined, $ENV{HARNESS_PERL_SWITCHES}, @harness_switches;
+  
+  $Test::Harness::switches = undef   unless length $Test::Harness::switches;
+  $Test::Harness::Switches = undef   unless length $Test::Harness::Switches;
+  delete $ENV{HARNESS_PERL_SWITCHES} unless length $ENV{HARNESS_PERL_SWITCHES};
   
   local ($Test::Harness::verbose,
 	 $Test::Harness::Verbose,
