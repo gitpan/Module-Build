@@ -1,6 +1,76 @@
 Revision history for Perl extension Module::Build.
 
-0.13
+0.14  Fri Dec 13 14:06:29 AEST 2002
+
+  - Added support for MacPerl (Mac OS version 9 and below), which (as
+    far as I know) was never natively supported by MakeMaker.  Still
+    lacks support for the 'test' action (because Test::Harness
+    requires forking, which MacPerl won't do) and compiling XS/C files
+    (because I don't know how to invoke a compiler on MacOS, and one
+    may not even be available).  This change is brought to you by
+    Michael Schwern and the letter '('.
+
+  - Improved processing of .xs files.  Now we use the new
+    ExtUtils::ParseXS module if it's available, otherwise we use
+    backticks and write the result to a .c file ourselves.  This
+    avoids the need to do cross-platform shell redirection.
+
+  - Make sure all parts of 'Build test' use the not-yet-installed
+    version of Module::Build.  This only affects the tests for this
+    module, not any of the module code itself.  [Spotted by Schwern]
+
+  - Oopsie - use $Config{ld} instead of $Config{cc} for linking.
+
+  - Added a 'diff' action, which is useful for comparing the details
+    of what you're about to install with what is already installed on
+    your system.  This uses File::Compare, which is in the core.
+
+  - Fixed a problem on Windows in which the _build/ directory wasn't
+    getting deleted during the 'realclean' action, because we had a
+    file open in that directory. [Spotted by Michael Schwern]
+
+  - delete_filetree() now always uses File::Path::rmtree(), regardless
+    of whether the thing being deleted is a file or a directory.  This
+    helps remove things on obscure platforms with strange locking
+    rules (or even not so obscure ones like MacOS).  It also now
+    reports the number of files or directories deleted (without
+    recursing directory contents).
+
+  - rm_previous_build_script() is gone, replaced by calls to
+    delete_filetree().
+
+  - 'Build' now chdir()s in a BEGIN block, so the 'use Module::Build'
+    statement will work correctly.  Solves a problem on MacOS, where
+    the 'Build' script may often be invoked from the wrong working
+    directory.  [Fix by Michael Schwern]
+
+  - Internally we now use the multi-argument form of system() to run
+    external commands (such as 'diff' or 'cc') whenever possible (and
+    whenever we can't avoid system() altogether).  Note that this
+    means we have to handle splitting some strings (such as
+    $Config{ccflags}) into argument lists like the shell would, which
+    is a drag.  However, the alternative would be to handle shell
+    quoting of all arguments to commands ourselves, which is an even
+    bigger drag across platforms and involves arbitrary filenames and
+    so on.
+
+  - To handle the argument splitting mentioned above, a method
+    split_like_shell() has been created.  So far it's just doing naive
+    processing.  In practice, I've yet to actually see a %Config entry
+    that uses quotes & spaces, so the splitting task is usually not
+    very error-prone.
+
+  - The 'test' action now takes a 'test_files' parameter, similar to
+    the (undocumented) ExtUtils::MakeMaker TEST_FILES argument.  Handy
+    during development when fixing bugs.
+
+  - Internally, the rscan_dir() method can now accept a predicate
+    function that decides whether a file/directory should be matched.
+
+  - We now issue a warning message when the author hasn't specified a
+    license type.
+
+0.13  Wed Nov 20 20:07:53 AEST 2002
 
   - 'cleanup' file lists are now written immediately, rather than at
     program termination.  This helps avoid "phantom files" that don't

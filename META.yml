@@ -1,23 +1,26 @@
 --- #YAML:1.0
-build_requires:
-  Test: 0
-conflicts: {}
-distribution_type: module
-dynamic_config: 1
-generated_by: Module::Build version 0.13
-license: perl
 name: Module-Build
-recommends:
-  Archive::Tar: 0.22
-  YAML: 0.35
+version: 0.14
+license: perl
+distribution_type: module
 requires:
   Config: 0
   Cwd: 0
   Data::Dumper: 0
+  ExtUtils::Install: 0
   File::Basename: 0
+  File::Compare: 0
   File::Copy: 0
   File::Find: 0
   File::Path: 0
   File::Spec: 0
   perl: 5.6.0
-version: 0.13
+recommends:
+  Archive::Tar: 0.22
+  ExtUtils::Install: 0.3
+  ExtUtils::ParseXS: 0
+  YAML: 0.35
+build_requires:
+  Test: 0
+conflicts: {}
+generated_by: Module::Build version 0.14

@@ -1,6 +1,6 @@
 package Module::Build::Base;
 
-# $Id: Base.pm,v 1.42 2002/11/20 08:58:46 kwilliams Exp $
+# $Id: Base.pm,v 1.54 2002/12/13 03:01:56 kwilliams Exp $
 
 use strict;
 use Config;
@@ -9,6 +9,7 @@ use File::Find ();
 use File::Path ();
 use File::Basename ();
 use File::Spec ();
+use File::Compare ();
 use Data::Dumper ();
 
 sub new {
@@ -57,7 +58,6 @@ sub new {
 				   %input,
 				   %$cmd_properties,
 				  },
-		    new_cleanup => {},
 		   }, $package;
   my $p = $self->{properties};
 
@@ -70,8 +70,6 @@ sub new {
       unless exists $p->{dist_name};
     $p->{dist_version_from} = join( '/', 'lib', split '::', $p->{module_name} ) . '.pm'
       unless exists $p->{dist_version_from} or exists $p->{dist_version};
-    
-    delete $p->{module_name};
   }
 
   $self->check_manifest;
@@ -85,6 +83,8 @@ sub cwd {
   require Cwd;
   return Cwd::cwd;
 }
+
+sub base_dir { shift()->{properties}{base_dir} }
 
 sub prompt {
   my $self = shift;
@@ -207,7 +207,7 @@ sub find_version {
   my $version_from;
   if (exists $p->{dist_version_from}) {
     # dist_version_from is always a Unix-style path
-    $version_from = File::Spec->catfile( split '/', delete $p->{dist_version_from} );
+    $version_from = File::Spec->catfile( split '/', $p->{dist_version_from} );
   } else {
     die "Must supply either 'dist_version', 'dist_version_from', or 'module_name' parameter";
   }
@@ -232,22 +232,21 @@ sub version_from_file {
   # Some of this code came from the ExtUtils:: hierarchy.
   open my($fh), $file or die "Can't open '$file' for version: $!";
   while (<$fh>) {
-    if ( /([\$*])(([\w\:\']*)\bVERSION)\b.*\=/ ) {
+    if ( my ($sigil, $var) = /([\$*])(([\w\:\']*)\bVERSION)\b.*\=/ ) {
       my $eval = qq{
 		    package Module::Build::Base::_version;
 		    no strict;
 		    
-		    local $1$2;
-		    \$$2=undef; do {
+		    local $sigil$var;
+		    \$$var=undef; do {
 		      $_
-		    }; \$$2
+		    }; \$$var
 		   };
       local $^W;
       return scalar eval $eval;
     }
   }
   return undef;
-  #die "Couldn't find version string in '$file'";
 }
 
 sub add_to_cleanup {
@@ -256,10 +255,8 @@ sub add_to_cleanup {
   return unless @need_to_write;
   
   if ( my $file = $self->config_file('cleanup') ) {
-    if ( !$self->{cleanup_fh} ) {
-      open $self->{cleanup_fh}, ">> $file" or die "Can't append to $file: $!";
-    }
-    print {$self->{cleanup_fh}} "$_\n" foreach @need_to_write;
+    open my($fh), ">> $file" or die "Can't append to $file: $!";
+    print $fh "$_\n" foreach @need_to_write;
   }
   
   @{$self->{cleanup}}{ @need_to_write } = ();
@@ -426,16 +423,16 @@ sub check_installed_version {
   return 0;
 }
 
-sub rm_previous_build_script {
-  my $self = shift;
-  if (-e $self->{properties}{build_script}) {
-    print "Removing previous file '$self->{properties}{build_script}'\n";
-    unlink $self->{properties}{build_script} or die "Couldn't remove '$self->{properties}{build_script}': $!";
-  }
-}
+sub make_executable {
+  # Perl's chmod() is mapped to useful things on various non-Unix
+  # platforms, so we use it in the base class even though it looks
+  # Unixish.
 
-sub make_build_script_executable {
-  chmod 0544, $_[0]->{properties}{build_script};
+  my $self = shift;
+  foreach (@_) {
+    my $current_mode = (stat $_)[2];
+    chmod $current_mode | 0111, $_;
+  }
 }
 
 sub print_build_script {
@@ -444,7 +441,7 @@ sub print_build_script {
   my $build_package = ref($self);
 
   my ($config_dir, $build_script, $base_dir) = 
-    ($self->{properties}{config_dir}, $self->{properties}{build_script}, $self->{properties}{base_dir});
+    ($self->{properties}{config_dir}, $self->{properties}{build_script}, $self->base_dir);
 
   my @myINC = @INC;
   for ($config_dir, $build_script, $base_dir, @myINC) {
@@ -456,9 +453,11 @@ sub print_build_script {
   print $fh <<EOF;
 $self->{config}{startperl} -w
 
-BEGIN { \@INC = ($quoted_INC) }
+BEGIN {
+  chdir('$base_dir') or die 'Cannot chdir to $base_dir: '.\$!;
+  \@INC = ($quoted_INC);
+}
 
-chdir('$base_dir') or die 'Cannot chdir to $base_dir: '.\$!;
 use $build_package;
 
 # This should have just enough arguments to be able to bootstrap the rest.
@@ -474,18 +473,21 @@ EOF
 
 sub create_build_script {
   my ($self) = @_;
+  my $p = $self->{properties};
   
   $self->write_config;
   
-  $self->rm_previous_build_script;
+  if ( $self->delete_filetree($p->{build_script}) ) {
+    print "Removed previous script '$p->{build_script}'\n";
+  }
 
-  print("Creating new '$self->{properties}{build_script}' script for ",
-	"'$self->{properties}{dist_name}' version '$self->{properties}{dist_version}'\n");
-  open my $fh, ">$self->{properties}{build_script}" or die "Can't create '$self->{properties}{build_script}': $!";
+  print("Creating new '$p->{build_script}' script for ",
+	"'$p->{dist_name}' version '$p->{dist_version}'\n");
+  open my $fh, ">$p->{build_script}" or die "Can't create '$p->{build_script}': $!";
   $self->print_build_script($fh);
   close $fh;
   
-  $self->make_build_script_executable;
+  $self->make_executable($p->{build_script});
 
   return 1;
 }
@@ -560,6 +562,21 @@ sub super_classes {
   return @super, map {$self->super_classes($_,$seen)} @super;
 }
 
+sub known_actions {
+  my ($self) = @_;
+
+  my %actions;
+  no strict 'refs';
+  
+  foreach my $class ($self->super_classes) {
+    foreach ( keys %{ $class . '::' } ) {
+      $actions{$1}++ if /ACTION_(\w+)/;
+    }
+  }
+
+  return sort keys %actions;
+}
+
 sub ACTION_help {
   my ($self) = @_;
 
@@ -571,19 +588,7 @@ sub ACTION_help {
  Actions defined:
 EOF
 
-  my %actions;
-  {
-    no strict 'refs';
-    
-    foreach my $class ($self->super_classes) {
-      #print "Checking $class\n";
-      foreach ( keys %{ $class . '::' } ) {
-	$actions{$1}++ if /ACTION_(\w+)/;
-      }
-    }
-  }
-
-  my @actions = sort keys %actions;
+  my @actions = $self->known_actions;
   # Flow down columns, not across rows
   @actions = map $actions[($_ + ($_ % 2) * @actions) / 2],  0..$#actions;
   
@@ -611,16 +616,18 @@ sub ACTION_test {
          $ENV{HARNESS_VERBOSE}) = ($self->{properties}{verbose} || 0) x 4;
 
   # Make sure we test the module in blib/
-  {
-    local $SIG{__WARN__} = sub {};  # shut blib.pm up
-    eval "use blib";
-  }
-  die $@ if $@;
+  local @INC = (File::Spec->catdir('blib', 'lib'),
+		File::Spec->catdir('blib', 'arch'),
+		@INC);
   
   # Find all possible tests and run them
   my @tests;
-  push @tests, 'test.pl'                          if -e 'test.pl';
-  push @tests, @{$self->rscan_dir('t', qr{\.t$})} if -e 't' and -d _;
+  if ($self->{args}{test_files}) {
+    @tests = ($self->{args}{test_files});
+  } else {
+    push @tests, 'test.pl'                          if -e 'test.pl';
+    push @tests, @{$self->rscan_dir('t', qr{\.t$})} if -e 't' and -d _;
+  }
   if (@tests) {
     # Work around a Test::Harness bug that loses the particular perl we're running under
     local $^X = $self->{config}{perlpath} unless $Test::Harness::VERSION gt '2.01';
@@ -667,6 +674,45 @@ sub ACTION_build {
   $self->lib_to_blib($files, 'blib');
 }
 
+# For systems that don't have 'diff' executable, should use Algorithm::Diff
+sub ACTION_diff {
+  my $self = shift;
+  $self->depends_on('build');
+  my @myINC = grep {$_ ne 'lib'} @INC;
+  my @flags = $self->split_like_shell($self->{args}{flags} || '');
+  
+  my $installmap = $self->install_map('blib');
+  delete $installmap->{read};
+
+  my $text_suffix = qr{\.(pm|pod)$};
+
+  while (my $localdir = each %$installmap) {
+    my $files = $self->rscan_dir($localdir, sub {-f});
+    
+    foreach my $file (@$files) {
+      my @parts = File::Spec->splitdir($file);
+      my @localparts = File::Spec->splitdir($localdir);
+      @parts = @parts[@localparts .. $#parts]; # Get rid of blib/lib or similar
+      
+      my $installed = $self->find_module_by_name(join('::', @parts), \@myINC);
+      if (not $installed) {
+	print "Only in lib: $file\n";
+	next;
+      }
+      
+      my $status = File::Compare::compare($installed, $file);
+      next if $status == 0;  # Files are the same
+      die "Can't compare $installed and $file: $!" if $status == -1;
+      
+      if ($file !~ /$text_suffix/) {
+	print "Binary files $file and $installed differ\n";
+      } else {
+	$self->do_system('diff', @flags, $installed, $file);
+      }
+    }
+  }
+}
+
 sub process_PL_files {
   my ($self, $dir) = @_;
   my $p = $self->{properties}{PL_files};
@@ -699,7 +745,7 @@ sub ACTION_fakeinstall {
 
 sub ACTION_clean {
   my ($self) = @_;
-  foreach my $item (keys %{$self->{cleanup}}, keys %{$self->{new_cleanup}}) {
+  foreach my $item (keys %{$self->{cleanup}}) {
     $self->delete_filetree($item);
   }
 }
@@ -769,10 +815,10 @@ sub ACTION_disttest {
   my $dist_dir = $self->dist_dir;
   chdir $dist_dir or die "Cannot chdir to $dist_dir: $!";
   # XXX could be different names for scripts
-  $self->do_system("$^X Build.PL") or die "Error executing '$^X Build.PL' in dist directory: $!";
+  $self->do_system($^X, 'Build.PL') or die "Error executing '$^X Build.PL' in dist directory: $!";
   $self->do_system('./Build') or die "Error executing './Build' in dist directory: $!";
-  $self->do_system('./Build test') or die "Error executing './Build test' in dist directory: $!";
-  chdir $self->{properties}{base_dir};
+  $self->do_system('./Build', 'test') or die "Error executing './Build test' in dist directory: $!";
+  chdir $self->base_dir;
 }
 
 sub ACTION_manifest {
@@ -792,30 +838,35 @@ sub write_metadata {
   my ($self, $file) = @_;
   my $p = $self->{properties};
 
-  $p->{license} ||= 'unknown';
+  unless ($p->{license}) {
+    warn "No license specified, setting license = 'unknown'\n";
+    $p->{license} = 'unknown';
+  }
   unless (grep {$p->{license} eq $_} qw(perl gpl restrictive artistic unknown)) {
     die "Unknown license type '$p->{license}";
   }
 
-  my %metadata = (
-		  distribution_type => 'module',
-		  dynamic_config => 0,
-		  name => $p->{dist_name},
-		  version => $p->{dist_version},
-		  license => $p->{license},
-		  generated_by => (ref($self) || $self) . " version " . $self->VERSION,
-		 );
-  
-  foreach (qw(requires build_requires recommends conflicts dynamic_config)) {
-    $metadata{$_} = $p->{$_} if exists $p->{$_};
-  }
-  
   unless (eval {require YAML; 1}) {
     warn "Couldn't load YAML.pm: $@\n";
     return;
   }
-  return YAML::StoreFile($file, \%metadata) if $YAML::VERSION le '0.30';
-  return YAML::DumpFile( $file, \%metadata);
+
+  # We use YAML::Node to get the order nice in the YAML file.
+  my $node = YAML::Node->new({});
+  
+  $node->{name} = $p->{dist_name};
+  $node->{version} = $p->{dist_version};
+  $node->{license} = $p->{license};
+  $node->{distribution_type} = 'module';
+
+  foreach (qw(requires recommends build_requires conflicts dynamic_config)) {
+    $node->{$_} = $p->{$_} if exists $p->{$_};
+  }
+  
+  $node->{generated_by} = "Module::Build version " . Module::Build->VERSION;
+
+  return YAML::StoreFile($file, $node ) if $YAML::VERSION le '0.30';
+  return YAML::DumpFile( $file, $node );
 }
 
 sub make_tarball {
@@ -848,24 +899,26 @@ sub depends_on {
 sub rscan_dir {
   my ($self, $dir, $pattern) = @_;
   my @result;
-  my $subr = $pattern ? sub {push @result, $File::Find::name if /$pattern/}
-                      : sub {push @result, $File::Find::name};
+  my $subr = !$pattern ? sub {push @result, $File::Find::name} :
+             !ref($pattern) || (ref $pattern eq 'Regexp') ? sub {push @result, $File::Find::name if /$pattern/} :
+	     ref($pattern) eq 'CODE' ? sub {push @result, $File::Find::name if $pattern->()} :
+	     die "Unknown pattern type";
+  
   File::Find::find({wanted => $subr, no_chdir => 1}, $dir);
   return \@result;
 }
 
 sub delete_filetree {
   my $self = shift;
+  my $deleted = 0;
   foreach (@_) {
     next unless -e $_;
     print "Deleting $_\n";
-    if (-d $_) {
-      File::Path::rmtree($_, 0, 0);
-    } else {
-      unlink $_;
-    }
+    File::Path::rmtree($_, 0, 0);
     die "Couldn't remove '$_': $!\n" if -e $_;
+    $deleted++;
   }
+  return $deleted;
 }
 
 sub lib_to_blib {
@@ -907,36 +960,99 @@ sub compile_c {
   # File name, minus the suffix
   (my $file_base = $file) =~ s/\.[^.]+$//;
   my $obj_file = "$file_base$cf->{obj_ext}";
+  $self->add_to_cleanup($obj_file);
   return $obj_file if $self->up_to_date($file, $obj_file);
   
-  $self->add_to_cleanup($obj_file);
   my $coredir = File::Spec->catdir($cf->{archlib}, 'CORE');
-  my $include_dirs = $self->{include_dirs} ? join ' ', map {"-I$_"} @{$self->{include_dirs}} : '';
-  $self->do_system("$cf->{cc} $include_dirs -c $cf->{ccflags} -I$coredir -o $obj_file $file")
+  my @include_dirs = $self->{include_dirs} ? map {"-I$_"} @{$self->{include_dirs}} : ();
+  my @ccflags = split ' ', $cf->{ccflags};
+  $self->do_system($cf->{cc}, @include_dirs, '-c', @ccflags, "-I$coredir", '-o', $obj_file, $file)
     or die "error building $cf->{dlext} file from '$file'";
 
   return $obj_file;
 }
 
 sub link_c {
-  my ($self, $archdir, $file_base) = @_;
+  my ($self, $to, $file_base) = @_;
   my $cf = $self->{config}; # For convenience
 
-  my $lib_file = File::Spec->catfile($archdir, File::Basename::basename("$file_base.$cf->{dlext}"));
+  my $lib_file = File::Spec->catfile($to, File::Basename::basename("$file_base.$cf->{dlext}"));
+  $self->add_to_cleanup($lib_file);
   my $objects = $self->{objects} || [];
 
   unless ($self->up_to_date("$file_base$cf->{obj_ext}", [$lib_file, @$objects])) {
-    my $linker_flags = $cf->{extra_linker_flags} || '';
-    $self->do_system("$cf->{shrpenv} $cf->{cc} $cf->{lddlflags} -o $lib_file ".
-		     "$file_base$cf->{obj_ext} @$objects $linker_flags")
+    my @linker_flags = $self->split_like_shell($cf->{extra_linker_flags} || '');
+    my @lddlflags = $self->split_like_shell($cf->{lddlflags});
+    my @shrp = $self->split_like_shell($cf->{shrpenv});
+    $self->do_system(@shrp, $cf->{ld}, @lddlflags, '-o', $lib_file,
+		     "$file_base$cf->{obj_ext}", @$objects, @linker_flags)
       or die "error building $file_base$cf->{obj_ext} from '$file_base.$cf->{dlext}'";
+  }
+}
+
+sub compile_xs {
+  my ($self, $file) = @_;
+  (my $file_base = $file) =~ s/\.[^.]+$//;
+
+  print "$file -> $file_base.c\n";
+  
+  if (eval {require ExtUtils::ParseXS; 1}) {
+    
+    ExtUtils::ParseXS::process_file(
+				    filename => $file,
+				    prototypes => 0,
+				    output => "$file_base.c",
+				   );
+  } else {
+    # Ok, I give up.  Just use backticks.
+    
+    my $xsubpp  = $self->find_module_by_name('ExtUtils::xsubpp', \@INC)
+      or die "Can't find ExtUtils::xsubpp in INC (@INC)";
+    
+    my $typemap =  $self->find_module_by_name('ExtUtils::typemap', \@INC);
+    my $cf = $self->{config};
+    
+    my $command = (qq{$^X "-I$cf->{archlib}" "-I$cf->{privlib}" "$xsubpp" -noprototypes } .
+		   qq{-typemap "$typemap" "$file"});
+    
+    print $command;
+    open my($fh), "> $file_base.c" or die "Couldn't write $file_base.c: $!";
+    print $fh `$command`;
+    close $fh;
+  }
+}
+
+sub split_like_shell {
+  my $self = shift;
+  local $_ = shift;
+  return wantarray ? () : '' unless defined() && length();
+  
+  return split ' ', $_;  # XXX This is naive - needs a fix
+}
+
+sub stdout_to_file {
+  my ($self, $coderef, $redirect) = @_;
+  local *SAVE;
+  if ($redirect) {
+    open SAVE, ">&STDOUT" or die "Can't save STDOUT handle: $!";
+    open STDOUT, "> $redirect" or die "Can't create '$redirect': $!";
+  }
+
+  $coderef->();
+
+  if ($redirect) {
+    close STDOUT;
+    open STDOUT, ">&SAVE" or die "Can't restore STDOUT: $!";
   }
 }
 
 sub run_perl_script {
   my ($self, $script, $preargs, $postargs) = @_;
-  $preargs ||= '';   $postargs ||= '';
-  return $self->do_system("$self->{config}{perlpath} $preargs $script $postargs");
+  foreach ($preargs, $postargs) {
+    $_ = [ $self->split_like_shell($_) ] unless ref();
+  }
+  
+  return $self->do_system($self->{config}{perlpath}, @$preargs, $script, @$postargs);
 }
 
 # A lot of this looks Unixy, but actually it may work fine on Windows.
@@ -951,15 +1067,7 @@ sub process_xs {
   # .xs -> .c
   unless ($self->up_to_date($file, "$file_base.c")) {
     $self->add_to_cleanup("$file_base.c");
-    
-    my $xsubpp  = $self->find_module_by_name('ExtUtils::xsubpp', \@INC)
-      or die "Can't find ExtUtils::xsubpp in INC (@INC)";
-    my $typemap =  $self->find_module_by_name('ExtUtils::typemap', \@INC);
-    
-    # XXX the '> $file_base.c' isn't really a post-arg, it's redirection.  Fix later.
-    $self->run_perl_script($xsubpp, "-I$cf->{archlib} -I$cf->{privlib}", 
-			   "-noprototypes -typemap '$typemap' $file > $file_base.c")
-      or die "error building .c file from '$file'";
+    $self->compile_xs($file);
   }
   
   # .c -> .o
@@ -988,9 +1096,9 @@ sub process_xs {
 }
 
 sub do_system {
-  my ($self, $cmd, $silent) = @_;
-  print "$cmd\n" unless $silent;
-  return !system($cmd);
+  my ($self, @cmd) = @_;
+  print "@cmd\n";
+  return !system(@cmd);
 }
 
 sub copy_if_modified {
@@ -1003,7 +1111,7 @@ sub copy_if_modified {
   } else {
     $to_path = File::Spec->catfile($to, $file);
   }
-  return if -e $to_path and -M $to_path < -M $file;  # Already fresh
+  return if $self->up_to_date($file, $to_path); # Already fresh
   
   # Create parent directories
   File::Path::mkpath(File::Basename::dirname($to_path), 0, 0777);
@@ -1024,12 +1132,11 @@ sub up_to_date {
     $most_recent_source = -M $file if -M $file < $most_recent_source;
   }
   
-  foreach my $file (@derived) {
-    return 0 if -M $file > $most_recent_source;
+  foreach my $derived (@derived) {
+    return 0 if -M $derived > $most_recent_source;
   }
   return 1;
 }
-
 
 #sub is_newer_than {
 #  my ($self, $one, $two) = @_;
