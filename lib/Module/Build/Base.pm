@@ -155,6 +155,7 @@ sub find_perl_interpreter {
 }
 
 sub base_dir { shift()->{properties}{base_dir} }
+sub installdirs { shift()->{properties}{installdirs} }
 
 sub prompt {
   my $self = shift;
@@ -235,6 +236,7 @@ sub notes {
        install_types
        install_sets
        install_path
+       install_base
        installdirs
        destdir
        debugger
@@ -640,8 +642,7 @@ sub check_installed_status {
     
     next if $op eq '>=' and !$version;  # Module doesn't have to actually define a $VERSION
     
-    unless (eval "\$status{have} $op \$version") {
-      warn $@ if $@;
+    unless ($self->compare_versions( $status{have}, $op, $version )) {
       $status{message} = "Version $status{have} is installed, but we need version $op $version";
       return \%status;
     }
@@ -649,6 +650,21 @@ sub check_installed_status {
   
   $status{ok} = 1;
   return \%status;
+}
+
+sub compare_versions {
+  my $self = shift;
+  my ($v1, $op, $v2) = @_;
+
+  # for alpha versions - this doesn't cover all cases, but should work for most:
+  $v1 =~ s/_(\d+)\z/$1/;
+  $v2 =~ s/_(\d+)\z/$1/;
+
+  my $eval_str = "\$v1 $op \$v2";
+  my $result   = eval $eval_str;
+  warn "error comparing versions: '$eval_str' $@" if $@;
+
+  return $result;
 }
 
 # I wish I could set $! to a string, but I can't, so I use $@
@@ -764,12 +780,12 @@ sub dispatch {
   my $self = shift;
 
   if (@_) {
-    (local $self->{action}, my %p) = @_;
+    my ($action, %p) = @_;
     my $args = $p{args} ? delete($p{args}) : {};
     
     local $self->{args} = {%{$self->{args}}, %$args};
     local $self->{properties} = {%{$self->{properties}}, %p};
-    return $self->_call_action($self->{action});
+    return $self->_call_action($action);
   }
 
   die "No build action specified" unless $self->{action};
@@ -778,8 +794,9 @@ sub dispatch {
 
 sub _call_action {
   my ($self, $action) = @_;
-  my $method = "ACTION_$self->{action}";
-  die "No action '$self->{action}' defined" unless $self->can($method);
+  local $self->{action} = $action;
+  my $method = "ACTION_$action";
+  die "No action '$action' defined" unless $self->can($method);
   return $self->$method();
 }
 
@@ -1151,8 +1168,8 @@ eval 'exec $interpreter $arg -S \$0 \${1+"\$\@"}'
 sub ACTION_builddocs {
   my $self = shift;
   require Pod::Man;
-  $self->manify_bin_pods();
-  $self->manify_lib_pods();
+  $self->manify_bin_pods() if $self->install_destination('bindoc');
+  $self->manify_lib_pods() if $self->install_destination('libdoc');
 }
 
 sub manify_bin_pods {
@@ -1167,6 +1184,7 @@ sub manify_bin_pods {
   foreach my $file (keys %$files) {
     my $manpage = $self->man1page_name( $file ) . '.' . $self->{config}{man1ext};
     my $outfile = File::Spec->catfile( $mandir, $manpage);
+    next if $self->up_to_date( $file, $outfile );
     print "Manifying $file -> $outfile\n";
     $parser->parse_from_file( $file, $outfile );
     $files->{$file} = $outfile;
@@ -1185,6 +1203,7 @@ sub manify_lib_pods {
   foreach my $file (keys %$files) {
     my $manpage = $self->man3page_name( $file ) . '.' . $self->{config}{man3ext};
     my $outfile = File::Spec->catfile( $mandir, $manpage);
+    next if $self->up_to_date( $file, $outfile );
     print "Manifying $file -> $outfile\n";
     $parser->parse_from_file( $file, $outfile );
     $files->{$file} = $outfile;
@@ -1198,7 +1217,7 @@ sub _find_pods {
     my $dir = $self->localize_file_path($spec);
     next unless -e $dir;
     do { $files{$_} = $_ if $self->contains_pod( $_ ) }
-      for @{ $self->rscan_dir( $dir, sub { -f $File::Find::name } ) };
+      for @{ $self->rscan_dir( $dir ) };
   }
   return \%files;
 }
@@ -1617,7 +1636,7 @@ sub install_map {
 sub depends_on {
   my $self = shift;
   foreach my $action (@_) {
-    $self->dispatch($action);
+    $self->_call_action($action);
   }
 }
 

@@ -12,7 +12,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.19_03';
+$VERSION = '0.19_04';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -133,16 +133,17 @@ This illustrates initial configuration and the running of three
 'actions'.  In this case the actions run are 'build' (the default
 action), 'test', and 'install'.  Actions defined so far include:
 
-  build                          help        
+  build                          fakeinstall 
+  builddocs                      help        
   clean                          install     
   diff                           manifest    
-  dist                           manifypods  
+  dist                           ppd         
   distcheck                      realclean   
   distclean                      skipcheck   
   distdir                        test        
-  distsign                       testdb      
-  disttest                       versioninstall
-  fakeinstall
+  distmeta                       testdb      
+  distsign                       versioninstall
+  disttest                                   
 
 You can run the 'help' action for a complete list of actions.
 
@@ -542,6 +543,29 @@ To link your XS code against glib you might write something like:
      extra_linker_flags   => `glib-config --libs`,
  );
 
+=item dist_author
+
+This should be something like "John Doe <jdoe@example.com>".  This is
+used when creating PPD files.  If this is not specified, then
+C<Module::Build> looks at the module from which it gets the
+distribution's version.  If it finds a POD section marked "=head1
+AUTHOR", then it uses the contents of this section.
+
+=item dist_abstract
+
+This should be a short description of the distribution.  This is used
+when creating PPD files.  If it is not given then C<Module::Build>
+looks in the POD of the module from which it gets the distribution's
+version.  It looks for the first line matching C<$package\s-\s(.+)>,
+and uses the captured text as the abstract.
+
+=item codebase
+
+This can be either a single scalar string, or an array reference of
+strings.  It is required when creating PPD files.  It should be a URL,
+or URLs, to be used as the value for the C<< <CODEBASE> >> tag in the
+generated PPD.
+
 =back
 
 =item create_build_script()
@@ -765,6 +789,25 @@ i.e. where the C<Build.PL> script and the C<lib> directory can be
 found.  This is usually the same as the current working directory,
 because the C<Build> script will C<chdir()> into this directory as
 soon as it begins execution.
+
+=item up_to_date($source_file, $derived_file)
+
+=item up_to_date(\@source_files, \@derived_files)
+
+This method can be used to compare a set of source files to a set of
+derived files.  If any of the source files are newer than any of the
+derived files, it returns false.  Additionally, if any of the derived
+files do not exist, it returns false.  Otherwise it returns true.
+
+The arguments may be either a scalar or an array reference of file
+names.
+
+=item contains_pod($file)
+
+Returns true if the given file appears to contain POD documentation.
+Currently this checks whether the file has a line beginning with
+'=pod', '=head', or '=item', but the exact semantics may change in the
+future.
 
 =back
 
@@ -994,6 +1037,10 @@ GZIP compression.
 Uses C<Module::Signature> to create a SIGNATURE file for your
 distribution.
 
+=item distmeta
+
+Creates the F<META.yml> file for your distribution.
+
 =item distcheck
 
 Reports which files are in the build directory but not in the
@@ -1029,6 +1076,10 @@ F<MANIFEST> - if it's not, a warning will be issued.
 Performs the 'distdir' action, then switches into that directory and
 runs a C<perl Build.PL>, followed by the 'build' and 'test' actions in
 that directory.
+
+=item ppd
+
+Build a PPD file for your distribution.
 
 =back
 

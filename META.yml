@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: Module-Build
-version: 0.19_03
+version: 0.19_04
 license: perl
 distribution_type: module
 requires:
@@ -27,7 +27,7 @@ conflicts: {}
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: 0.19_03
+    version: 0.19_04
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
   Module::Build::Compat:
@@ -65,4 +65,4 @@ provides:
     file: lib/Module/Build/Platform/Windows.pm
   Module::Build::Platform::darwin:
     file: lib/Module/Build/Platform/darwin.pm
-generated_by: Module::Build version 0.19_03
+generated_by: Module::Build version 0.19_04
