@@ -2,7 +2,7 @@
 
 use strict;
 use Test;
-BEGIN { plan tests => 42 }
+BEGIN { plan tests => 49 }
 use Module::Build;
 ok(1);
 
@@ -163,4 +163,20 @@ chdir 't';
   ok $words[1], 'two three';
   ok $words[2], 'fo"ur ';
   ok $words[3], 'five';
+
+  # Test whitespace handling
+  @words = Module::Build->split_like_shell(q{ foo bar });
+  ok @words, 2;
+  ok $words[0], 'foo';
+  ok $words[1], 'bar';
+
+  # Test some Win32-specific stuff
+  my $win = 'Module::Build::Platform::Windows';
+  eval "use $win; 1" or die $@;
+  
+  @words = $win->split_like_shell(q{foo "\bar\baz" "b\"nai"});
+  ok @words, 3;
+  ok $words[0], 'foo';
+  ok $words[1], '\bar\baz';
+  ok $words[2], 'b"nai';
 }
