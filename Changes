@@ -6,13 +6,62 @@ Revision history for Perl extension Module::Build.
    signature tests if we're testing noninteractively, or if the user's
    gpg setup isn't right, etc.
  
- - Get the installation to nonstandard locations figured out and
-   working, finally
+ - Get the 'install_base' parameter working as documented.
 
-0.19 (Future release)
+0.18_03
 
+ - Added support for the 'install_path' parameter, which allows custom
+   specification of where things should be installed.  This is a major
+   improvement to Module::Build's functionality.
+
+ - Command-line arguments may now either be specified using the syntax
+   '--foo foovalue' as well as the traditional syntax 'foo=foovalue'.
+   The former is often more convenient for shell tab-completion when
+   the value is a filename (as in 'Build test --test_files t/basic.t').
+
+ - Command-line arguments may now include non-named parameters, which
+   make some actions more natural.  For instance, the 'diff' action
+   may now be invoked as 'Build diff -u' rather than as
+   'Build diff flags=-u'.
+
+ - Pass-through Makefile.PLs now convert unknown Makefile.PL
+   parameters to lower-case and hand them to Build.PL, rather than
+   ignoring them.  This means we only have to account for the
+   differences in the interface, not the entire interface, in
+   translating parameters.
+
+ - We now issue a warning & don't proceed if asked to make a distdir
+   and there's no MANIFEST or it's empty.
+
+ - We now install scripts by default to $Config{installsitebin}
+   instead of $Config{installscript}.  Neither is a great choice, but
+   the former is likely to be [analogous to] /usr/local/bin, and the
+   latter is likely to be [something like] /usr/bin .  If/when there's
+   a $Config{installsitescript}, we'll start using that automatically.
+
+ - Moved INSTALL to INSTALL.txt to increase compatibility with various
+   odd versions of 'make' during 'make install' on case-insensitive
+   filesystems (like nmake on Win32, often).  Only affects the
+   Makefile compatibility layer.  [reported by Andrew Savage]
+
+ - Module::Build->known_actions() now works as a class method.
+
+ - We now use the correct perl interpreter (via
+   Module::Build->find_perl_interpreter) in pass-through makefiles.
+
+ - Pass-through makefiles now list each action individually rather
+   than using a ".DEFAULT" catch-all.  This improves compatibility
+   with 'nmake' on Win32, and probably some other less common 'make'
+   dialects.  [Andrew Savage]
+
+ - We're now more aggressive about testing the pass-through makefiles,
+   e.g. making sure they can run 'all' and 'test' targets, and making
+   sure the Makefile itself actually exists.
 
 0.18_02  Sun Jun  1 18:32:22 CDT 2003
+
+ - Fixed a problem with check_installed_status() when installed
+   version contains non-numeric characters like underscores.
 
  - Fixed a problem with a bareword 'File::Spec' in one of the test
    scripts that caused it not to compile under 5.8.0 (but is fine

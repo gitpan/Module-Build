@@ -12,7 +12,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.18_02';
+$VERSION = '0.18_03';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -107,9 +107,19 @@ the "./" notation, you can do this:
 
 =head1 DESCRIPTION
 
-This is a beta version of a new module I've been working on,
-C<Module::Build>.  It is meant to be a replacement for
-C<ExtUtils::MakeMaker>.
+C<Module::Build> is a system for building, testing, and installing
+Perl modules.  It is meant to be a replacement for
+C<ExtUtils::MakeMaker>.  Developers may alter the behavior of the
+module through subclassing in a much more straightforward way than
+with C<MakeMaker>.  It also does not require a C<make> on your system
+- most of the C<Module::Build> code is pure-perl and written in a very
+cross-platform way.  In fact, you don't even need a shell, so even
+platforms like MacOS (traditional) can use it fairly easily.  Its only
+prerequisites are modules that are included with perl 5.6.0, and it
+works fine on perl 5.005 if you can install a few additional modules.
+
+See L<MOTIVATIONS> for more comparisons between C<ExtUtils::MakeMaker>
+and C<Module::Build>.
 
 To install C<Module::Build>, and any other module that uses
 C<Module::Build> for its installation process, do the following:
@@ -140,14 +150,14 @@ When creating a C<Build.PL> script for a module, something like the
 following code will typically be used:
 
   use Module::Build;
-  my $build = new Module::Build
+  my $build = Module::Build->new
     (
      module_name => 'Foo::Bar',
      license => 'perl',
      requires => {
-                  perl           => '5.6.1',
-                  Some::Module   => '1.23',
-                  Other::Module  => '>= 1.2, != 1.5, < 2.0',
+                  'perl'           => '5.6.1',
+                  'Some::Module'   => '1.23',
+                  'Other::Module'  => '>= 1.2, != 1.5, < 2.0',
                  },
     );
   $build->create_build_script;
@@ -164,11 +174,11 @@ C<Build.PL> script:
 The model used by C<Module::Build> is a lot like the C<MakeMaker>
 metaphor, with the following correspondences:
 
-   In ExtUtils::MakeMaker               In Module::Build
-  ------------------------             ---------------------------
-   Makefile.PL (initial script)         Build.PL (initial script)
-   Makefile (a long Makefile)           Build (a short perl script)
-   <none>                               _build/ (for saving state info)
+   In Module::Build                 In ExtUtils::MakeMaker
+  ---------------------------      ------------------------
+   Build.PL (initial script)        Makefile.PL (initial script)
+   Build (a short perl script)      Makefile (a long Makefile)
+   _build/ (saved state info)       various config text in the Makefile
 
 Any customization can be done simply by subclassing C<Module::Build>
 and adding a method called (for example) C<ACTION_test>, overriding
@@ -898,12 +908,22 @@ parameters it will accept - a good one is C<-u>:
 =item install
 
 This action will use C<ExtUtils::Install> to install the files from
-C<blib/> into the system.  Under normal circumstances, you'll need
-superuser privileges to install into your system's default C<sitelib>
-directory.
+C<blib/> into the system.  See L<How Installation Paths are Determined> for details
+about how Module::Build determines where to install things, and how to
+influence this process.
 
-See L<How Installation Works> for details about how Module::Build
-determines where to install things, and how to influence this process.
+If you want the installation process to look around in C<@INC> for
+other versions of the stuff you're installing and try to delete it,
+you can use the C<uninst> parameter, which tells C<Module::Install> to
+do so:
+
+ Build install uninst=1
+
+This can be a good idea, as it helps prevent multiple versions of a
+module from being present on your system, which can be a confusing
+situation indeed.
+
+
 
 =item fakeinstall
 
@@ -1012,36 +1032,142 @@ that directory.
 
 =back
 
-=head2 How Installation Works
+=head2 How Installation Paths are Determined
 
 When you invoke Module::Build's C<build> action, it needs to figure
-out where to install things.  Natively, Module::Build provides default
-installation locations for several types of installable items.  The
-determination of the default locations is reminiscent of the way
-MakeMaker does it:
+out where to install things.  The nutshell version of how this works
+is that default installation locations are determined from
+F<Config.pm>, and they may be overridden by using the C<install_path>
+parameter.  An C<install_base> parameter lets you specify an
+alternative installation root like F</home/foo>, and a C<destdir> lets
+you specify a temporary installation directory like F</tmp/install> in
+case you want to create bundled-up installable packages.
 
- (XXX blah blah blah how installation works)
+Natively, Module::Build provides default installation locations for
+the following types of installable items:
 
 =over 4
 
-=item installdirs
+=item lib
 
-                            'installdirs' set to:
-                     core          site                vendor
+Usually pure-Perl module files ending in F<.pm>.
+
+=item arch
+
+"Architecture-dependent" module files, usually produced by compiling
+XS, Inline, or similar code.
+
+=item script
+
+Programs written in pure Perl.  In order to improve reuse, try to make
+these as small as possible - put the code into modules whenever
+possible.
+
+=item bin
+
+"Architecture-dependent" executable programs, i.e. compiled C code or
+something.  Pretty rare to see this in a perl distribution, but it
+happens.
+
+=item libdoc
+
+Documentation for the stuff in C<lib> and C<arch>.  This is usually
+generated from the POD in F<.pm> files.  Under Unix, these are manual
+pages belonging to the 'man3' category.
+
+=item bindoc
+
+Documentation for the stuff in C<script> and C<bin>.  Usually
+generated from the POD in those files.  Under Unix, these are manual
+pages belonging to the 'man1' category.
+
+=back
+
+=head3 installdirs
+
+The default destinations for these installable things come from
+entries in your system's C<Config.pm>.  You can select from three
+different sets of default locations by setting the C<installdirs>
+parameter as follows:
+
+                          'installdirs' set to:
+                   core          site                vendor
  
-             results in the following defaults from Config.pm:
+              uses the following defaults from Config.pm:
  
- arch   =>   installarchlib  installsitearch     installvendorarch
- lib    =>   installprivlib  installsitelib      installvendorlib
- bin    =>   installbin      installsitebin      installvendorbin
- script =>   installscript   installscript       installscript
- man1   =>   installman1dir  installsiteman1dir  installvendorman1dir
- man3   =>   installman3dir  installsiteman3dir  installvendorman3dir
+ lib     => installprivlib  installsitelib      installvendorlib
+ arch    => installarchlib  installsitearch     installvendorarch
+ script  => installscript   installsitebin      installvendorbin
+ bin     => installbin      installsitebin      installvendorbin
+ libdoc  => installman3dir  installsiteman3dir  installvendorman3dir
+ bindoc  => installman1dir  installsiteman1dir  installvendorman1dir
 
+The default value of C<installdirs> is "site".  If you're creating
+vendor distributions of module packages, you may want to do something
+like this:
 
- (XXX blah blah blah how installation works)
+ perl Build.PL installdirs=vendor
 
-=item destdir
+or
+
+ Build install installdirs=vendor
+
+If you're installing an updated version of a module that was included
+with perl itself (i.e. a "core module"), then you may set
+C<installdirs> to "core" to overwrite the module in its present
+location.
+
+(Note that the 'script' line is different from MakeMaker -
+unfortunately there's no such thing as "installsitescript" or
+"installvendorscript" entry in C<Config.pm>, so we use the
+"installsitebin" and "installvendorbin" entries to at least get the
+general location right.  In the future, if C<Config.pm> adds some more
+appropriate entries, we'll start using those.)
+
+=head3 install_path
+
+Once the defaults have been set, you can override them.  You can set
+individual entries by using the C<install_path> parameter:
+
+ my $m = Module::Build->new
+  (...other options...,
+   install_path => {lib  => '/foo/lib',
+                    arch => '/foo/lib/arch'});
+
+On the command line, that would look like this:
+
+ perl Build.PL install_path=lib=/foo/lib install_path=arch=/foo/lib/arch
+
+or this:
+
+ Build install install_path=lib=/foo/lib install_path=arch=/foo/lib/arch
+
+=head3 install_base
+
+You can also set the whole bunch of installation paths by supplying the
+C<install_base> parameter to point to a directory on your system.  For
+instance, if you set C<install_base> to "/home/ken" on a Linux
+system, you'll install as follows:
+
+ lib     => /home/ken/lib
+ arch    => /home/ken/lib/i386-linux
+ script  => /home/ken/scripts
+ bin     => /home/ken/bin
+ libdoc  => /home/ken/man/man1
+ bindoc  => /home/ken/man/man3
+
+Note that this is I<different> from how MakeMaker's C<PREFIX>
+parameter works.  C<PREFIX> tries to create a mini-replica of a
+C<site>-style installation under the directory you specify, which is
+not always possible (and the results are not always pretty in this
+case).  C<install_base> just gives you a default layout under the
+directory you specify, which may have little to do with the
+C<installdirs=site> layout.
+
+The exact layout under the directory you specify may vary by system -
+we try to do the "sensible" thing on each platform.
+
+=head3 destdir
 
 If you want to install everything into a temporary directory first
 (for instance, if you want to create a directory tree that a package
@@ -1054,24 +1180,11 @@ or
 
  Build install destdir=/tmp/foo
 
-This will effectively install to "$destdir/$sitelib",
-"$destdir/$sitearch", and the like, except that it will use
+This will effectively install to "/tmp/foo/$sitelib",
+"/tmp/foo/$sitearch", and the like, except that it will use
 C<File::Spec> to make the pathnames work correctly on whatever
 platform you're installing on.
 
-=item uninst
-
-If you want the installation process to look around in C<@INC> for
-other versions of the stuff you're installing and try to delete it,
-you can use the C<uninst> parameter:
-
- Build install uninst=1
-
-This can be a good idea, as it helps prevent multiple versions of a
-module from being present on your system, which can be a confusing
-situation indeed.
-
-=back
 
 =head1 AUTOMATION
 
@@ -1080,7 +1193,7 @@ methods, you can invoke these methods directly if you want to install
 a module non-interactively.  For instance, the following Perl script
 will invoke the entire build/install procedure:
 
- my $m = new Module::Build (module_name => 'MyModule');
+ my $m = Module::Build->new(module_name => 'MyModule');
  $m->dispatch('build');
  $m->dispatch('test');
  $m->dispatch('install');
@@ -1090,7 +1203,7 @@ exception.
 
 You can also pass arguments as part of the build process:
 
- my $m = new Module::Build (module_name => 'MyModule');
+ my $m = Module::Build->new(module_name => 'MyModule');
  $m->dispatch('build');
  $m->dispatch('test', verbose => 1);
  $m->dispatch('install', sitelib => '/my/secret/place/');

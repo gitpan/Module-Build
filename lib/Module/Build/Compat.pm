@@ -9,12 +9,8 @@ use Module::Build;
 
 my %makefile_to_build = 
   (
-   PREFIX  => 'prefix',
-   LIB     => 'lib',
-   UNINST  => 'uninst',
    TEST_VERBOSE => 'verbose',
    VERBINST     => 'verbose',
-   TEST_FILES   => 'test_files',
    INC     => sub { map "extra_compiler_flags=-I$_", Module::Build->split_like_shell(shift) },
    POLLUTE => sub { 'extra_compiler_flags=-DPERL_POLLUTE' },
    INSTALLDIRS => sub {local $_ = shift; 'installdirs=' . /^perl$/ ? 'core' : $_ }
@@ -98,7 +94,8 @@ sub makefile_to_build_args {
       my $trans = $makefile_to_build{$key};
       push @out, ref($trans) ? $trans->($val) : "$trans=$val";
     } else {
-      warn "Unknown parameter '$key'";
+      # Assume M::B can handle it in lowercase form
+      push @out, "\L$key\E=$val";
     }
   }
   return @out;
@@ -114,18 +111,30 @@ sub run_build_pl {
 
 sub fake_makefile {
   my $makefile = $_[1];
-  my $build = File::Spec->catfile( '.', 'Build' );
+  my $perl = Module::Build->find_perl_interpreter;
 
-  return <<"EOF";
-all :
-	$^X $build
-realclean :
-	$^X $build realclean
-	$^X -e unlink -e shift $makefile
-.DEFAULT :
-	$^X $build \$@
-.PHONY   : install manifest
+  # Start with a couple special actions
+  my $maketext = <<"EOF";
+all : force_do_it
+	$perl Build
+realclean : force_do_it
+	$perl Build realclean
+	$perl -e unlink -e shift $makefile
+
+force_do_it :
+
 EOF
+
+  # XXX - user might be using a different subclass
+  foreach my $action (Module::Build->known_actions) {
+    next if $action =~ /^(all|realclean|force_do_it)$/;  # Don't double-define
+    $maketext .= <<"EOF";
+$action : force_do_it
+	$perl Build $action
+EOF
+  }
+  
+  return $maketext;
 }
 
 sub fake_prereqs {

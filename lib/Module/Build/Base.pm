@@ -1,7 +1,5 @@
 package Module::Build::Base;
 
-# $Id: Base.pm,v 1.125 2003/05/27 16:57:47 kwilliams Exp $
-
 use strict;
 BEGIN { require 5.00503 }
 use Config;
@@ -25,20 +23,13 @@ sub new {
   die "Too early to specify a build action '$action'.  Do 'Build $action' instead.\n"
     if $action;
 
-  my $cmd_config;
-  if ($cmd_args->{config}) {
-    # XXX need to hashify this string better (deal with quoted whitespace)
-    $cmd_config->{$1} = $2 while $cmd_args->{config} =~ /(\w+)=(\S+)/g;
-  } else {
-    $cmd_config = {};
-  }
-  delete $cmd_args->{config};
-
   # Extract our 'properties' from $cmd_args, the rest are put in 'args'
   my $cmd_properties = {};
   foreach my $key (keys %$cmd_args) {
     $cmd_properties->{$key} = delete $cmd_args->{$key} if __PACKAGE__->valid_property($key);
   }
+
+  my $cmd_config = delete $cmd_args->{config};
 
   # The following warning could be unnecessary if the user is running
   # an embedded perl, but there aren't too many of those around, and
@@ -66,6 +57,7 @@ sub new {
 				   conflicts => {},
 				   perl => $perl,
 				   install_types => [qw(lib arch script)],
+				   installdirs => 'site',
 				   include_dirs => [],
 				   %input,
 				   %$cmd_properties,
@@ -80,12 +72,46 @@ sub new {
   $self->add_to_cleanup( @{delete $p->{add_to_cleanup}} )
     if $p->{add_to_cleanup};
   
+  $self->_set_install_paths;
   $self->dist_name;
   $self->check_manifest;
   $self->check_prereq;
   $self->dist_version;
 
   return $self;
+}
+
+sub _set_install_paths {
+  my $self = shift;
+  my $c = $self->{config};
+
+  $self->{properties}{install_sets} =
+    {
+     core   => {
+		lib     => $c->{installprivlib},
+		arch    => $c->{installarchlib},
+		bin     => $c->{installbin},
+		script  => $c->{installscript},
+		bindoc  => $c->{installman1dir},
+		libdoc  => $c->{installman3dir},
+	       },
+     site   => {
+		lib     => $c->{installsitelib},
+		arch    => $c->{installsitearch},
+		bin     => $c->{installsitebin},
+		script  => $c->{installsitescript} || $c->{installsitebin},
+		bindoc  => $c->{installsiteman1dir},
+		libdoc  => $c->{installsiteman3dir},
+	       },
+     vendor => {
+		lib     => $c->{installvendorlib},
+		arch    => $c->{installvendorarch},
+		bin     => $c->{installvendorbin},
+		script  => $c->{installvendorscript} || $c->{installvendorbin},
+		bindoc  => $c->{installvendorman1dir},
+		libdoc  => $c->{installvendorman3dir},
+	       },
+    };
 }
 
 sub cwd {
@@ -195,6 +221,9 @@ sub resume {
        config_dir
        build_script
        install_types
+       install_sets
+       install_path
+       installdirs
        destdir
        debugger
        verbose
@@ -528,6 +557,9 @@ sub check_installed_status {
     # It's much more convenient to use $] here than $^V, but 'man
     # perlvar' says I'm not supposed to.  Bloody tyrant.
     $status{have} = $self->perl_version;
+  
+  } elsif (eval { $status{have} = $modname->VERSION }) {
+    # Don't try to load if it's already loaded
     
   } else {
     my $file = $self->find_module_by_name($modname, \@INC);
@@ -546,16 +578,17 @@ sub check_installed_status {
   my @conditions = $self->_parse_conditions($spec);
   
   foreach (@conditions) {
-    unless ( /^\s*  (<=?|>=?|==|!=)  \s*  ([\w.]+)  \s*$/x ) {
-      die "Invalid prerequisite condition '$_' for $modname";
-    }
-    if ($modname eq 'perl') {
-      my ($op, $version) = ($1, $2);
-      $_ = "$op " . $self->perl_version_to_float($version);
-    }
-    next if $_ eq '>= 0';  # Module doesn't have to actually define a $VERSION
-    unless (eval "\$status{have} $_") {
-      $status{message} = "Version $status{have} is installed, but we need version $_";
+    my ($op, $version) = /^\s*  (<=?|>=?|==|!=)  \s*  ([\w.]+)  \s*$/x
+      or die "Invalid prerequisite condition '$_' for $modname";
+    
+    $version = $self->perl_version_to_float($version)
+      if $modname eq 'perl';
+    
+    next if $op eq '>=' and !$version;  # Module doesn't have to actually define a $VERSION
+    
+    unless (eval "\$status{have} $op \$version") {
+      warn $@ if $@;
+      $status{message} = "Version $status{have} is installed, but we need version $op $version";
       return \%status;
     }
   }
@@ -696,30 +729,53 @@ sub _call_action {
   return $self->$method();
 }
 
+sub _cull_arg {
+  my ($self, $args, $key, $val) = @_;
+
+  if ( exists $args->{$key} ) {
+    $args->{$key} = [ $args->{$key} ] unless ref $args->{$key};
+    push @{$args->{$key}}, $val;
+  } else {
+    $args->{$key} = $val;
+  }
+}
+
 sub cull_args {
   my $self = shift;
-  my ($action, %args);
-  foreach (@_) {
+  my ($action, %args, @argv);
+  while (@_) {
+    local $_ = shift;
     if ( /^(\w+)=(.*)/ ) {
-      if ( exists $args{$1} ) {
-        $args{$1} = [ $args{$1} ] unless ref $args{$1};
-        push @{$args{$1}}, $2;
-      } else {
-        $args{$1} = $2;
-      }
-    } elsif ( /^(\w+)$/ ) {
-      die "Error: multiple build actions given: '$action' and '$1'" if $action;
+      $self->_cull_arg(\%args, $1, $2);
+    } elsif ( /^--(\w+)$/ ) {
+      $self->_cull_arg(\%args, $1, shift());
+    } elsif ( /^(\w+)$/ and !defined($action)) {
       $action = $1;
     } else {
-      die "Malformed build parameter '$_'";
+      push @argv, $_;
     }
   }
+  $args{ARGV} = \@argv;
+
+  # Hashify these parameters
+  for ('config', 'install_path') {
+    my %hash;
+    $args{$_} ||= [];
+    $args{$_} = [ $args{$_} ] unless ref $args{$_};
+    foreach my $arg ( @{$args{$_}} ) {
+      $arg =~ /(\w+)=(.+)/
+	or die "Malformed '$_' argument: '$arg'";
+      $hash{$1} = $2;
+    }
+    $args{$_} = \%hash;
+  }
+
   return ($action, \%args);
 }
 
 sub super_classes {
   my ($self, $class, $seen) = @_;
-  $class ||= ref($self);
+  $class ||= ref($self) || $self;
   $seen  ||= {};
   
   no strict 'refs';
@@ -735,7 +791,7 @@ sub known_actions {
   
   foreach my $class ($self->super_classes) {
     foreach ( keys %{ $class . '::' } ) {
-      $actions{$1}++ if /ACTION_(\w+)/;
+      $actions{$1}++ if /^ACTION_(\w+)/;
     }
   }
 
@@ -807,7 +863,7 @@ sub test_files {
   my $self = shift;
   
   my @tests;
-  if ($self->{args}{test_files}) {
+  if ($self->{args}{test_files}) {  # XXX use 'properties'
     @tests = $self->split_like_shell($self->{args}{test_files});
   } else {
     # Find all possible tests in t/ or test.pl
@@ -1038,8 +1094,10 @@ sub ACTION_manifypods {
 sub ACTION_diff {
   my $self = shift;
   $self->depends_on('build');
-  my @myINC = grep {$_ ne 'lib'} @INC;
-  my @flags = $self->split_like_shell($self->{args}{flags} || '');
+  my $local_lib = File::Spec->rel2abs('lib');
+  my @myINC = grep {$_ ne $local_lib} @INC;
+  my @flags = @{$self->{args}{ARGV}};
+  @flags = $self->split_like_shell($self->{args}{flags} || '') unless @flags;
   
   my $installmap = $self->install_map('blib');
   delete $installmap->{read};
@@ -1187,10 +1245,11 @@ sub ACTION_distdir {
     Module::Build::Compat->create_makefile_pl($self->{properties}{create_makefile_pl}, $self);
   }
   
-  require ExtUtils::Manifest;  # ExtUtils::Manifest is not warnings clean.
-  local ($^W, $ExtUtils::Manifest::Quiet) = (0,1);
-  
-  my $dist_files = ExtUtils::Manifest::maniread('MANIFEST');
+  my $dist_files = $self->_read_manifest('MANIFEST');
+  unless (keys %$dist_files) {
+    warn "No files found in MANIFEST - try running 'manifest' action?\n";
+    return;
+  }
   $self->delete_filetree($dist_dir);
   $self->add_to_cleanup($dist_dir);
   ExtUtils::Manifest::manicopy($dist_files, $dist_dir, 'best');
@@ -1285,11 +1344,22 @@ sub ACTION_distmeta {
   return $self->{wrote_metadata} = $yaml_sub->($self->{metafile}, $node );
 }
 
+sub _read_manifest {
+  my ($self, $file) = @_;
+  require ExtUtils::Manifest;  # ExtUtils::Manifest is not warnings clean.
+  local ($^W, $ExtUtils::Manifest::Quiet) = (0,1);
+
+  return scalar ExtUtils::Manifest::maniread($file);
+}
+
 sub find_dist_packages {
   my $self = shift;
   
   # Only packages in .pm files are candidates for inclusion here.
-  my @pm_files = keys %{ $self->find_pm_files };
+  # Only include things in the MANIFEST, not things in developer's
+  # private stock.
+  my $dist_files = $self->_read_manifest('MANIFEST');
+  my @pm_files = grep {exists $dist_files->{$_}} keys %{ $self->find_pm_files };
   
   my %out;
   foreach my $file (@pm_files) {
@@ -1325,36 +1395,10 @@ sub make_tarball {
 
 sub install_destination {
   my ($self, $type) = @_;
-  my $c = $self->{config};
-
-  my %map = ( core => {
-		       arch   => $c->{installarchlib},
-		       lib    => $c->{installprivlib},
-		       bin    => $c->{installbin},
-		       script => $c->{installscript},
-		       man1   => $c->{installman1dir},
-		       man3   => $c->{installman3dir},
-		      },
-	      site => {
-		       arch   => $c->{installsitearch},
-		       lib    => $c->{installsitelib},
-		       bin    => $c->{installsitebin},
-		       script => $c->{installscript},
-		       man1   => $c->{installsiteman1dir},
-		       man3   => $c->{installsiteman3dir},
-		      },
-	    vendor => {
-		       arch   => $c->{installvendorarch},
-		       lib    => $c->{installvendorlib},
-		       bin    => $c->{installvendorbin},
-		       script => $c->{installscript},
-		       man1   => $c->{installvendorman1dir},
-		       man3   => $c->{installvendorman3dir},
-		      },
-	    );
+  my $p = $self->{properties};
   
-  my $installdirs = $self->{properties}{installdirs} || 'site';
-  return $map{$installdirs}{$type};
+  return $p->{install_path}{$type} if exists $p->{install_path}{$type};
+  return $p->{install_sets}{ $p->{installdirs} }{$type};
 }
 
 sub install_types {
