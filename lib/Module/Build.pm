@@ -12,7 +12,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.23';
+$VERSION = '0.24';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -518,8 +518,12 @@ for C<*.t> files.
 =item autosplit
 
 An optional C<autosplit> argument specifies a file which should be run
-through the C<Autosplit::autosplit()> function.  In general I don't
-consider this a great idea, because it's not always clear that
+through the C<Autosplit::autosplit()> function.  If multiple files
+should be split, the argument may be given as an array of the files to
+split.
+
+In general I don't consider autosplitting a great idea, because it's
+not always clear that
 autosplitting achieves its intended performance benefits.  It may even
 harm performance in environments like mod_perl, where as much as
 possible of a module's code should be loaded during startup.
@@ -576,6 +580,13 @@ To link your XS code against glib you might write something like:
      extra_compiler_flags => scalar `glib-config --cflags`,
      extra_linker_flags   => scalar `glib-config --libs`,
  );
+
+=item include_dirs
+
+Specifies any additional directories in which to search for C header
+files.  May be given as a string indicating a single directory, or as
+a list reference indicating multiple directories.
+
 
 =item dist_author
 
@@ -1597,7 +1608,7 @@ signature or the like, if available.  See C<cons> for an example.
 
 =head1 AUTHOR
 
-Ken Williams, ken@mathforum.org
+Ken Williams, kwilliams@cpan.org
 
 Development questions, bug reports, and patches should be sent to the
 Module-Build mailing list at module-build-general@lists.sourceforge.net .

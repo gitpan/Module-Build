@@ -57,7 +57,7 @@ sub compiler_type {
 
 sub compile_c {
   my ($self, $file) = @_;
-  my $cf = $self->{config};
+  my ($cf, $p) = ($self->{config}, $self->{properties});
 
   my ($basename, $srcdir) =
     ( File::Basename::fileparse($file, '\.[^.]+$') )[0,1];
@@ -75,7 +75,7 @@ sub compile_c {
                    ],
     optimize    => [ $self->split_like_shell($cf->{optimize})    ],
     defines     => [ '' ],
-    includes    => $self->{include_dirs} || [],
+    includes    => $p->{include_dirs} || [],
     perlinc     => [
                      File::Spec->catdir($cf->{archlib}, 'CORE'),
                      $self->split_like_shell($cf->{incpath}),
@@ -94,6 +94,12 @@ sub compile_c {
      $spec{includes},
      $spec{perlinc},
   );
+
+  # Add -I flag to includes, *once*
+  foreach my $path ( @{ $spec{includes} || [] },
+                     @{ $spec{perlinc}  || [] } ) {
+    $path = '-I' . $path unless $path =~ /-I/;
+  }
 
   my @cmds = $self->format_compiler_cmd(%spec);
   while ( my $cmd = shift @cmds ) {
@@ -251,16 +257,11 @@ package Module::Build::Platform::Windows::MSVC;
 sub format_compiler_cmd {
   my ($self, %spec) = @_;
 
-  foreach my $path ( @{ $spec{includes} || [] },
-                     @{ $spec{perlinc}  || [] } ) {
-    $path = '-I' . $path;
-  }
-
   %spec = $self->write_compiler_script(%spec)
     if $spec{use_scripts};
 
   return [ grep {defined && length} (
-    $spec{cc}, '-c'         ,
+    $spec{cc},'-nologo','-c',
     @{$spec{includes}}      ,
     @{$spec{cflags}}        ,
     @{$spec{optimize}}      ,
@@ -365,11 +366,6 @@ package Module::Build::Platform::Windows::BCC;
 
 sub format_compiler_cmd {
   my ($self, %spec) = @_;
-
-  foreach my $path ( @{ $spec{includes} || [] },
-                     @{ $spec{perlinc}  || [] } ) {
-    $path = '-I' . $path;
-  }
 
   %spec = $self->write_compiler_script(%spec)
     if $spec{use_scripts};
@@ -493,11 +489,6 @@ package Module::Build::Platform::Windows::GCC;
 
 sub format_compiler_cmd {
   my ($self, %spec) = @_;
-
-  foreach my $path ( @{ $spec{includes} || [] },
-                     @{ $spec{perlinc}  || [] } ) {
-    $path = '-I' . $path;
-  }
 
   return [ grep {defined && length} (
     $spec{cc}, '-c'         ,

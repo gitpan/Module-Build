@@ -1,5 +1,35 @@
 Revision history for Perl extension Module::Build.
 
+0.24
+
+ - Fixed a problem with incude_dirs not being propagated to the 'ccs'
+   file when compiling XS files on Win32. [Randy Sims and Steve Hay]
+
+ - In 0.23, Module::Build::Compat->fake_makefile() started choking
+   when no 'build_class' parameter was supplied in the Makefile.PL.
+   Since these Makefile.PLs still exist on CPAN, we now default
+   'build_class' to 'Module::Build', which was the old 0.22 behavior
+   anyway.  [Reported by Martin Titz and Jeremy Seitz]
+
+ - Added documentation for the 'include_dirs' parameter to
+   new(). [Steve Hay]
+
+ - Changed the no-op command on Win32 from 'rem' to 'rem>nul' inside
+   pass-through Makefiles. [Randy Sims]
+
+ - The 'autosplit' parameter now accepts an array reference if
+   multiple files should be split. [Jaap Karssenberg]
+
+ - find_perl_interpreter() will now use $^X (if absolute), $ENV{PATH}
+   (if $^X isn't absolute), and $Config{perlpath}, in that order.
+   Also, we now make darn sure the result is the same version of perl,
+   by checking Config::myconfig() for a match against the current
+   perl.  [Reported by Edward Sabol]
+
+ - Fixed a fatal error on Win32 (and any other platform that doesn't
+   define an installation location for Unix-style man pages) during
+   installation.
+
 0.23  Sun Feb  8 22:01:18 CST 2004
 
  - Fixed a compatibility problem in pass-through Makefiles (created by

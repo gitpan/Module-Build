@@ -35,10 +35,11 @@ sub resume {
   
   $self->read_config;
   
-  my $perl = $self->find_perl_interpreter;
-  warn(" * WARNING: Configuration was initially created with '$self->{properties}{perl}',\n".
-       "   but we are now using '$perl'.\n")
-    unless $perl eq $self->{properties}{perl};
+  unless ($self->_perl_is_same($self->{properties}{perl})) {
+    my $perl = $self->find_perl_interpreter;
+    warn(" * WARNING: Configuration was initially created with '$self->{properties}{perl}',\n".
+	 "   but we are now using '$perl'.\n");
+  }
   
   my $mb_version = Module::Build->VERSION;
   die(" * ERROR: Configuration was initially created with Module::Build version '$self->{properties}{mb_version}',\n".
@@ -75,14 +76,6 @@ sub _construct {
   my $args   = delete $input{args}   || {};
   my $config = delete $input{config} || {};
 
-  # The following warning could be unnecessary if the user is running
-  # an embedded perl, but there aren't too many of those around, and
-  # embedded perls aren't usually used to install modules, and the
-  # installation process sometimes needs to run external scripts
-  # (e.g. to run tests).
-  my $perl = $package->find_perl_interpreter
-    or warn "Warning: Can't locate your perl binary";
-
   my $self = bless {
 		    args => {%$args},
 		    config => {%Config, %$config},
@@ -95,7 +88,6 @@ sub _construct {
 				   recommends      => {},
 				   build_requires  => {},
 				   conflicts       => {},
-				   perl            => $perl,
 				   mb_version      => Module::Build->VERSION,
 				   build_elements  => [qw( PL support pm xs pod script )],
 				   install_types   => [qw( lib arch script bindoc libdoc )],
@@ -106,6 +98,15 @@ sub _construct {
 		   }, $package;
 
   my ($p, $c) = ($self->{properties}, $self->{config});
+
+  # The following warning could be unnecessary if the user is running
+  # an embedded perl, but there aren't too many of those around, and
+  # embedded perls aren't usually used to install modules, and the
+  # installation process sometimes needs to run external scripts
+  # (e.g. to run tests).
+  $p->{perl} = $self->find_perl_interpreter
+    or warn "Warning: Can't locate your perl binary";
+
   $p->{bindoc_dirs} ||= [ "$p->{blib}/script" ];
   $p->{libdoc_dirs} ||= [ "$p->{blib}/lib", "$p->{blib}/arch" ];
 
@@ -165,12 +166,32 @@ sub cwd {
   return Cwd::cwd();
 }
 
+sub _perl_is_same {
+  my ($self, $perl) = @_;
+  return `$perl -MConfig=myconfig -e print -e myconfig` eq Config->myconfig;
+}
+
 sub find_perl_interpreter {
-  my $perl;
-  File::Spec->file_name_is_absolute($perl = $^X)
-    or -f ($perl = $Config::Config{perlpath})
-    or ($perl = $^X);
-  return $perl;
+  return $^X if File::Spec->file_name_is_absolute($^X);
+  my $proto = shift;
+  my $c = ref($proto) ? $proto->{config} : \%Config::Config;
+  my $exe = $c->{exe_ext};
+
+  my $thisperl = $^X;
+  if ($proto->os_type eq 'VMS') {
+    # VMS might have a file version at the end
+    $thisperl .= $exe unless $thisperl =~ m/$exe(;\d+)?$/i;
+  } elsif (defined $exe) {
+    $thisperl .= $exe unless $thisperl =~ m/$exe$/i;
+  }
+  
+  my @candidates = map File::Spec->catfile($_, $thisperl), File::Spec->path();
+  push @candidates, $c->{perlpath};
+  
+  foreach my $perl (@candidates) {
+    return $perl if -f $perl and $proto->_perl_is_same($perl);
+  }
+  return;
 }
 
 sub base_dir { shift()->{properties}{base_dir} }
@@ -220,15 +241,51 @@ sub y_n {
   }
 }
 
-sub notes {
+sub _general_notes {
   my $self = shift;
-  return $self->_persistent_hash_read('notes') unless @_;
+  my $type = shift;
+  return $self->_persistent_hash_read($type) unless @_;
   
   my $key = shift;
-  return $self->_persistent_hash_read('notes', $key) unless @_;
+  return $self->_persistent_hash_read($type, $key) unless @_;
   
   my $value = shift;
-  return $self->_persistent_hash_write('notes', { $key => $value });
+  $self->has_build_config(1) if $type =~ /^(build_config|features)$/;
+  return $self->_persistent_hash_write($type, { $key => $value });
+}
+
+sub notes        { shift()->_general_notes('notes', @_) }
+sub build_config { shift()->_general_notes('build_config', @_) }
+sub features     { shift()->_general_notes('features', @_) }
+
+sub ACTION_build_config {
+  my $self = shift;
+  return unless $self->has_build_config;
+  
+  die "The build_config feature requires that 'module_name' be set" unless $self->module_name;
+  my $notes_name = $self->module_name . '::BuildConfig';
+  my $notes_pm = File::Spec->catfile($self->blib, 'lib', split /::/, "$notes_name.pm");
+
+  print "Writing config notes to $notes_pm\n";
+  
+  my $fh = IO::File->new("> $notes_pm") or die "Can't create '$notes_pm': $!";
+
+  printf $fh <<'EOF', $notes_name;
+package %s;
+use strict;
+my $arrayref = eval do {local $/; <DATA>}
+  or die "Couldn't load BuildConfig data: $@";
+close DATA;
+my ($notes, $features) = @$arrayref;
+
+sub get { $notes->{$_[1]} }
+sub feature { $features->{$_[1]} }
+
+__DATA__
+EOF
+
+  local $Data::Dumper::Terse = 1;
+  print $fh Data::Dumper::Dumper([scalar $self->build_config, scalar $self->features]);
 }
 
 {
@@ -254,6 +311,7 @@ sub notes {
        perl
        config_dir
        blib
+       has_build_config
        build_script
        build_elements
        install_types
@@ -905,7 +963,6 @@ sub merge_args {
   }
 }
 
-
 sub cull_args {
   my $self = shift;
   my ($args, $action) = $self->read_args(@_);
@@ -1057,7 +1114,7 @@ sub ACTION_test {
   # This will get run and the user will see the output.  It doesn't
   # emit Test::Harness-style output.
   if (-e 'visual.pl') {
-    $self->run_perl_script('visual.pl', '-Mblib');
+    $self->run_perl_script('visual.pl', '-Mblib='.$self->blib);
   }
 }
 
@@ -1091,7 +1148,9 @@ sub ACTION_code {
   $self->add_to_cleanup($blib);
   File::Path::mkpath( File::Spec->catdir($blib, 'arch') );
   
-  $self->autosplit_file($self->autosplit, $blib) if $self->autosplit;
+  if (my $split = $self->autosplit) {
+    $self->autosplit_file($_, $blib) for ref($split) ? @$split : ($split);
+  }
   
   foreach my $element (@{$self->build_elements}) {
     my $method = "process_${element}_files";
@@ -1103,6 +1162,7 @@ sub ACTION_build {
   my $self = shift;
   $self->depends_on('code');
   $self->depends_on('docs');
+  $self->depends_on('build_config');
 }
 
 sub process_support_files {
@@ -1380,6 +1440,77 @@ sub contains_pod {
   return '';
 }
 
+sub ACTION_html {
+  my $self = shift;
+  $self->depends_on('build');
+  
+  require Pod::Html;
+  require Module::Build::PodParser;
+  
+  my $html_base = $Config{installhtmldir} ?
+    File::Basename::basename($Config{installhtmldir}) : 'html';
+  
+  my $blib = $self->blib;
+  my $html = File::Spec::Unix->catdir($blib, $html_base);
+  my $script = File::Spec::Unix->catdir($blib, 'script');
+  unless (-d $html) {
+    File::Path::mkpath($html, 1, 0755) or die "Couldn't mkdir $html: $!";
+  }
+
+  my $pods = $self->_find_pods($self->blib);
+  my %pods = Pod::Find::pod_find({-verbose => 1}, $self->blib);
+  if (-d $script) {
+    File::Find::finddepth( sub
+                           {$pods{$File::Find::name} =
+                              "script::" . basename($File::Find::name)
+                                if (-f $_ and not /\.bat$/ and $self->contains_pod($_));
+                          }, $script);
+  }
+
+  my $backlink = '__top';
+  my $css = ($^O =~ /Win32/) ? 'Active.css' : '';
+  foreach my $pod (keys %pods){
+    my @dirs = split /::/, $pods{$pod};
+    my $isbin = $dirs[0] eq 'script';
+    my $infile = File::Spec::Unix->abs2rel($pod);
+    my $outfile = "$dirs[-1].html";
+
+    my @rootdirs  = $isbin? ('bin') : ('site', 'lib');
+    my $path2root = "../" x (@rootdirs+@dirs);
+    $path2root =~ s!/$!!;
+
+    my $fulldir = File::Spec::Unix->catfile($html, @rootdirs, @dirs);
+    unless (-d $fulldir){
+      File::Path::mkpath($fulldir, 1, 0755)
+          or die "Couldn't mkdir $fulldir: $!";
+    }
+    $outfile = File::Spec::Unix->catfile($fulldir, $outfile);
+
+    my $htmlroot = File::Spec::Unix->catdir($path2root, 'site', 'lib');
+    my $podpath = join ":" => map { File::Spec::Unix->catdir($blib, $_) }
+      ($isbin ? qw(bin lib) : qw(lib));
+    (my $package = $pods{$pod}) =~ s!^(lib|script)::!!;
+
+    my $parser = Module::Build::PodParser->new(file => $infile);
+    my $abstract = $parser->get_abstract;
+    my $title =  $abstract ? "$package - $abstract" : $package;
+    my @opts = (
+		'--header',
+                '--flush',
+                "--backlink=__top",
+		"--title=$title",
+                "--podpath=$podpath",
+		"--infile=$infile",
+		"--outfile=$outfile",
+		"--podroot=$blib",
+		"--htmlroot=$htmlroot",
+	       );
+    push @opts, "--css=$path2root/$css" if $css;
+    print "pod2html @opts\n";
+    Pod::Html::pod2html(@opts);# or warn "pod2html @opts failed: $!";
+  }
+}
+
 # Adapted from ExtUtils::MM_Unix
 sub man1page_name {
   my $self = shift;
@@ -1421,11 +1552,11 @@ sub ACTION_diff {
   my $text_suffix = qr{\.(pm|pod)$};
 
   while (my $localdir = each %$installmap) {
+    my @localparts = File::Spec->splitdir($localdir);
     my $files = $self->rscan_dir($localdir, sub {-f});
     
     foreach my $file (@$files) {
       my @parts = File::Spec->splitdir($file);
-      my @localparts = File::Spec->splitdir($localdir);
       @parts = @parts[@localparts .. $#parts]; # Get rid of blib/lib or similar
       
       my $installed = $self->find_module_by_name(join('::', @parts), \@myINC);
@@ -1500,7 +1631,7 @@ sub ACTION_ppmdist {
   
   $self->depends_on('build', 'ppd');
   $self->add_to_cleanup($self->ppm_name);
-  $self->make_tarball($self->{properties}{blib}, $self->ppm_name);
+  $self->make_tarball($self->blib, $self->ppm_name);
 }
 
 sub ACTION_dist {
@@ -1602,11 +1733,11 @@ sub ACTION_distdir {
   
   my $dist_files = $self->_read_manifest('MANIFEST');
   delete $dist_files->{SIGNATURE};  # Don't copy, create a fresh one
-  unless (keys %$dist_files) {
-    warn "No files found in MANIFEST - try running 'manifest' action?\n";
-    return;
-  }
-  warn "*** Did you forget to add $self->{metafile} to the MANIFEST?\n" unless exists $dist_files->{$self->{metafile}};
+  die "No files found in MANIFEST - try running 'manifest' action?\n"
+    unless ($dist_files and keys %$dist_files);
+  
+  warn "*** Did you forget to add $self->{metafile} to the MANIFEST?\n"
+    unless exists $dist_files->{$self->{metafile}};
   
   my $dist_dir = $self->dist_dir;
   $self->delete_filetree($dist_dir);
@@ -1744,9 +1875,10 @@ EOM
 
 sub _read_manifest {
   my ($self, $file) = @_;
+  return undef unless -e $file;
+
   require ExtUtils::Manifest;  # ExtUtils::Manifest is not warnings clean.
   local ($^W, $ExtUtils::Manifest::Quiet) = (0,1);
-
   return scalar ExtUtils::Manifest::maniread($file);
 }
 
@@ -1845,8 +1977,13 @@ sub install_map {
     my $localdir = File::Spec->catdir( $blib, $type );
     next unless -e $localdir;
     
-    $map{$localdir} = $self->install_destination($type)
-      or die "Can't figure out where to install things of type '$type'";
+    if (my $dest = $self->install_destination($type)) {
+      $map{$localdir} = $dest;
+    } else {
+      # Platforms like Win32, MacOS, etc. may not build man pages
+      die "Can't figure out where to install things of type '$type'"
+	unless $type =~ /^(lib|bin)doc$/;
+    }
   }
 
   if (length(my $destdir = $self->{properties}{destdir} || '')) {

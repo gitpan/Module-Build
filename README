@@ -401,12 +401,15 @@ METHODS
 
         autosplit
             An optional "autosplit" argument specifies a file which should
-            be run through the "Autosplit::autosplit()" function. In general
-            I don't consider this a great idea, because it's not always
-            clear that autosplitting achieves its intended performance
-            benefits. It may even harm performance in environments like
-            mod_perl, where as much as possible of a module's code should be
-            loaded during startup.
+            be run through the "Autosplit::autosplit()" function. If
+            multiple files should be split, the argument may be given as an
+            array of the files to split.
+
+            In general I don't consider autosplitting a great idea, because
+            it's not always clear that autosplitting achieves its intended
+            performance benefits. It may even harm performance in
+            environments like mod_perl, where as much as possible of a
+            module's code should be loaded during startup.
 
         dynamic_config
             A boolean flag indicating whether the Build.PL file must be
@@ -459,6 +462,12 @@ METHODS
                  extra_compiler_flags => scalar `glib-config --cflags`,
                  extra_linker_flags   => scalar `glib-config --libs`,
              );
+
+        include_dirs
+            Specifies any additional directories in which to search for C
+            header files. May be given as a string indicating a single
+            directory, or as a list reference indicating multiple
+            directories.
 
         dist_author
             This should be something like "John Doe <jdoe@example.com>", or
@@ -1374,7 +1383,7 @@ TO DO
     (needed for un-install)
 
 AUTHOR
-    Ken Williams, ken@mathforum.org
+    Ken Williams, kwilliams@cpan.org
 
     Development questions, bug reports, and patches should be sent to the
     Module-Build mailing list at module-build-general@lists.sourceforge.net
