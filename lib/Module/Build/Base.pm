@@ -98,16 +98,16 @@ sub _set_install_paths {
      site   => {
 		lib     => $c->{installsitelib},
 		arch    => $c->{installsitearch},
-		bin     => $c->{installsitebin},
-		script  => $c->{installsitescript} || $c->{installsitebin},
+		bin     => $c->{installsitebin} || $c->{installbin},
+		script  => $c->{installsitescript} || $c->{installsitebin} || $c->{installscript},
 		bindoc  => $c->{installsiteman1dir},
 		libdoc  => $c->{installsiteman3dir},
 	       },
      vendor => {
 		lib     => $c->{installvendorlib},
 		arch    => $c->{installvendorarch},
-		bin     => $c->{installvendorbin},
-		script  => $c->{installvendorscript} || $c->{installvendorbin},
+		bin     => $c->{installvendorbin} || $c->{installbin},
+		script  => $c->{installvendorscript} || $c->{installvendorbin} || $c->{installscript},
 		bindoc  => $c->{installvendorman1dir},
 		libdoc  => $c->{installvendorman3dir},
 	       },
@@ -1370,22 +1370,26 @@ sub find_dist_packages {
   foreach my $file (@pm_files) {
     next if $file =~ m{^t/};  # Skip things in t/
     
-    return unless eval {require Module::Info; Module::Info->VERSION(0.19); 1};
-    
     my $localfile = File::Spec->catfile( split m{/}, $file );
     my $version = $self->version_from_file( $localfile );
-
-    print "Scanning $localfile for packages\n";
-    my $module = Module::Info->new_from_file( $localfile );
-
-    foreach my $package ($module->packages_inside) {
-      $out{$package} = {
-			file => $file,
-			version => $version,
-		       };
+    
+    foreach my $package ($self->_packages_inside($localfile)) {
+      $out{$package}{file} = $file;
+      $out{$package}{version} = $version if defined $version;
     }
   }
   return \%out;
+}
+
+sub _packages_inside {
+  # XXX this SUCKS SUCKS SUCKS!  Damn you perl!
+  my ($self, $file) = @_;
+  my $fh = IO::File->new($file) or die "Can't read $file: $!";
+  my @packages;
+  while (defined(my $line = <$fh>)) {
+    push @packages, $1 if $line =~ /^[\s\{;]*package\s+([\w:]+)/;
+  }
+  return @packages;
 }
 
 sub make_tarball {
