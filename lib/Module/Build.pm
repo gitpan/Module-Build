@@ -12,7 +12,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.22';
+$VERSION = '0.23';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -135,17 +135,18 @@ This illustrates initial configuration and the running of three
 'actions'.  In this case the actions run are 'build' (the default
 action), 'test', and 'install'.  Actions defined so far include:
 
-  build                          docs        
-  clean                          fakeinstall 
-  code                           help        
-  diff                           install     
-  dist                           manifest    
-  distcheck                      ppd         
-  distclean                      realclean   
-  distdir                        skipcheck   
-  distmeta                       test        
-  distsign                       testdb      
+  build                          fakeinstall   
+  clean                          help          
+  code                           install       
+  diff                           manifest      
+  dist                           ppd           
+  distcheck                      ppmdist       
+  distclean                      realclean     
+  distdir                        skipcheck     
+  distmeta                       test          
+  distsign                       testdb        
   disttest                       versioninstall
+  docs
 
 You can run the 'help' action for a complete list of actions.
 
@@ -190,7 +191,8 @@ C<ACTION_whatever>, and then you could perform the action C<Build
 whatever>.
 
 For information on providing backward compatibility with
-C<ExtUtils::MakeMaker>, see L<Module::Build::Compat>.
+C<ExtUtils::MakeMaker>, see L<Module::Build::Compat> and
+L<http://www.makemaker.org/wiki/index.cgi?ModuleBuildConversionGuide>.
 
 =head1 METHODS
 
@@ -496,6 +498,22 @@ install.
 For backward compatibility, you may use the parameter C<scripts>
 instead of C<script_files>.  Please consider this usage deprecated,
 though it will continue to exist for several version releases.
+
+=item test_files
+
+An optional parameter specifying a set of files that should be used as
+C<Test::Harness>-style regression tests to be run during the C<test>
+action.  May be given as an array reference of the files, or as a hash
+reference whose keys are the files (and whose values will currently be
+ignored).  If the argument is given as a single string (not in an
+array reference), that string will be treated as a C<glob()> pattern
+specifying the files to use.
+
+The default is to look for a F<test.pl> script in the top-level
+directory of the distribution, and any files matching the glob pattern
+C<*.t> in the F<t/> subdirectory.  If the C<recursive_test_files>
+property is true, then the C<t/> directory will be scanned recursively
+for C<*.t> files.
 
 =item autosplit
 
@@ -840,8 +858,8 @@ This method may be called as a class or object method.
 
 =item script_files()
 
-Returns an array reference specifying the perl script files to be
-installed.  This corresponds to the C<script_files> parameter to the
+Returns a hash reference whose keys are the perl script files to be
+installed, if any.  This corresponds to the C<script_files> parameter to the
 C<new()> method.  With an optional argument, this parameter may be set
 dynamically.
 
@@ -1164,6 +1182,12 @@ This action is helpful for module authors who want to package up their
 module for distribution through a medium like CPAN.  It will create a
 tarball of the files listed in F<MANIFEST> and compress the tarball using
 GZIP compression.
+
+=item ppmdist
+
+Generates a PPM binary distribution and a PPD description file.  This
+action also invokes the 'ppd' action, so it can accept the same
+C<codebase> argument described under that action.
 
 =item distsign
 
@@ -1586,7 +1610,7 @@ details of how to access it.
 
 =head1 SEE ALSO
 
-perl(1), ExtUtils::MakeMaker(3), YAML(3)
+perl(1), Module::Build::Cookbook(3), ExtUtils::MakeMaker(3), YAML(3)
 
 http://www.dsmit.com/cons/
 

@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: Module-Build
-version: 0.22
+version: 0.23
 author:
   - Ken Williams, ken@mathforum.org
 abstract: Build and install Perl modules
@@ -26,11 +26,10 @@ recommends:
   YAML: 0.35
 build_requires:
   Test: 0
-conflicts: {}
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: 0.22
+    version: 0.23
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
   Module::Build::Compat:
@@ -76,4 +75,4 @@ provides:
     file: lib/Module/Build/Platform/os2.pm
   Module::Build::PodParser:
     file: lib/Module/Build/PodParser.pm
-generated_by: Module::Build version 0.22
+generated_by: Module::Build version 0.23

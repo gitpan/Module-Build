@@ -44,17 +44,18 @@ DESCRIPTION
     'actions'. In this case the actions run are 'build' (the default
     action), 'test', and 'install'. Actions defined so far include:
 
-      build                          docs        
-      clean                          fakeinstall 
-      code                           help        
-      diff                           install     
-      dist                           manifest    
-      distcheck                      ppd         
-      distclean                      realclean   
-      distdir                        skipcheck   
-      distmeta                       test        
-      distsign                       testdb      
+      build                          fakeinstall   
+      clean                          help          
+      code                           install       
+      diff                           manifest      
+      dist                           ppd           
+      distcheck                      ppmdist       
+      distclean                      realclean     
+      distdir                        skipcheck     
+      distmeta                       test          
+      distsign                       testdb        
       disttest                       versioninstall
+      docs
 
     You can run the 'help' action for a complete list of actions.
 
@@ -99,7 +100,8 @@ DESCRIPTION
     whatever".
 
     For information on providing backward compatibility with
-    "ExtUtils::MakeMaker", see the Module::Build::Compat manpage.
+    "ExtUtils::MakeMaker", see the Module::Build::Compat manpage and
+    http://www.makemaker.org/wiki/index.cgi?ModuleBuildConversionGuide.
 
 METHODS
     I list here some of the most important methods in "Module::Build".
@@ -380,6 +382,22 @@ METHODS
             instead of "script_files". Please consider this usage
             deprecated, though it will continue to exist for several version
             releases.
+
+        test_files
+            An optional parameter specifying a set of files that should be
+            used as "Test::Harness"-style regression tests to be run during
+            the "test" action. May be given as an array reference of the
+            files, or as a hash reference whose keys are the files (and
+            whose values will currently be ignored). If the argument is
+            given as a single string (not in an array reference), that
+            string will be treated as a "glob()" pattern specifying the
+            files to use.
+
+            The default is to look for a test.pl script in the top-level
+            directory of the distribution, and any files matching the glob
+            pattern "*.t" in the t/ subdirectory. If the
+            "recursive_test_files" property is true, then the "t/" directory
+            will be scanned recursively for "*.t" files.
 
         autosplit
             An optional "autosplit" argument specifies a file which should
@@ -698,10 +716,10 @@ METHODS
         This method may be called as a class or object method.
 
     script_files()
-        Returns an array reference specifying the perl script files to be
-        installed. This corresponds to the "script_files" parameter to the
-        "new()" method. With an optional argument, this parameter may be set
-        dynamically.
+        Returns a hash reference whose keys are the perl script files to be
+        installed, if any. This corresponds to the "script_files" parameter
+        to the "new()" method. With an optional argument, this parameter may
+        be set dynamically.
 
         For backward compatibility, the "scripts()" method does exactly the
         same thing as "script_files()". "scripts()" is deprecated, but it
@@ -997,6 +1015,11 @@ ACTIONS
         their module for distribution through a medium like CPAN. It will
         create a tarball of the files listed in MANIFEST and compress the
         tarball using GZIP compression.
+
+    ppmdist
+        Generates a PPM binary distribution and a PPD description file. This
+        action also invokes the 'ppd' action, so it can accept the same
+        "codebase" argument described under that action.
 
     distsign
         Uses "Module::Signature" to create a SIGNATURE file for your
@@ -1363,7 +1386,7 @@ AUTHOR
     details of how to access it.
 
 SEE ALSO
-    perl(1), ExtUtils::MakeMaker(3), YAML(3)
+    perl(1), Module::Build::Cookbook(3), ExtUtils::MakeMaker(3), YAML(3)
 
     http://www.dsmit.com/cons/
 

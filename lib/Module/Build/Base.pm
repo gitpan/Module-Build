@@ -58,7 +58,9 @@ sub new_from_context {
   
   # Run the Build.PL
   $package->run_perl_script('Build.PL');
-  return $package->resume;
+  my $self = $package->resume;
+  $self->merge_args(%args);
+  return $self;
 }
 
 sub current {
@@ -834,7 +836,7 @@ sub _call_action {
   return $self->$method();
 }
 
-sub _cull_arg {
+sub _read_arg {
   my ($self, $args, $key, $val) = @_;
 
   if ( exists $args->{$key} ) {
@@ -845,15 +847,15 @@ sub _cull_arg {
   }
 }
 
-sub cull_args {
+sub read_args {
   my $self = shift;
   my ($action, %args, @argv);
   while (@_) {
     local $_ = shift;
     if ( /^(\w+)=(.*)/ ) {
-      $self->_cull_arg(\%args, $1, $2);
+      $self->_read_arg(\%args, $1, $2);
     } elsif ( /^--(\w+)$/ ) {
-      $self->_cull_arg(\%args, $1, shift());
+      $self->_read_arg(\%args, $1, shift());
     } elsif ( /^(\w+)$/ and !defined($action)) {
       $action = $1;
     } else {
@@ -863,8 +865,7 @@ sub cull_args {
   $args{ARGV} = \@argv;
 
   # 'config' and 'install_path' are additive by hash key
-  my %additive = (config => $self->{config},
-		  install_path => $self->{properties}{install_path} ||= {});
+  my %additive = map {$_, 1} qw(config install_path);
 
   # Hashify these parameters
   for (keys %additive) {
@@ -879,8 +880,15 @@ sub cull_args {
     }
     $args{$_} = \%hash;
   }
+  
+  return \%args, $action;
+}
 
-  # Now merge data into $self.
+sub merge_args {
+  my ($self, $action, %args) = @_;
+  my %additive = (config => $self->{config},
+		  install_path => $self->{properties}{install_path} ||= {});
+
   $self->{action} = $action if defined $action;
 
   # Extract our 'properties' from $cmd_args, the rest are put in 'args'.
@@ -895,7 +903,13 @@ sub cull_args {
       $add_to->{$key} = $val;
     }
   }
+}
 
+
+sub cull_args {
+  my $self = shift;
+  my ($args, $action) = $self->read_args(@_);
+  $self->merge_args($action, %$args);
 }
 
 sub super_classes {
@@ -923,7 +937,7 @@ sub known_actions {
   return wantarray ? sort keys %actions : \%actions;
 }
 
-sub _get_action_docs {
+sub get_action_docs {
   my ($self, $action, $actions) = @_;
   $actions ||= $self->known_actions;
   $@ = '';
@@ -948,9 +962,9 @@ sub _get_action_docs {
     # Look for our action
     my ($found, $inlist) = (0, 0);
     while (<$fh>) {
-      if (/^=item\s+\Q$action\E\b/o)  {
+      if (/^=item\s+\Q$action\E\b/)  {
 	$found = 1;
-      } elsif (/^=item/) {
+      } elsif (/^=(item|back)/) {
 	last if $found > 1 and not $inlist;
       }
       next unless $found;
@@ -960,12 +974,17 @@ sub _get_action_docs {
       ++$found  if /^\w/; # Found descriptive text
     }
   }
-  ($@ = "Sorry, couldn't find any documentation to search.\n"), return
-    unless $files_found;
-  ($@ = "Couldn't find any docs for action '$action'.\n"), return
-    unless @docs;
+
+  unless ($files_found) {
+    $@ = "Couldn't find any documentation to search";
+    return;
+  }
+  unless (@docs) {
+    $@ = "Couldn't find any docs for action '$action'";
+    return;
+  }
   
-  return @docs;
+  return join '', @docs;
 }
 
 sub ACTION_help {
@@ -973,7 +992,8 @@ sub ACTION_help {
   my $actions = $self->known_actions;
   
   if (@{$self->{args}{ARGV}}) {
-    print $self->_get_action_docs($self->{args}{ARGV}[0], $actions), $@;
+    my $msg = $self->get_action_docs($self->{args}{ARGV}[0], $actions) || "$@\n";
+    print $msg;
     return;
   }
 
@@ -1024,7 +1044,7 @@ sub ACTION_test {
 		File::Spec->catdir($p->{base_dir}, $self->blib, 'arch'),
 		@INC);
   
-  my $tests = $self->test_files;
+  my $tests = $self->find_test_files;
 
   if (@$tests) {
     # Work around a Test::Harness bug that loses the particular perl we're running under
@@ -1045,20 +1065,9 @@ sub test_files {
   my $self = shift;
   my $p = $self->{properties};
   if (@_) {
-    $p->{test_files} = (@_ == 1 ? shift : [@_]);
+    return $p->{test_files} = (@_ == 1 ? shift : [@_]);
   }
-
-  my @tests;
-  if ($p->{test_files}) {
-    @tests = (map { -d $_ ? $self->expand_test_dir($_) : $_ }
-	      map glob,
-	      $self->split_like_shell($p->{test_files}));
-  } else {
-    # Find all possible tests in t/ or test.pl
-    push @tests, 'test.pl'                          if -e 'test.pl';
-    push @tests, $self->expand_test_dir('t')        if -e 't' and -d _;
-  }
-  return \@tests;
+  return $self->find_test_files;
 }
 
 sub expand_test_dir {
@@ -1114,6 +1123,7 @@ sub process_PL_files {
   my $files = $self->find_PL_files;
   
   while (my ($file, $to) = each %$files) {
+    local $ENV{'PERL5LIB'} = join $self->{config}{path_sep}, @INC;
     unless ($self->up_to_date( $file, $to )) {
       $self->run_perl_script($file, [], [@$to]);
       $self->add_to_cleanup(@$to);
@@ -1197,9 +1207,7 @@ sub find_xs_files  { shift->_find_file_by_type('xs',  'lib') }
 
 sub find_script_files {
   my $self = shift;
-  if (my $files = $self->{properties}{"script_files"}) {
-    $files = { map {$_, undef} @$files } if UNIVERSAL::isa($files, 'ARRAY');
-    
+  if (my $files = $self->script_files) {
     # Always given as a Unix file spec.  Values in the hash are
     # meaningless, but we preserve if present.
     return { map {$self->localize_file_path($_), $files->{$_}} keys %$files };
@@ -1207,6 +1215,29 @@ sub find_script_files {
   
   # No default location for script files
   return {};
+}
+
+sub find_test_files {
+  my $self = shift;
+  my $p = $self->{properties};
+  
+  if (my $files = $p->{test_files}) {
+    $files = [keys %$files] if UNIVERSAL::isa($files, 'HASH');
+    $files = [map { -d $_ ? $self->expand_test_dir($_) : $_ }
+	      map glob,
+	      $self->split_like_shell($files)];
+    
+    # Always given as a Unix file spec.  Values in the hash are
+    # meaningless, but we preserve if present.
+    return [ map $self->localize_file_path($_), @$files ];
+    
+  } else {
+    # Find all possible tests in t/ or test.pl
+    my @tests;
+    push @tests, 'test.pl'                          if -e 'test.pl';
+    push @tests, $self->expand_test_dir('t')        if -e 't' and -d _;
+    return \@tests;
+  }
 }
 
 sub _find_file_by_type {
@@ -1241,6 +1272,7 @@ sub fix_shebang_line { # Adapted from fixin() in ExtUtils::MM_Unix 1.35
     next unless $line =~ s/^\s*\#!\s*//;     # Not a shbang file.
     
     my ($cmd, $arg) = (split(' ', $line, 2), '');
+    next unless $cmd =~ /perl/i;
     my $interpreter = $self->{properties}{perl};
     
     print STDOUT "Changing sharpbang in $file to $interpreter" if $self->{verbose};
@@ -1463,6 +1495,14 @@ sub ACTION_ppd {
   $self->add_to_cleanup($file);
 }
 
+sub ACTION_ppmdist {
+  my ($self) = @_;
+  
+  $self->depends_on('build', 'ppd');
+  $self->add_to_cleanup($self->ppm_name);
+  $self->make_tarball($self->{properties}{blib}, $self->ppm_name);
+}
+
 sub ACTION_dist {
   my ($self) = @_;
   
@@ -1539,21 +1579,26 @@ sub ACTION_distclean {
   $self->depends_on('distcheck');
 }
 
+sub do_create_makefile_pl {
+  my $self = shift;
+  require Module::Build::Compat;
+  Module::Build::Compat->create_makefile_pl($self->create_makefile_pl, $self, @_);
+}
+
+sub do_create_readme {
+  my $self = shift;
+  require Pod::Text;
+  my $parser = Pod::Text->new;
+  $parser->parse_from_file($self->dist_version_from, 'README', @_);
+}
+
 sub ACTION_distdir {
   my ($self) = @_;
 
   $self->depends_on('distmeta');
 
-  if ($self->create_makefile_pl) {
-    require Module::Build::Compat;
-    Module::Build::Compat->create_makefile_pl($self->create_makefile_pl, $self);
-  }
-  
-  if ($self->create_readme) {
-    require Pod::Text;
-    my $parser = Pod::Text->new;
-    $parser->parse_from_file($self->dist_version_from, 'README');
-  }
+  $self->do_create_makefile_pl if $self->create_makefile_pl;
+  $self->do_create_readme if $self->create_readme;
   
   my $dist_files = $self->_read_manifest('MANIFEST');
   delete $dist_files->{SIGNATURE};  # Don't copy, create a fresh one
@@ -1604,12 +1649,23 @@ sub dist_dir {
   return "$self->{properties}{dist_name}-$self->{properties}{dist_version}";
 }
 
+sub ppm_name {
+  my $self = shift;
+  return 'PPM-' . $self->dist_dir;
+}
+
 sub script_files {
   my $self = shift;
-  if (@_) {
-    $self->{properties}{script_files} = ref($_[0]) ? $_[0] : [@_];
+  
+  for ($self->{properties}{script_files}) {
+    $_ = shift if @_;
+    return unless $_;
+    
+    # Always coerce into a hash
+    return $_ if UNIVERSAL::isa($_, 'HASH');
+    return $_ = {$_ => 1} unless ref();
+    return { map {$_,1} @$_ };
   }
-  return $self->{properties}{script_files};
 }
 BEGIN { *scripts = \&script_files; }
 
@@ -1674,7 +1730,7 @@ EOM
   }
 
   foreach (qw(requires recommends build_requires conflicts dynamic_config)) {
-    $node->{$_} = $p->{$_} if exists $p->{$_};
+    $node->{$_} = $p->{$_} if exists $p->{$_} and keys %{ $p->{$_} };
   }
   
   $node->{provides} = $self->find_dist_packages;
@@ -1731,18 +1787,22 @@ sub _packages_inside {
 }
 
 sub make_tarball {
-  my ($self, $dir) = @_;
-
-  print "Creating $dir.tar.gz\n";
+  my ($self, $dir, $file) = @_;
+  $file ||= $dir;
+  
+  print "Creating $file.tar.gz\n";
   
   if ($self->{args}{tar}) {
     my $tar_flags = $self->{properties}{verbose} ? 'cvf' : 'cf';
-    $self->do_system($self->{args}{tar}, $tar_flags, "$dir.tar", $dir);
-    $self->do_system($self->{args}{gzip}, "$dir.tar") if $self->{args}{gzip};
+    $self->do_system($self->{args}{tar}, $tar_flags, "$file.tar", $dir);
+    $self->do_system($self->{args}{gzip}, "$file.tar") if $self->{args}{gzip};
   } else {
     require Archive::Tar;
+    # Archive::Tar versions >= 1.09 use the following to enable a compatibility
+    # hack so that the resulting archive is compatible with older clients.
+    $Archive::Tar::DO_NOT_USE_PREFIX = 0;
     my $files = $self->rscan_dir($dir);
-    Archive::Tar->create_archive("$dir.tar.gz", 1, @$files);
+    Archive::Tar->create_archive("$file.tar.gz", 1, @$files);
   }
 }
 
