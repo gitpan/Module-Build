@@ -15,8 +15,9 @@ sub new {
   my $class = shift;
   my $self = $class->SUPER::new(@_);
 
-  # Check compiler type.
   my $cf = $self->{config};
+
+  # Check compiler type.
   if ( $cf->{cc} =~ /cl(\.exe)?$/ ) {
     $cf->{ccname} = 'MSVC';
   } elsif ( $cf->{cc} =~ /bcc32(\.exe)?$/ ) {
@@ -28,6 +29,21 @@ sub new {
   # Inherit from an appropriate compiler driver class
   my $cc_driver = "Module::Build::Platform::Windows::$cf->{ccname}";
   unshift @ISA, $cc_driver;
+
+  # Find 'pl2bat.bat' utility used for installing perl scripts.
+  # This search is probably overkill, as I've never met a MSWin32 perl
+  # where these locations differed from each other.
+  my @potential_dirs = map { File::Spec->canonpath($_) }
+    @${cf}{qw(installscript installbin installsitebin installvendorbin)},
+    File::Basename::dirname($self->{properties}{perl});
+
+  foreach my $dir (@potential_dirs) {
+    my $potential_file = File::Spec->catfile($dir, 'pl2bat.bat');
+    if ( -f $potential_file && !-d _ ) {
+      $cf->{pl2bat} = $potential_file;
+      last;
+    }
+  }
 
   return $self;
 }
@@ -123,11 +139,11 @@ sub link_c {
     objects       => [ "$file_base$cf->{obj_ext}", @{$self->{objects} || []} ],
     libs          => [ ],
     output        => $mylib,
-    ld            => $self->{config}{ld},
-    libperl       => $self->{config}{libperl},
-    perllibs      => [ $self->split_like_shell($self->{config}{perllibs})  ],
-    libpath       => [ $self->split_like_shell($self->{config}{libpth})    ],
-    lddlflags     => [ $self->split_like_shell($self->{config}{lddlflags}) ],
+    ld            => $cf->{ld},
+    libperl       => $cf->{libperl},
+    perllibs      => [ $self->split_like_shell($cf->{perllibs})  ],
+    libpath       => [ $self->split_like_shell($cf->{libpth})    ],
+    lddlflags     => [ $self->split_like_shell($cf->{lddlflags}) ],
     other_ldflags => [ $self->split_like_shell($self->{properties}{extra_linker_flags} || '') ],
     use_scripts   => 1, # XXX provide user option to change this???
   );
@@ -190,6 +206,35 @@ sub normalize_filespecs {
   }
 }
 
+sub make_executable {
+  my $self = shift;
+  $self->SUPER::make_executable(@_);
+
+  my $pl2bat = $self->{config}{pl2bat};
+
+  if ( defined($pl2bat) && length($pl2bat) ) {
+    foreach my $script (@_) {
+      # Don't run 'pl2bat.bat' for the 'Build' script;
+      # there is no easy way to get the resulting 'Build.bat'
+      # to delete itself when doing a 'Build realclean'.
+      next if ( $script eq $self->{properties}{build_script} );
+
+      (my $script_bat = $script) =~ s/\.plx?//i;
+      $script_bat .= '.bat' unless $script_bat =~ /\.bat$/i;
+
+      my $status = $self->do_system($pl2bat, '<', $script, '>', $script_bat);
+      if ( $status && -f $script_bat ) {
+        $self->SUPER::make_executable($script_bat);
+      } else {
+        warn "Unable to convert '$script' to an executable.\n";
+      }
+    }
+  } else {
+    warn "Could not find 'pl2bat.bat' utility needed to make scripts executable.\n"
+       . "Unable to convert scripts ( " . join(', ', @_) . " ) to executables.\n";
+  }
+}
+
 
 1;
 
@@ -227,7 +272,7 @@ sub format_compiler_cmd {
   %spec = $self->write_compiler_script(%spec)
     if $spec{use_scripts};
 
-  return [ grep {defined && $_} (
+  return [ grep {defined && length} (
     $spec{cc}, '-c'         ,
     @{$spec{includes}}      ,
     @{$spec{cflags}}        ,
@@ -281,7 +326,7 @@ sub format_linker_cmd {
   %spec = $self->write_linker_script(%spec)
     if $spec{use_scripts};
 
-  return [ grep {defined && $_} (
+  return [ grep {defined && length} (
     $spec{ld}               ,
     @{$spec{lddlflags}}     ,
     @{$spec{libpath}}       ,
@@ -342,7 +387,7 @@ sub format_compiler_cmd {
   %spec = $self->write_compiler_script(%spec)
     if $spec{use_scripts};
 
-  return [ grep {defined && $_} (
+  return [ grep {defined && length} (
     $spec{cc}, '-c'         ,
     @{$spec{includes}}      ,
     @{$spec{cflags}}        ,
@@ -394,7 +439,7 @@ sub format_linker_cmd {
   %spec = $self->write_linker_script(%spec)
     if $spec{use_scripts};
 
-  return [ grep {defined && $_} (
+  return [ grep {defined && length} (
     $spec{ld}               ,
     @{$spec{lddlflags}}     ,
     @{$spec{libpath}}       ,
@@ -467,7 +512,7 @@ sub format_compiler_cmd {
     $path = '-I' . $path;
   }
 
-  return [ grep {defined && $_} (
+  return [ grep {defined && length} (
     $spec{cc}, '-c'         ,
     @{$spec{includes}}      ,
     @{$spec{cflags}}        ,
@@ -513,7 +558,7 @@ sub format_linker_cmd {
                '--output-exp' , $spec{explib}
   ];
 
-  push @cmds, [ grep {defined && $_} (
+  push @cmds, [ grep {defined && length} (
     $spec{ld}                 ,
     '-o', $spec{output}       ,
     "-Wl,--base-file,$spec{base_file}"   ,
@@ -535,7 +580,7 @@ sub format_linker_cmd {
                '--base-file'  , $spec{base_file}
   ];
 
-  push @cmds, [ grep {defined && $_} (
+  push @cmds, [ grep {defined && length} (
     $spec{ld}                 ,
     '-o', $spec{output}       ,
     "-Wl,--image-base,$spec{image_base}" ,

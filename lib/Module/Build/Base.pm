@@ -1,8 +1,9 @@
 package Module::Build::Base;
 
-# $Id: Base.pm,v 1.68 2003/02/24 19:00:44 kwilliams Exp $
+# $Id: Base.pm,v 1.77 2003/03/29 21:30:05 kwilliams Exp $
 
 use strict;
+BEGIN { require 5.00503 }
 use Config;
 use File::Copy ();
 use File::Find ();
@@ -11,6 +12,7 @@ use File::Basename ();
 use File::Spec ();
 use File::Compare ();
 use Data::Dumper ();
+use IO::File ();
 
 sub new {
   my $package = shift;
@@ -38,6 +40,14 @@ sub new {
     $cmd_properties->{$key} = delete $cmd_args->{$key} if __PACKAGE__->valid_property($key);
   }
 
+  # The following warning could be unnecessary if the user is running
+  # an embedded perl, but there aren't too many of those around, and
+  # embedded perls aren't usually used to install modules, and the
+  # installation process sometimes needs to run external scripts
+  # (e.g. to run tests).
+  my $perl = $package->find_perl_interpreter
+    or warn "Warning: Can't locate your perl binary";
+
   # 'args' are arbitrary user args.
   # 'config' is Config.pm and its overridden values.
   # 'properties' is stuff Module::Build needs in order to work.  They get saved in _build/.
@@ -54,9 +64,8 @@ sub new {
 				   recommends => {},
 				   build_requires => {},
 				   conflicts => {},
-				   PL_files => {},
 				   scripts => [],
-				   perl => $^X,
+				   perl => $perl,
 				   %input,
 				   %$cmd_properties,
 				  },
@@ -84,6 +93,14 @@ sub new {
 sub cwd {
   require Cwd;
   return Cwd::cwd();
+}
+
+sub find_perl_interpreter {
+  my $perl;
+  File::Spec->file_name_is_absolute($perl = $^X)
+    or -f ($perl = $Config::Config{perlpath})
+    or ($perl = $^X);
+  return $perl;
 }
 
 sub base_dir { shift()->{properties}{base_dir} }
@@ -137,6 +154,12 @@ sub resume {
   my $self = bless {@_}, $package;
   
   $self->read_config;
+  
+  my $perl = $self->find_perl_interpreter;
+  warn(" * WARNING: Configuration was initially created with '$self->{properties}{perl}',\n".
+       "   but we are now using '$perl'.\n")
+    unless $perl eq $self->{properties}{perl};
+  
   return $self;
 }
 
@@ -235,7 +258,7 @@ sub version_from_file {
   my ($self, $file) = @_;
 
   # Some of this code came from the ExtUtils:: hierarchy.
-  open my($fh), $file or die "Can't open '$file' for version: $!";
+  my $fh = IO::File->new($file) or die "Can't open '$file' for version: $!";
   while (<$fh>) {
     if ( my ($sigil, $var) = /([\$*])(([\w\:\']*)\bVERSION)\b.*\=/ ) {
       my $eval = qq{
@@ -260,7 +283,7 @@ sub add_to_cleanup {
   return unless @need_to_write;
   
   if ( my $file = $self->config_file('cleanup') ) {
-    open my($fh), ">> $file" or die "Can't append to $file: $!";
+    my $fh = IO::File->new(">> $file") or die "Can't append to $file: $!";
     print $fh "$_\n" foreach @need_to_write;
   }
   
@@ -277,7 +300,7 @@ sub read_config {
   my ($self) = @_;
   
   my $file = $self->config_file('build_params');
-  open my $fh, $file or die "Can't read '$file': $!";
+  my $fh = IO::File->new($file) or die "Can't read '$file': $!";
   my $ref = eval do {local $/; <$fh>};
   die if $@;
   ($self->{args}, $self->{config}, $self->{properties}) = @$ref;
@@ -286,7 +309,7 @@ sub read_config {
   my $cleanup_file = $self->config_file('cleanup');
   $self->{cleanup} = {};
   if (-e $cleanup_file) {
-    open my $fh, $cleanup_file or die "Can't read '$file': $!";
+    my $fh = IO::File->new($cleanup_file) or die "Can't read '$file': $!";
     my @files = <$fh>;
     chomp @files;
     @{$self->{cleanup}}{@files} = ();
@@ -302,7 +325,7 @@ sub write_config {
   local $Data::Dumper::Terse = 1;
 
   my $file = $self->config_file('build_params');
-  open my $fh, "> $file" or die "Can't create '$file': $!";
+  my $fh = IO::File->new("> $file") or die "Can't create '$file': $!";
   print $fh Data::Dumper::Dumper([$self->{args}, $self->{config}, $self->{properties}]);
   close $fh;
 
@@ -472,8 +495,6 @@ my \$build = resume $build_package (
     build_script => '$build_script',
   },
 );
-warn "WARNING: '\$0' script was created with \$build->{properties}{perl}, but\\n".
-     "we are now using \$^X\\n" unless \$^X eq \$build->{properties}{perl};
 
 \$build->dispatch;
 EOF
@@ -491,7 +512,7 @@ sub create_build_script {
 
   print("Creating new '$p->{build_script}' script for ",
 	"'$p->{dist_name}' version '$p->{dist_version}'\n");
-  open my $fh, ">$p->{build_script}" or die "Can't create '$p->{build_script}': $!";
+  my $fh = IO::File->new(">$p->{build_script}") or die "Can't create '$p->{build_script}': $!";
   $self->print_build_script($fh);
   close $fh;
   
@@ -541,7 +562,7 @@ sub dispatch {
   my $method = "ACTION_$self->{action}";
   print("No action '$self->{action}' defined.\n"), return unless $self->can($method);
 
-  return $self->$method;
+  return $self->$method();
 }
 
 sub cull_args {
@@ -628,18 +649,12 @@ sub ACTION_test {
 		File::Spec->catdir('blib', 'arch'),
 		@INC);
   
-  # Find all possible tests and run them
-  my @tests;
-  if ($self->{args}{test_files}) {
-    @tests = ($self->{args}{test_files});
-  } else {
-    push @tests, 'test.pl'                          if -e 'test.pl';
-    push @tests, @{$self->rscan_dir('t', qr{\.t$})} if -e 't' and -d _;
-  }
-  if (@tests) {
+  my $tests = $self->test_files;
+
+  if (@$tests) {
     # Work around a Test::Harness bug that loses the particular perl we're running under
     local $^X = $self->{config}{perlpath} unless $Test::Harness::VERSION gt '2.01';
-    Test::Harness::runtests(sort @tests);
+    Test::Harness::runtests(@$tests);
   } else {
     print("No tests defined.\n");
   }
@@ -651,18 +666,53 @@ sub ACTION_test {
   }
 }
 
+sub test_files {
+  my $self = shift;
+  
+  my @tests;
+  if ($self->{args}{test_files}) {
+    @tests = ($self->split_like_shell($self->{args}{test_files}));
+  } else {
+    # Find all possible tests in t/ or test.pl
+    push @tests, 'test.pl'                          if -e 'test.pl';
+    push @tests, @{$self->rscan_dir('t', qr{\.t$})} if -e 't' and -d _;
+  }
+  return [sort @tests];
+}
+
 sub ACTION_testdb {
   my ($self) = @_;
   local $self->{properties}{debugger} = 1;
   $self->depends_on('test');
 }
 
+sub ACTION_build {
+  my ($self) = @_;
+  
+  # All installable stuff gets created in blib/ .
+  # Create blib/arch to keep blib.pm happy
+  my $blib = 'blib';
+  $self->add_to_cleanup($blib);
+  File::Path::mkpath( File::Spec->catdir($blib, 'arch') );
+  
+  if ($self->{properties}{autosplit}) {
+    $self->autosplit_file($self->{properties}{autosplit}, $blib);
+  }
+  
+  $self->process_PL_files;
+  
+  $self->compile_support_files;
+  
+  $self->process_pm_files;
+  $self->process_xs_files;
+  $self->process_pod_files;
+  $self->process_script_files;
+}
+
 sub compile_support_files {
   my $self = shift;
 
   if ($self->{properties}{c_source}) {
-    $self->process_PL_files($self->{properties}{c_source});
-    
     my $files = $self->rscan_dir($self->{properties}{c_source}, qr{\.c(pp)?$});
     
     push @{$self->{include_dirs}}, $self->{properties}{c_source};
@@ -673,33 +723,69 @@ sub compile_support_files {
   }
 }
 
-sub ACTION_build {
-  my ($self) = @_;
-
-  $self->compile_support_files;
-  
-  # What more needs to be done when creating blib/ from lib/?
-  # Currently we handle .pm, .xs, .pod, and .PL files.
-
-  $self->process_PL_files('lib');
-
-  my $blib = 'blib';
-  $self->add_to_cleanup($blib);
-  File::Path::mkpath($blib);
-  
-  my $files = $self->rscan_dir('lib', qr{\.(pm|pod|xs)$});
-  $self->lib_to_blib($files, $blib);
-  
-  if (@{$self->{properties}{scripts}}) {
-    my $script_dir = File::Spec->catdir($blib, 'script');
-    File::Path::mkpath( $script_dir );
-
-    foreach my $file (@{$self->{properties}{scripts}}) {
-      my $result = $self->copy_if_modified($file, $script_dir, 'flatten');
-      $self->make_executable($result) if $result;
-    }
+sub process_xs_files {
+  my $self = shift;
+  my $files = $self->find_xs_files;
+  foreach my $file (@$files) {
+    $self->process_xs($file);
   }
+}
 
+sub process_pod_files {
+  my $self = shift;
+  my $files = $self->find_pod_files;
+  foreach my $file (@$files) {
+    $self->copy_if_modified($file, 'blib');
+  }
+}
+
+sub process_pm_files {
+  my $self = shift;
+  my $files = $self->find_pm_files;
+  foreach my $file (@$files) {
+    $self->copy_if_modified($file, 'blib');
+  }
+}
+
+sub find_PL_files {
+  my $self = shift;
+  return $self->{properties}{PL_files} || { map {+$_, undef} $self->rscan_dir('lib', qr{\.PL$}) };
+}
+
+sub find_pm_files {
+  my $self = shift;
+  return $self->{properties}{pm_files} || $self->rscan_dir('lib', qr{\.pm$});
+}
+
+sub find_pod_files {
+  my $self = shift;
+  return $self->{properties}{pod_files} || $self->rscan_dir('lib', qr{\.pod$});
+}
+
+sub find_xs_files {
+  my $self = shift;
+  return $self->{properties}{xs_files} || $self->rscan_dir('lib', qr{\.xs$});
+}
+
+sub find_script_files {
+  my $self = shift;
+  return $self->{properties}{script_files} || [];
+}
+
+sub process_script_files {
+  my $self = shift;
+  my $files = $self->find_script_files;
+  return unless @$files;
+
+  my $script_dir = File::Spec->catdir('blib', 'script');
+  File::Path::mkpath( $script_dir );
+  
+  foreach my $file (@$files) {
+    my $result = $self->copy_if_modified($file, $script_dir, 'flatten') or next;
+    require ExtUtils::MM;
+    ExtUtils::MM->fixin($result);
+    $self->make_executable($result);
+  }
 }
 
 sub ACTION_manifypods {
@@ -755,14 +841,15 @@ sub ACTION_diff {
 }
 
 sub process_PL_files {
-  my ($self, $dir) = @_;
-  my $p = $self->{properties}{PL_files};
-  my $files = $self->rscan_dir($dir, qr{\.PL$});
-  foreach my $file (@$files) {
-    my @to = (exists $p->{$file} ?
-	      (ref $p->{$file} ? @{$p->{$file}} : ($p->{$file})) :
+  my ($self) = @_;
+  my $files = $self->find_PL_files;
+  
+  while (my ($file, $to) = each %$files) {
+    my @to = (defined $to ?
+	      (ref $to ? @$to : ($to)) :
 	      $file =~ /^(.*)\.PL$/);
     
+    # XXX - needs to use File::Spec
     if (grep {!-e $_ or  -M _ > -M $file} @to) {
       $self->run_perl_script($file);
       $self->add_to_cleanup(@to);
@@ -910,6 +997,10 @@ sub scripts {
   return $self->{properties}{scripts};
 }
 
+sub valid_licenses {
+  return { map {$_, 1} qw(perl gpl artistic lgpl bsd open_source unrestricted restrictive unknown) };
+}
+
 sub write_metadata {
   my ($self, $file) = @_;
   my $p = $self->{properties};
@@ -918,7 +1009,7 @@ sub write_metadata {
     warn "No license specified, setting license = 'unknown'\n";
     $p->{license} = 'unknown';
   }
-  unless (grep {$p->{license} eq $_} qw(perl gpl restrictive artistic unknown)) {
+  unless ($self->valid_licenses->{ $p->{license} }) {
     die "Unknown license type '$p->{license}";
   }
 
@@ -980,7 +1071,7 @@ sub depends_on {
   my $self = shift;
   foreach my $action (@_) {
     my $method = "ACTION_$action";
-    $self->$method;
+    $self->$method();
   }
 }
 
@@ -1007,31 +1098,6 @@ sub delete_filetree {
     $deleted++;
   }
   return $deleted;
-}
-
-sub lib_to_blib {
-  my ($self, $files, $to) = @_;
-  
-  # Create $to/arch to keep blib.pm happy (what a load of hooie!)
-  File::Path::mkpath( File::Spec->catdir($to, 'arch') );
-
-  if ($self->{properties}{autosplit}) {
-    $self->autosplit_file($self->{properties}{autosplit}, $to);
-  }
-  
-  foreach my $file (@$files) {
-    if ($file =~ /\.p(m|od)$/) {
-      # No processing needed
-      $self->copy_if_modified($file, $to);
-
-    } elsif ($file =~ /\.xs$/) {
-      $self->process_xs($file);
-
-    } else {
-      warn "Ignoring file '$file', unknown extension\n";
-    }
-  }
-
 }
 
 sub autosplit_file {
@@ -1141,7 +1207,7 @@ sub run_perl_script {
     $_ = [ $self->split_like_shell($_) ] unless ref();
   }
   
-  return $self->do_system($self->{config}{perlpath}, @$preargs, $script, @$postargs);
+  return $self->do_system($self->{properties}{perl}, @$preargs, $script, @$postargs);
 }
 
 # A lot of this looks Unixy, but actually it may work fine on Windows.
@@ -1176,7 +1242,7 @@ sub process_xs {
     require ExtUtils::Mkbootstrap;
     print "ExtUtils::Mkbootstrap::Mkbootstrap('$file_base')\n";
     ExtUtils::Mkbootstrap::Mkbootstrap($file_base);  # Original had $BSLOADLIBS - what's that?
-    {open my $fh, ">> $file_base.bs"}  # touch
+    {my $fh = IO::File->new(">> $file_base.bs")}  # touch
   }
   $self->copy_if_modified("$file_base.bs", $archdir, 1);
   
