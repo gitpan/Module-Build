@@ -12,7 +12,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.19_04';
+$VERSION = '0.19_05';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -133,17 +133,17 @@ This illustrates initial configuration and the running of three
 'actions'.  In this case the actions run are 'build' (the default
 action), 'test', and 'install'.  Actions defined so far include:
 
-  build                          fakeinstall 
-  builddocs                      help        
-  clean                          install     
-  diff                           manifest    
-  dist                           ppd         
-  distcheck                      realclean   
-  distclean                      skipcheck   
-  distdir                        test        
-  distmeta                       testdb      
-  distsign                       versioninstall
-  disttest                                   
+  build                          docs        
+  clean                          fakeinstall 
+  code                           help        
+  diff                           install     
+  dist                           manifest    
+  distcheck                      ppd         
+  distclean                      realclean   
+  distdir                        skipcheck   
+  distmeta                       test        
+  distsign                       testdb      
+  disttest                       versioninstall
 
 You can run the 'help' action for a complete list of actions.
 
@@ -489,8 +489,10 @@ though it will continue to exist for several version releases.
 
 An optional C<autosplit> argument specifies a file which should be run
 through the C<Autosplit::autosplit()> function.  In general I don't
-consider this a great idea, and I may even go so far as to remove this
-feature later.  Let me know if I shouldn't.
+consider this a great idea, because it's not always clear that
+autosplitting achieves its intended performance benefits.  It may even
+harm performance in environments like mod_perl, where as much as
+possible of a module's code should be loaded during startup.
 
 =item dynamic_config
 
@@ -593,7 +595,51 @@ You'll probably never call this method directly, it's only called from
 the auto-generated C<Build> script.  The C<new()> method is only
 called once, when the user runs C<perl Build.PL>.  Thereafter, when
 the user runs C<Build test> or another action, the C<Module::Build>
-object is created using the C<resume()> method.
+object is created using the C<resume()> method to reinstantiate with
+the settings given earlier to C<new()>.
+
+=item current()
+
+This method returns a reasonable faxsimile of the currently-executing
+C<Module::Build> object representing the current build.  You can use
+this object to query its C<notes()> method, inquire about installed
+modules, and so on.  This is a great way to share information between
+different parts of your building process.  For instance, you can ask
+the user a question during C<perl Build.PL>, then use their answer
+during a regression test:
+
+ # In Build.PL:
+ my $color = $build->prompt("What is your favorite color?");
+ $build->notes(color => $color);
+ 
+ # In t/colortest.t:
+ use Module::Build;
+ my $build = Module::Build->current;
+ my $color = $build->notes('color');
+ ...
+
+The way the C<current()> method is currently implemented, there may be
+slight differences between the C<$build> object in Build.PL and the
+one in C<t/colortest.t>.  It is our goal to minimize these differences
+in future releases of Module::Build, so please report any anomalies
+you find.
+
+=item notes()
+
+=item notes($key)
+
+=item notes($key => $value)
+
+The C<notes()> value allows you to store your own persistent
+information about the build, and to share that information among
+different entities involved in the build.  See the example in the
+C<current()> method.
+
+The C<notes()> method is essentally a glorified hash access.  With no
+arguments, C<notes()> returns a reference to the entire hash of notes.
+With one argument, C<notes($key)> returns the value associated with
+the given key.  With two arguments, C<notes($key, $value)> sets the
+value associated with the given key to C<$value>.
 
 =item dispatch($action, %args)
 
@@ -852,6 +898,10 @@ This action will simply print out a message that is meant to help you
 use the build process.  It will show you a list of available build
 actions too.
 
+With an optional argument specifying an action name (e.g. C<Build help
+test>), the 'help' action will show you any POD documentation it can
+find for that action.
+
 =item build
 
 If you run the C<Build> script without any arguments, it runs the
@@ -914,7 +964,16 @@ argument whose value is a whitespace-separated list of test scripts to
 run.  This is especially useful in development, when you only want to
 run a single test to see whether you've squashed a certain bug yet:
 
- ./Build test verbose=1 test_files=t/something_failing.t
+ ./Build test --test_files t/something_failing.t
+
+You may also pass several C<test_files> arguments separately:
+
+ ./Build test --test_files t/one.t --test_files t/two.t
+
+or use a C<glob()>-style pattern:
+
+ ./Build test --test_files 't/01-*.t'
+
 
 =item testdb
 
@@ -1377,7 +1436,12 @@ C<ExtUtils::MakeMaker>.  There is a workaround C<MY> package that lets
 you override certain MakeMaker methods, but only certain explicitly
 predefined (by MakeMaker) methods can be overridden.  Also, the method
 of customization is very crude: you have to modify a string containing
-the Makefile text for the particular target.
+the Makefile text for the particular target.  Since these strings
+aren't documented, and I<can't> be documented (they take on different
+values depending on the platform, version of perl, version of
+MakeMaker, etc.), you have no guarantee that your modifications will
+work on someone else's machine or after an upgrade of MakeMaker or
+perl.
 
 =item *
 
@@ -1396,7 +1460,6 @@ another?  Are you getting riled up yet??
 
 =back
 
-Please contact me if you have any questions or ideas.
 
 =head1 MIGRATION
 
@@ -1407,6 +1470,10 @@ doesn't try to run your F<Build.PL> as a normal F<.PL> file:
 
  PL_FILES => {},
 
+You may also be interested in looking at the C<Module::Build::Compat>
+module, which can automatically create various kinds of F<Makefile.PL>
+compatibility layers.
+
 =head1 TO DO
 
 The current method of relying on time stamps to determine whether a
@@ -1415,15 +1482,6 @@ requires tracing all dependencies backward, it runs into problems on
 NFS, and it's just generally flimsy.  It would be better to use an MD5
 signature or the like, if available.  See C<cons> for an example.
 
-When generating META.yml, you may see errors from Module::Info.  This
-is because to build the I<provides> section, Module::Info compiles
-each source file to determine what packages it contains.  If that
-module requires dependencies, they will not be loaded if they are part
-of the same distribution, because they might not have been built yet.
-Patches to fix this welcome.  The right solution may be to make C<use>
-not die if it encounters an error, but that might be hard to do.
-
-- make man pages and install them.
 - append to perllocal.pod
 - write .packlist in appropriate location (needed for un-install)
 
@@ -1433,6 +1491,8 @@ Ken Williams, ken@mathforum.org
 
 Development questions, bug reports, and patches should be sent to the
 Module-Build mailing list at module-build-general@lists.sourceforge.net .
+Bug reports are also welcome at
+http://rt.cpan.org/NoAuth/Bugs.html?Dist=Module-Build .
 
 An anonymous CVS repository containing the latest development version
 is available; see http://sourceforge.net/cvs/?group_id=45731 for the

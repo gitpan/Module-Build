@@ -35,6 +35,7 @@ sub new {
 				   build_script    => 'Build',
 				   base_dir        => $package->cwd,
 				   config_dir      => '_build',
+				   blib            => 'blib',
 				   requires        => {},
 				   recommends      => {},
 				   build_requires  => {},
@@ -43,27 +44,22 @@ sub new {
 				   install_types   => [qw( lib arch script bindoc libdoc )],
 				   installdirs     => 'site',
 				   include_dirs    => [],
-				   bindoc_dirs     => [ 'blib/script' ],
-				   libdoc_dirs     => [ 'blib/lib', 'blib/arch' ],
 				   %input,
 				  },
 		   }, $package;
+
+  my $p = $self->{properties};
+  $p->{bindoc_dirs} ||= [ "$p->{blib}/script" ];
+  $p->{libdoc_dirs} ||= [ "$p->{blib}/lib", "$p->{blib}/arch" ];
+
+  # Synonyms
+  $p->{requires} = delete $p->{prereq} if exists $p->{prereq};
+  $p->{script_files} = delete $p->{scripts} if exists $p->{scripts};
 
   $self->cull_args(@ARGV);
   
   die "Too early to specify a build action '$self->{action}'.  Do 'Build $self->{action}' instead.\n"
     if $self->{action};
-
-  # 'args' are arbitrary user args.
-  # 'config' is Config.pm and its overridden values.
-  # 'properties' is stuff Module::Build needs in order to work.  They get saved in _build/.
-  # Anything else in $self doesn't get saved.
-
-  my $p = $self->{properties};
-
-  # Synonyms
-  $p->{requires} = delete $p->{prereq} if exists $p->{prereq};
-  $p->{script_files} = delete $p->{scripts} if exists $p->{scripts};
 
   $self->add_to_cleanup( @{delete $p->{add_to_cleanup}} )
     if $p->{add_to_cleanup};
@@ -94,14 +90,13 @@ sub resume {
   return $self;
 }
 
-sub instance {
+sub current {
   my $package = shift;
   # hmm, wonder what the right thing to do here is
   local @ARGV;
   return $package->resume(
 			  properties => {
 					 config_dir => '_build',
-					 build_script => 'Build',
 					},
 			 );
 }
@@ -230,8 +225,10 @@ sub notes {
        PL_files
        scripts
        script_files
+       test_files
        perl
        config_dir
+       blib
        build_script
        install_types
        install_sets
@@ -251,6 +248,17 @@ sub notes {
       );
 
   sub valid_property { exists $valid_properties{$_[1]} }
+
+  # Create an accessor for each property that doesn't already have one
+  foreach my $property (keys %valid_properties) {
+      next if __PACKAGE__->can($property);
+      no strict 'refs';
+      *{$property} = sub {
+          my $self = shift;
+          $self->{properties}{$property} = shift if @_;
+          return $self->{properties}{$property};
+      };
+  }
 }
 
 # XXX Problem - if Module::Build is loaded from a different directory,
@@ -609,9 +617,6 @@ sub check_installed_status {
   my %status = (need => $spec);
   
   if ($modname eq 'perl') {
-    # Check the current perl interpreter
-    # It's much more convenient to use $] here than $^V, but 'man
-    # perlvar' says I'm not supposed to.  Bloody tyrant.
     $status{have} = $self->perl_version;
   
   } elsif (eval { $status{have} = $modname->VERSION }) {
@@ -698,12 +703,11 @@ sub print_build_script {
   my ($self, $fh) = @_;
   
   my $build_package = ref($self);
-
-  my ($config_dir, $build_script, $base_dir) = 
-    ($self->{properties}{config_dir}, $self->{properties}{build_script}, $self->base_dir);
+  
+  my %q = map {$_, $self->$_()} qw(config_dir base_dir);
 
   my @myINC = @INC;
-  for ($config_dir, $build_script, $base_dir, @myINC) {
+  for (@myINC, values %q) {
     $_ = File::Spec->rel2abs($_);
     s/([\\\'])/\\$1/g;
   }
@@ -715,7 +719,7 @@ $self->{config}{startperl}
 
 BEGIN {
   \$^W = 1;  # Use warnings
-  my \$start_dir = '$base_dir';
+  my \$start_dir = '$q{base_dir}';
   chdir(\$start_dir) or die "Cannot chdir to \$start_dir: \$!";
   \@INC = 
     (
@@ -728,8 +732,7 @@ use $build_package;
 # This should have just enough arguments to be able to bootstrap the rest.
 my \$build = resume $build_package (
   properties => {
-    config_dir => '$config_dir',
-    build_script => '$build_script',
+    config_dir => '$q{config_dir}',
   },
 );
 
@@ -778,6 +781,7 @@ sub check_manifest {
 
 sub dispatch {
   my $self = shift;
+  local $self->{_completed_actions} = {};
 
   if (@_) {
     my ($action, %p) = @_;
@@ -794,6 +798,7 @@ sub dispatch {
 
 sub _call_action {
   my ($self, $action) = @_;
+  return if $self->{_completed_actions}{$action}++;
   local $self->{action} = $action;
   my $method = "ACTION_$action";
   die "No action '$action' defined" unless $self->can($method);
@@ -883,11 +888,62 @@ sub known_actions {
     }
   }
 
-  return sort keys %actions;
+  return wantarray ? sort keys %actions : \%actions;
+}
+
+sub _get_action_docs {
+  my ($self, $action, $actions) = @_;
+  $actions ||= $self->known_actions;
+  $@ = '';
+  ($@ = "No known action '$action'\n"), return
+    unless $actions->{$action};
+  
+  my ($files_found, @docs) = (0);
+  foreach my $class ($self->super_classes) {
+    (my $file = $class) =~ s{::}{/}g;
+    $file = $INC{$file . '.pm'} or next;
+    my $fh = IO::File->new("< $file") or next;
+    $files_found++;
+    
+    # Code below modified from /usr/bin/perldoc
+    
+    # Skip to ACTIONS section
+    local $_;
+    while (<$fh>) {
+      last if /^=head1 ACTIONS\s/;
+    }
+    
+    # Look for our action
+    my ($found, $inlist) = (0, 0);
+    while (<$fh>) {
+      if (/^=item\s+\Q$action\E\b/o)  {
+	$found = 1;
+      } elsif (/^=item/) {
+	last if $found > 1 and not $inlist;
+      }
+      next unless $found;
+      push @docs, $_;
+      ++$inlist if /^=over/;
+      --$inlist if /^=back/;
+      ++$found  if /^\w/; # Found descriptive text
+    }
+  }
+  ($@ = "Sorry, couldn't find any documentation to search.\n"), return
+    unless $files_found;
+  ($@ = "Couldn't find any docs for action '$action'.\n"), return
+    unless @docs;
+  
+  return @docs;
 }
 
 sub ACTION_help {
   my ($self) = @_;
+  my $actions = $self->known_actions;
+  
+  if (@{$self->{args}{ARGV}}) {
+    print $self->_get_action_docs($self->{args}{ARGV}[0], $actions), $@;
+    return;
+  }
 
   print <<EOF;
 
@@ -897,15 +953,16 @@ sub ACTION_help {
  Actions defined:
 EOF
 
-  my @actions = $self->known_actions;
   # Flow down columns, not across rows
+  my @actions = sort keys %$actions;
   @actions = map $actions[($_ + ($_ % 2) * @actions) / 2],  0..$#actions;
   
   while (my ($one, $two) = splice @actions, 0, 2) {
     printf("  %-12s                   %-12s\n", $one, $two||'');
   }
-
-  print "\nSee `perldoc Module::Build` for details of the individual actions.\n";
+  
+  print "\nRun `Build help <action>` for details on an individual action.\n";
+  print "See `perldoc Module::Build` for complete documentation.\n";
 }
 
 sub ACTION_test {
@@ -913,7 +970,7 @@ sub ACTION_test {
   my $p = $self->{properties};
   require Test::Harness;
   
-  $self->depends_on('build');
+  $self->depends_on('code');
   
   # Do everything in our power to work with all versions of Test::Harness
   local ($Test::Harness::switches,
@@ -926,8 +983,8 @@ sub ACTION_test {
          $ENV{HARNESS_VERBOSE}) = ($p->{verbose} || 0) x 4;
 
   # Make sure we test the module in blib/
-  local @INC = (File::Spec->catdir($p->{base_dir}, 'blib', 'lib'),
-		File::Spec->catdir($p->{base_dir}, 'blib', 'arch'),
+  local @INC = (File::Spec->catdir($p->{base_dir}, $self->blib, 'lib'),
+		File::Spec->catdir($p->{base_dir}, $self->blib, 'arch'),
 		@INC);
   
   my $tests = $self->test_files;
@@ -949,16 +1006,28 @@ sub ACTION_test {
 
 sub test_files {
   my $self = shift;
-  
+  my $p = $self->{properties};
+  if (@_) {
+    $p->{test_files} = (@_ == 1 ? shift : [@_]);
+  }
+
   my @tests;
-  if ($self->{args}{test_files}) {  # XXX use 'properties'
-    @tests = $self->split_like_shell($self->{args}{test_files});
+  if ($p->{test_files}) {
+    @tests = (map { -d $_ ? $self->expand_test_dir($_) : $_ }
+	      map glob,
+	      $self->split_like_shell($p->{test_files}));
   } else {
     # Find all possible tests in t/ or test.pl
     push @tests, 'test.pl'                          if -e 'test.pl';
-    push @tests, @{$self->rscan_dir('t', qr{\.t$})} if -e 't' and -d _;
+    push @tests, $self->expand_test_dir('t')        if -e 't' and -d _;
   }
-  return [sort @tests];
+  return \@tests;
+}
+
+sub expand_test_dir {
+  my ($self, $dir) = @_;
+  return @{$self->rscan_dir($dir, qr{\.t$})} if $self->{properties}{recursive_test_files};
+  return sort glob File::Spec->catfile($dir, "*.t");
 }
 
 sub ACTION_testdb {
@@ -967,12 +1036,12 @@ sub ACTION_testdb {
   $self->depends_on('test');
 }
 
-sub ACTION_build {
+sub ACTION_code {
   my ($self) = @_;
   
   # All installable stuff gets created in blib/ .
   # Create blib/arch to keep blib.pm happy
-  my $blib = 'blib';
+  my $blib = $self->blib;
   $self->add_to_cleanup($blib);
   File::Path::mkpath( File::Spec->catdir($blib, 'arch') );
   
@@ -988,6 +1057,12 @@ sub ACTION_build {
   $self->process_xs_files;
   $self->process_pod_files;
   $self->process_script_files;
+}
+
+sub ACTION_build {
+  my $self = shift;
+  $self->depends_on('code');
+  $self->depends_on('docs');
 }
 
 sub compile_support_files {
@@ -1028,7 +1103,7 @@ sub process_pod_files {
   my $self = shift;
   my $files = $self->find_pod_files;
   while (my ($file, $dest) = each %$files) {
-    $self->copy_if_modified(from => $file, to => File::Spec->catfile('blib', $dest) );
+    $self->copy_if_modified(from => $file, to => File::Spec->catfile($self->blib, $dest) );
   }
 }
 
@@ -1036,7 +1111,7 @@ sub process_pm_files {
   my $self = shift;
   my $files = $self->find_pm_files;
   while (my ($file, $dest) = each %$files) {
-    $self->copy_if_modified(from => $file, to => File::Spec->catfile('blib', $dest) );
+    $self->copy_if_modified(from => $file, to => File::Spec->catfile($self->blib, $dest) );
   }
 }
 
@@ -1045,7 +1120,7 @@ sub process_script_files {
   my $files = $self->find_script_files;
   return unless keys %$files;
 
-  my $script_dir = File::Spec->catdir('blib', 'script');
+  my $script_dir = File::Spec->catdir($self->blib, 'script');
   File::Path::mkpath( $script_dir );
   
   foreach my $file (keys %$files) {
@@ -1165,8 +1240,9 @@ eval 'exec $interpreter $arg -S \$0 \${1+"\$\@"}'
 }
 
 
-sub ACTION_builddocs {
+sub ACTION_docs {
   my $self = shift;
+  $self->depends_on('code');
   require Pod::Man;
   $self->manify_bin_pods() if $self->install_destination('bindoc');
   $self->manify_lib_pods() if $self->install_destination('libdoc');
@@ -1178,7 +1254,7 @@ sub manify_bin_pods {
   my $files   = $self->_find_pods($self->{properties}{bindoc_dirs});
   return unless keys %$files;
   
-  my $mandir = File::Spec->catdir( 'blib', 'bindoc' );
+  my $mandir = File::Spec->catdir( $self->blib, 'bindoc' );
   File::Path::mkpath( $mandir, 0, 0777 );
 
   foreach my $file (keys %$files) {
@@ -1197,7 +1273,7 @@ sub manify_lib_pods {
   my $files   = $self->_find_pods($self->{properties}{libdoc_dirs});
   return unless keys %$files;
   
-  my $mandir = File::Spec->catdir( 'blib', 'libdoc' );
+  my $mandir = File::Spec->catdir( $self->blib, 'libdoc' );
   File::Path::mkpath( $mandir, 0, 0777 );
 
   foreach my $file (keys %$files) {
@@ -1272,7 +1348,7 @@ sub ACTION_diff {
   my @flags = @{$self->{args}{ARGV}};
   @flags = $self->split_like_shell($self->{args}{flags} || '') unless @flags;
   
-  my $installmap = $self->install_map('blib');
+  my $installmap = $self->install_map;
   delete $installmap->{read};
 
   my $text_suffix = qr{\.(pm|pod)$};
@@ -1307,15 +1383,15 @@ sub ACTION_diff {
 sub ACTION_install {
   my ($self) = @_;
   require ExtUtils::Install;
-  $self->depends_on('build', 'builddocs');
-  ExtUtils::Install::install($self->install_map('blib'), 1, 0, $self->{args}{uninst}||0);
+  $self->depends_on('build');
+  ExtUtils::Install::install($self->install_map, 1, 0, $self->{args}{uninst}||0);
 }
 
 sub ACTION_fakeinstall {
   my ($self) = @_;
   require ExtUtils::Install;
-  $self->depends_on('build', 'builddocs');
-  ExtUtils::Install::install($self->install_map('blib'), 1, 1, $self->{args}{uninst}||0);
+  $self->depends_on('build');
+  ExtUtils::Install::install($self->install_map, 1, 1, $self->{args}{uninst}||0);
 }
 
 sub ACTION_versioninstall {
@@ -1324,7 +1400,7 @@ sub ACTION_versioninstall {
   die "You must have only.pm 0.25 or greater installed for this operation: $@\n"
     unless eval { require only; 'only'->VERSION(0.25); 1 };
   
-  $self->depends_on('build', 'builddocs');
+  $self->depends_on('build');
   
   my %onlyargs = map {exists($self->{args}{$_}) ? ($_ => $self->{args}{$_}) : ()}
     qw(version versionlib);
@@ -1383,10 +1459,11 @@ sub _sign_dir {
   # the right directory after a signature failure.  Would be nice if
   # Module::Signature took a directory argument.
   
+  my $start_dir = $self->cwd;
   chdir $dir or die "Can't chdir() to $dir: $!";
   eval {Module::Signature::sign()};
   my @err = $@ ? ($@) : ();
-  chdir $self->base_dir or push @err, "Can't chdir() back to " . $self->base_dir . ": $!";
+  chdir $start_dir or push @err, "Can't chdir() back to $start_dir: $!";
   die join "\n", @err if @err;
 }
 
@@ -1441,6 +1518,7 @@ sub ACTION_disttest {
 
   $self->depends_on('distdir');
 
+  my $start_dir = $self->cwd;
   my $dist_dir = $self->dist_dir;
   chdir $dist_dir or die "Cannot chdir to $dist_dir: $!";
   # XXX could be different names for scripts
@@ -1449,7 +1527,7 @@ sub ACTION_disttest {
   $self->run_perl_script('Build.PL') or die "Error executing 'Build.PL' in dist directory: $!";
   $self->run_perl_script('Build') or die "Error executing 'Build' in dist directory: $!";
   $self->run_perl_script('Build', [], ['test']) or die "Error executing 'Build test' in dist directory";
-  chdir $self->base_dir;
+  chdir $start_dir;
 }
 
 sub ACTION_manifest {
@@ -1472,7 +1550,7 @@ sub script_files {
   }
   return $self->{properties}{script_files};
 }
-*scripts = \&script_files;
+BEGIN { *scripts = \&script_files; }
 
 sub valid_licenses {
   return { map {$_, 1} qw(perl gpl artistic lgpl bsd open_source unrestricted restrictive unknown) };
@@ -1609,6 +1687,7 @@ sub install_types {
 
 sub install_map {
   my ($self, $blib) = @_;
+  $blib ||= $self->blib;
 
   my %map;
   foreach my $type ($self->install_types) {
@@ -1809,7 +1888,7 @@ sub process_xs {
   my $archdir;
   {
     my @dirs = File::Spec->splitdir($file_base);
-    $archdir = File::Spec->catdir('blib','arch','auto', @dirs[1..$#dirs]);
+    $archdir = File::Spec->catdir($self->blib,'arch','auto', @dirs[1..$#dirs]);
   }
   
   # .xs -> .bs

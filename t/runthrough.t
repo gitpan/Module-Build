@@ -1,12 +1,11 @@
 use strict;
 
 use Test; 
-BEGIN { plan tests => 18 }
+BEGIN { plan tests => 21 }
 use Module::Build;
 use File::Spec;
 use File::Path;
 use Config;
-my $HAVE_YAML = eval {require YAML; 1};
 
 ok(1);
 ok $INC{'Module/Build.pm'}, '/blib/', "Make sure version from blib/ is loaded";
@@ -33,6 +32,7 @@ $build->add_to_cleanup('before_script');
 
 eval {$build->create_build_script};
 ok $@, '';
+ok -e $build->build_script, 1;
 
 # The 'cleanup' file doesn't exist yet
 ok grep $_ eq 'before_script', $build->cleanup;
@@ -46,6 +46,7 @@ ok grep $_ eq 'save_out',      $build->cleanup;
 my $output = eval {
   stdout_of( sub { $build->dispatch('test', verbose => 1) } )
 };
+ok $@, '';
 ok $output, qr/all tests successful/i;
 
 
@@ -55,7 +56,7 @@ $output =~ s/^/| /mg;
 print $output;
 print "^^^^^^^^^^^^^^^^^^^^^ Sample/test.pl output ^^^^^^^^^^^^^^^^^^^^^\n";
 
-if ($HAVE_YAML) {
+if ($build->check_installed_status('YAML', 0)) {
   eval {$build->dispatch('disttest')};
   ok $@, '';
   
@@ -119,5 +120,4 @@ EOF
 eval {$build->dispatch('realclean')};
 ok $@, '';
 
-# Clean up
-File::Path::rmtree( 'Sample-0.01', 0, 0 );
+ok -e 'Sample-0.01', undef;

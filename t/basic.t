@@ -2,7 +2,7 @@
 
 use strict;
 use Test;
-BEGIN { plan tests => 18 }
+BEGIN { plan tests => 19 }
 use Module::Build;
 ok(1);
 
@@ -22,6 +22,7 @@ chdir 't';
      module_name => 'ModuleBuildOne',
     );
   ok $build;
+  ok $build->module_name, 'ModuleBuildOne';
 }
 
 # Make sure actions are defined, and known_actions works as class method
@@ -84,8 +85,8 @@ chdir 't';
 
   $m->add_to_cleanup('save_out');
   # Use uc() so we don't confuse the current test output
-  ok uc(stdout_of( sub {$m->dispatch('test', verbose => 1)} )), '/OK 1/';
-  ok uc(stdout_of( sub {$m->dispatch('test', verbose => 0)} )), '/\.\.OK/';
+  ok uc(stdout_of( sub {$m->dispatch('test', verbose => 1)} )), qr/^OK 2/m;
+  ok uc(stdout_of( sub {$m->dispatch('test', verbose => 0)} )), qr/\.\.OK/;
   
   $m->dispatch('realclean');
   chdir $cwd or die "Can't change back to $cwd: $!";

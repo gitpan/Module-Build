@@ -1,5 +1,50 @@
 Revision history for Perl extension Module::Build.
 
+0.19_05
+
+ - Changed the way the depends_on() method works inside action
+   subroutines - now each action will only run once per dispatch()
+   invocation (similar to how perl's require() function works).  This
+   helps avoid some difficult problems with dependency loops.
+
+ - Separated the 'build' action into two separate actions, 'code' and
+   'docs'.  This is similar to MakeMaker's separation of the 'all'
+   target into 'pure_all' and 'manifypods'.  This fixes a permissions
+   hassle in which doing 'sudo Build install' would often create local
+   doc files that needed superuser permissions to delete.
+
+ - Enhanced the 'help' action - 'Build help foo' will now show the POD
+   documentation for the 'foo' action.
+
+ - Changed the documentation for the 'autosplit' parameter to give
+   reasons why it may not be a good idea to use, but no longer
+   threaten to remove it.  [Suggested by Martyn J. Pearce]
+
+ - Improved the formatting of the 'traditional' Makefile.PL generated
+   by Module::Build::Compat->create_makefile_pl. [Michael Schwern]
+
+ - The 'traditional' Makefile.PL will now use the 'module_name'
+   parameter (as NAME) if it's available, otherwise it will continue
+   to use the 'dist_name' (as DISTNAME). [Michael Schwern]
+
+ - Created read/write accessor methods for all our 'properties'.
+   [Michael Schwern]
+
+ - The 'test_files' parameter can now be specified using glob() syntax
+   (i.e. 't/*.t'), and the corresponding test_files() method is now a
+   read/write accessor.
+
+ - The 'builddocs' action from the last beta release has been renamed
+   to 'docs'.
+
+ - The location of the 'blib' directory is now a property of the Build
+   object - nobody is likely to notice this change, with any luck, but
+   it makes the design and code cleaner.
+
+ - The 'disttest' and 'distsign' methods now chdir() back to the
+   directory where they started, rather than to the base_dir of the
+   build.
+
 0.19_04
 
  - Fixed yet another bug with installation directories, in which the
@@ -25,7 +70,7 @@ Revision history for Perl extension Module::Build.
 0.19_03
 
  - Added a notes() feature, which helps share data transparently
-   between the Build.PL and t/*.t scripts.  (XXX needs documentation)
+   between the Build.PL and t/*.t scripts.
 
 0.19_02
 
@@ -652,7 +697,6 @@ Revision history for Perl extension Module::Build.
     debugger. (idea: Dave Rolsky)
 
   - Added prerequisite checking (Dave Rolsky)
-XXX Needs to write _build/prereq
 
   - Fixed an unlikely-to-occur bug with misquoted strings in the
     'Build' script (spot: Dave Rolsky)
