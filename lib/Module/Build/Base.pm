@@ -40,10 +40,25 @@ sub resume {
        "   but we are now using '$perl'.\n")
     unless $perl eq $self->{properties}{perl};
   
+  my $mb_version = Module::Build->VERSION;
+  die(" * ERROR: Configuration was initially created with Module::Build version '$self->{properties}{mb_version}',\n".
+      "   but we are now using version '$mb_version'.  Please re-run the Build.PL or Makefile.PL script.\n")
+    unless $mb_version eq $self->{properties}{mb_version};
+  
   $self->cull_args(@ARGV);
   $self->{action} ||= 'build';
   
   return $self;
+}
+
+sub new_from_context {
+  my ($package, %args) = @_;
+  
+  # XXX Read the META.yml and see whether we need to run the Build.PL
+  
+  # Run the Build.PL
+  $package->run_perl_script('Build.PL');
+  return $package->resume;
 }
 
 sub current {
@@ -79,6 +94,7 @@ sub _construct {
 				   build_requires  => {},
 				   conflicts       => {},
 				   perl            => $perl,
+				   mb_version      => Module::Build->VERSION,
 				   install_types   => [qw( lib arch script bindoc libdoc )],
 				   installdirs     => 'site',
 				   include_dirs    => [],
@@ -224,6 +240,7 @@ sub notes {
        dist_abstract
        requires
        recommends
+       license
        pm_files
        xs_files
        pod_files
@@ -246,6 +263,7 @@ sub notes {
        c_source
        autosplit
        create_makefile_pl
+       create_readme
        pollute
        include_dirs
        bindoc_dirs
@@ -1487,7 +1505,10 @@ sub _sign_dir {
 
 sub ACTION_distsign {
   my ($self) = @_;
-  $self->depends_on('distdir') unless -d $self->dist_dir;
+  {
+    local $self->{properties}{sign} = 0;  # We'll sign it ourselves
+    $self->depends_on('distdir') unless -d $self->dist_dir;
+  }
   $self->_sign_dir($self->dist_dir);
 }
 
@@ -1511,9 +1532,15 @@ sub ACTION_distdir {
 
   $self->depends_on('distmeta');
 
-  if ($self->{properties}{create_makefile_pl}) {
+  if ($self->create_makefile_pl) {
     require Module::Build::Compat;
-    Module::Build::Compat->create_makefile_pl($self->{properties}{create_makefile_pl}, $self);
+    Module::Build::Compat->create_makefile_pl($self->create_makefile_pl, $self);
+  }
+  
+  if ($self->create_readme) {
+    require Pod::Text;
+    my $parser = Pod::Text->new;
+    $parser->parse_from_file($self->dist_version_from, 'README');
   }
   
   my $dist_files = $self->_read_manifest('MANIFEST');
@@ -1883,8 +1910,9 @@ sub run_perl_script {
   foreach ($preargs, $postargs) {
     $_ = [ $self->split_like_shell($_) ] unless ref();
   }
+  my $perl = ref($self) ? $self->perl : $self->find_perl_interpreter;
   
-  return $self->do_system($self->{properties}{perl}, @$preargs, $script, @$postargs);
+  return $self->do_system($perl, @$preargs, $script, @$postargs);
 }
 
 # A lot of this looks Unixy, but actually it may work fine on Windows.

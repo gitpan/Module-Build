@@ -12,7 +12,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.20_01';
+$VERSION = '0.20_02';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -518,9 +518,11 @@ is performed.  See also the add_to_cleanup() method.
 
 If a true value is specified for this parameter, C<Module::Signature>
 will be used (via the 'distsign' action) to create a SIGNATURE file
-for your distribution during the 'distdir' action.  The default is
-false.  In the future, the default may change to true if you have
-C<Module::Signature> installed on your system.
+for your distribution during the 'distdir' action, and to add the
+SIGNATURE file to the MANIFEST (therefore, don't add it yourself).
+
+The default value is false.  In the future, the default may change to
+true if you have C<Module::Signature> installed on your system.
 
 =item extra_compiler_flags
 
@@ -837,6 +839,20 @@ needed to be copied.
 Any directories that need to be created in order to perform the
 copying will be automatically created.
 
+=item do_system($cmd, @args)
+
+This is a fairly simple wrapper around Perl's C<system()> built-in
+command.  Given a command and an array of optional arguments, this
+method will print the command to C<STDOUT>, and then execute it using
+Perl's C<system()>.  It returns true or false to indicate success or
+failure (the opposite of how C<system()> works, but more intuitive).
+
+Note that if you supply a single argument to C<do_system()>, it
+will/may be processed by the systems's shell, and any special
+characters will do their special things.  If you supply multiple
+arguments, no shell will get involved and the command will be executed
+directly.
+
 =item base_dir()
 
 Returns a string containing the root-level directory of this build,
@@ -1025,7 +1041,7 @@ influence this process.
 
 If you want the installation process to look around in C<@INC> for
 other versions of the stuff you're installing and try to delete it,
-you can use the C<uninst> parameter, which tells C<Module::Install> to
+you can use the C<uninst> parameter, which tells C<ExtUtils::Install> to
 do so:
 
  Build install uninst=1
@@ -1103,7 +1119,8 @@ GZIP compression.
 =item distsign
 
 Uses C<Module::Signature> to create a SIGNATURE file for your
-distribution.
+distribution, and adds the SIGNATURE file to the distribution's
+MANIFEST.
 
 =item distmeta
 

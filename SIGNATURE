@@ -14,15 +14,15 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 d0e26ad5cce0954e4e4772ff06b45e2185d4fc98 Build.PL
-SHA1 10e3daee9a36bfb2bb866cc81cd15fec5433b4cd Changes
+SHA1 b10dec67faf12eff725573f1d0d9afecb440641c Build.PL
+SHA1 f56ffa61db0ede93315e4992fb6e49de73527931 Changes
 SHA1 7ffbdcf27feba9f2ea5e3800f378835b0c3154a2 INSTALL.txt
 SHA1 0f34734aac840c51e6da5f910314c24bc4b3ef46 MANIFEST
-SHA1 643456b2cc82fefe9cca11f5f98caebac3604cf1 META.yml
+SHA1 6d2223374f2fdc72571f9b93d7218f8b5f182fad META.yml
 SHA1 995030a32256418eb6e2bb3c6d34c0c0b59366ec Makefile.PL
-SHA1 8a620ca5710529fb7d7fd5f30573659951c838dd README
-SHA1 7f56157a3237b37d7e22c9090d0a76eb3bf70d0c lib/Module/Build.pm
-SHA1 f04d7870736494702c322798ed9778bee1205383 lib/Module/Build/Base.pm
+SHA1 609ba612d41d3491250e9c09874e596f04ed7ddd README
+SHA1 4e343562446b8986c82f5a53df3c451813645252 lib/Module/Build.pm
+SHA1 dd91c7bae0648d38da9513d249aa6adac25c7fd7 lib/Module/Build/Base.pm
 SHA1 ba9f56181b2c9b9f5accafcbf4df9ebd5ee3eda9 lib/Module/Build/Compat.pm
 SHA1 33e35957419028f25bca7097878efc17962b0f94 lib/Module/Build/Cookbook.pm
 SHA1 6a45776a5b0bdc02632bc722b4c89827eb8f2caf lib/Module/Build/PPMMaker.pm
@@ -38,9 +38,9 @@ SHA1 0d7ef5abc425695ea65c2394039eaec0c678c200 lib/Module/Build/Platform/VOS.pm
 SHA1 86eb81b5ba0bcd8b8fcbbdddf21f07e39b1d9eb2 lib/Module/Build/Platform/Windows.pm
 SHA1 da8fa7070d7b933a5d22c1ffd5cf1751b6d8ecde lib/Module/Build/Platform/darwin.pm
 SHA1 da39a3ee5e6b4b0d3255bfef95601890afd80709 t/MANIFEST
-SHA1 b371cb24bbae3244a1a2ff15017b15f4e2c8c7f0 t/Sample/Build.PL
+SHA1 2a0171d7093ef9f2092d411927237ab8514bc04b t/Sample/Build.PL
 SHA1 bad37b6b0d8b6acc4789abe007fcfba946c92ede t/Sample/MANIFEST
-SHA1 23ee61d2b40a1cae19206d7f0a8261ec3b6316a3 t/Sample/META.yml
+SHA1 61d900eac9cfc5dc12186a68b3de54e51b395e0f t/Sample/META.yml
 SHA1 3312164e04d55d9673543d4fa5ed5762568a88ab t/Sample/bin/sample.pl
 SHA1 db0fe43e93fc01be595fd3205ef00d724fbbf7e1 t/Sample/lib/Sample.pm
 SHA1 5214d81ceb135e0733bd4debd6b0c02c4e4842c6 t/Sample/lib/Sample/Docs.pod
@@ -55,20 +55,20 @@ SHA1 35625f391ee806337b8800f2c500943374acb2f9 t/XSTest/lib/XSTest.xs
 SHA1 37ca8c729834b94e8393c402044239a4082ff0fa t/XSTest/test.pl
 SHA1 b0201d11220f766650e87cdc86e5590d02c0525a t/basic.t
 SHA1 7ec2309eee2971608e6cd3d13f8b1ad3e7b77066 t/common.pl
-SHA1 4f51bfb1edfc2662ad06bfcd901c5bb3480ac931 t/compat.t
+SHA1 7e4a7be86e71547ab33511ba16eeb0ecf6230a81 t/compat.t
 SHA1 e904ab82e57665e19f943d71738f4980a0ac1acc t/extend.t
 SHA1 8613f32acf67469382e0d9604c2d0bebfb1538a6 t/install.t
 SHA1 75f5be100d04180c615b416d9b1e3db77ceef7cd t/lib/ModuleBuildOne.pm
 SHA1 6760bb25f6511d53b5ec431540162f5963e9efc0 t/manifypods.t
 SHA1 4e03c06a4ae4344fef1ed89829a83d8e5bb97000 t/notes.t
-SHA1 8a80d3c8465ab4a8da3b531890f9ed3b66c02330 t/runthrough.t
+SHA1 4f27bb44c53a25aa4529e5561f97523fb72ff07b t/runthrough.t
 SHA1 ed9501549fc52aa2affc146b8e1afe3d225a85d8 t/signature.t
 SHA1 9450412529e8857c3cb68b7f36cb9ddde9c0b87f t/versions.t
 SHA1 3641d4e4fb3fe3ed633fb0f158726fd51f1349c9 t/xs.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.0.7 (Darwin)
 
-iD8DBQE/XTrwgrvMBLfvlHYRAoJjAJ9rbfJwn/b4CyysGoAVkhdgGhfTqwCgobMB
-7kaExLvGA1f7sG+RiGx8iFk=
-=s9PQ
+iD8DBQE/ZdyUgrvMBLfvlHYRAr4YAJ9szP+smGwGVT5Cwkn0p97ENgu5nwCg0V2o
+mkywyxcEpfdim78+LO8D0HQ=
+=rFYL
 -----END PGP SIGNATURE-----
