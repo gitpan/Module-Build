@@ -255,7 +255,12 @@ sub _general_notes {
 
 sub notes        { shift()->_general_notes('notes', @_) }
 sub build_config { shift()->_general_notes('build_config', @_) }
-sub features     { shift()->_general_notes('features', @_) }
+sub feature      { shift()->_general_notes('features', @_) }
+
+sub add_build_element {
+  my $self = shift;
+  push @{$self->build_elements}, shift;
+}
 
 sub ACTION_build_config {
   my $self = shift;
@@ -264,6 +269,8 @@ sub ACTION_build_config {
   die "The build_config feature requires that 'module_name' be set" unless $self->module_name;
   my $notes_name = $self->module_name . '::BuildConfig';
   my $notes_pm = File::Spec->catfile($self->blib, 'lib', split /::/, "$notes_name.pm");
+
+  return if $self->up_to_date([$self->config_file('build_config'), $self->config_file('features')], $notes_pm);
 
   print "Writing config notes to $notes_pm\n";
   
@@ -275,16 +282,46 @@ use strict;
 my $arrayref = eval do {local $/; <DATA>}
   or die "Couldn't load BuildConfig data: $@";
 close DATA;
-my ($notes, $features) = @$arrayref;
+my ($config, $features) = @$arrayref;
 
-sub get { $notes->{$_[1]} }
+sub config { $config->{$_[1]} }
 sub feature { $features->{$_[1]} }
+
+sub set_config { $config->{$_[1]} = $_[2] }
+sub set_feature { $features->{$_[1]} = $_[2] }
+
+sub feature_names { keys %%$features }
+sub config_names  { keys %%$config }
+
+sub write {
+  my $file = __FILE__;
+  require IO::File;
+  require Data::Dumper;
+
+  my $mode_orig = (stat __FILE__)[2] & 07777;
+  chmod($mode_orig | 0222, __FILE__); # Make it writeable
+  my $fh = IO::File->new(__FILE__, 'r+') or die "Can't rewrite ", __FILE__, ": $!";
+  seek($fh, 0, 0);
+  while (<$fh>) {
+    last if /^__DATA__$/;
+  }
+  die "Couldn't find __DATA__ token in ", __FILE__ if eof($fh);
+
+  local $Data::Dumper::Terse = 1;
+  seek($fh, tell($fh), 0);
+  $fh->print( Data::Dumper::Dumper([$config, $features]) );
+  truncate($fh, tell($fh));
+  $fh->close;
+
+  chmod($mode_orig, __FILE__)
+    or warn "Couldn't restore permissions on ", __FILE__, ": $!";
+}
 
 EOF
   print $fh "__DATA__\n";
 
   local $Data::Dumper::Terse = 1;
-  print $fh Data::Dumper::Dumper([scalar $self->build_config, scalar $self->features]);
+  print $fh Data::Dumper::Dumper([scalar $self->build_config, scalar $self->feature]);
 }
 
 {
@@ -573,7 +610,7 @@ sub read_config {
   ($self->{args}, $self->{config}, $self->{properties}) = @$ref;
   close $fh;
 
-  for ('cleanup', 'notes') {
+  for ('cleanup', 'notes', 'features', 'build_config') {
     next unless -e $self->config_file($_);
     $self->_persistent_hash_restore($_);
   }
@@ -598,7 +635,7 @@ sub write_config {
   $self->_write_dumper('prereqs', { map { $_, $self->$_() } @items });
   $self->_write_dumper('build_params', [$self->{args}, $self->{config}, $self->{properties}]);
 
-  $self->_persistent_hash_write($_) foreach qw(notes cleanup);
+  $self->_persistent_hash_write($_) foreach qw(notes cleanup features build_config);
 }
 
 sub config         { shift()->{config} }
@@ -1143,6 +1180,24 @@ sub ACTION_testdb {
   $self->depends_on('test');
 }
 
+sub ACTION_testcover {
+  my ($self) = @_;
+
+  unless ($self->find_module_by_name('Devel::Cover', \@INC)) {
+    warn("Cannot run testcover action unless Devel::Cover is installed.\n");
+    return;
+  }
+
+  $self->add_to_cleanup('coverage', 'cover_db');
+
+  local $Test::Harness::switches    = 
+  local $Test::Harness::Switches    = 
+  local $ENV{HARNESS_PERL_SWITCHES} = "-MDevel::Cover";
+
+  $self->depends_on('test');
+  $self->do_system('cover');
+}
+
 sub ACTION_code {
   my ($self) = @_;
   
@@ -1160,13 +1215,14 @@ sub ACTION_code {
     my $method = "process_${element}_files";
     $self->$method();
   }
+
+  $self->depends_on('build_config');
 }
 
 sub ACTION_build {
   my $self = shift;
   $self->depends_on('code');
   $self->depends_on('docs');
-  $self->depends_on('build_config');
 }
 
 sub process_support_files {
@@ -1453,7 +1509,6 @@ sub ACTION_html {
 
 sub htmlify_pods {
   my $self = shift;
-  require Pod::Html;
   require Module::Build::PodParser;
   
   my $blib = $self->blib;
@@ -1466,11 +1521,12 @@ sub htmlify_pods {
   
   my $pods = $self->_find_pods([$self->blib]);
   if (-d $script) {
-    File::Find::finddepth( sub 
-                           {$pods->{$File::Find::name} = 
-                              "script::" . File::Basename::basename($File::Find::name) 
-                                if (-f $_ and not /\.bat$/ and $self->contains_pod($_));
-                          }, $script);
+    File::Find::finddepth( sub {
+			     $pods->{$File::Find::name} = 
+			       File::Spec->catfile("script",
+						   File::Basename::basename($File::Find::name) )
+				   if (-f $_ and not /\.bat$/ and $self->contains_pod($_));
+			   }, $script);
   }
   
   foreach my $pod (keys %$pods){
@@ -1486,6 +1542,9 @@ sub htmlify_pods {
 
 sub _htmlify_pod {
   my ($self, %args) = @_;
+  require Pod::Html;
+
+  $self->add_to_cleanup('pod2htmd.x~~', 'pod2htmi.x~~');
   
   my ($name, $path) = File::Basename::fileparse($args{rel_path}, qr{\..*});
   my @dirs = File::Spec->splitdir($path);
@@ -1514,18 +1573,17 @@ sub _htmlify_pod {
     my $abstract = Module::Build::PodParser->new(fh => $fh)->get_abstract();
     $title .= " - $abstract" if $abstract;
   }
-    
+  
   my $blib = $self->blib;
   my @opts = (
-	      '--header',
 	      '--flush',
-	      "--backlink=$args{backlink}",
 	      "--title=$title",
 	      "--podpath=$podpath",
 	      "--infile=$infile",
 	      "--outfile=$outfile",
 	      "--podroot=$blib",
 	      "--htmlroot=$htmlroot",
+	      Pod::Html->VERSION >= 1.03 ? ('--header', "--backlink=$args{backlink}") : (),
 	     );
   push @opts, "--css=$path2root/$args{css}" if $args{css};
     
@@ -1914,7 +1972,11 @@ sub ACTION_distmeta {
   # If we're in the distdir, the metafile may exist and be non-writable.
   $self->delete_filetree($self->{metafile});
 
-  unless (eval {require YAML; 1}) {
+  # Since we're building ourself, we have to do some special stuff
+  # here: the BuildConfig module is found in blib/lib.
+  local @INC = (@INC, File::Spec->catdir($self->blib, 'lib'));
+  require Module::Build::BuildConfig;  # Only works after the 'build'
+  unless (Module::Build::BuildConfig->feature('YAML_support')) {
     warn <<EOM;
 \nCouldn't load YAML.pm, generating a minimal META.yml without it.
 Please check and edit the generated metadata, or consider installing YAML.pm.\n
@@ -1922,6 +1984,8 @@ EOM
 
     return $self->_write_minimal_metadata();
   }
+
+  require YAML;
 
   # We use YAML::Node to get the order nice in the YAML file.
   my $node = YAML::Node->new({});
@@ -2222,17 +2286,14 @@ sub link_c {
 }
 
 sub compile_xs {
-  my ($self, $file) = @_;
-  (my $file_base = $file) =~ s/\.[^.]+$//;
-
-  print "$file -> $file_base.c\n";
+  my ($self, $file, %args) = @_;
   
   if (eval {require ExtUtils::ParseXS; 1}) {
     
     ExtUtils::ParseXS::process_file(
 				    filename => $file,
 				    prototypes => 0,
-				    output => "$file_base.c",
+				    output => $args{outfile},
 				   );
   } else {
     # Ok, I give up.  Just use backticks.
@@ -2248,7 +2309,7 @@ sub compile_xs {
 		   qq{-typemap "$typemap" "$file"});
     
     print $command;
-    my $fh = IO::File->new("> $file_base.c") or die "Couldn't write $file_base.c: $!";
+    my $fh = IO::File->new("> $args{outfile}") or die "Couldn't write $args{outfile}: $!";
     print $fh `$command`;
     close $fh;
   }
@@ -2293,23 +2354,24 @@ sub run_perl_script {
   return $self->do_system($perl, @$preargs, $script, @$postargs);
 }
 
-# A lot of this looks Unixy, but actually it may work fine on Windows.
-# I'll see what people tell me about their results.
 sub process_xs {
   my ($self, $file) = @_;
   my $cf = $self->{config}; # For convenience
 
   # File name, minus the suffix
   (my $file_base = $file) =~ s/\.[^.]+$//;
+  my $c_file = "$file_base.c";
 
   # .xs -> .c
-  $self->add_to_cleanup("$file_base.c");
-  unless ($self->up_to_date($file, "$file_base.c")) {
-    $self->compile_xs($file);
+  $self->add_to_cleanup($c_file);
+  print "$file -> $c_file\n";
+  
+  unless ($self->up_to_date($file, $c_file)) {
+    $self->compile_xs($file, outfile => $c_file);
   }
   
   # .c -> .o
-  $self->compile_c("$file_base.c");
+  $self->compile_c($c_file);
 
   # The .bs and .a files don't go in blib/lib/, they go in blib/arch/auto/.
   # Unfortunately we have to pre-compute the whole path.

@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.25';
+$VERSION = '0.25_01';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -118,7 +118,7 @@ the "./" notation, you can do this:
 =head1 DESCRIPTION
 
 C<Module::Build> is a system for building, testing, and installing
-Perl modules.  It is meant to be a replacement for
+Perl modules.  It is meant to be an alternative to
 C<ExtUtils::MakeMaker>.  Developers may alter the behavior of the
 module through subclassing in a much more straightforward way than
 with C<MakeMaker>.  It also does not require a C<make> on your system
@@ -141,7 +141,7 @@ C<Module::Build> for its installation process, do the following:
 
 This illustrates initial configuration and the running of three
 'actions'.  In this case the actions run are 'build' (the default
-action), 'test', and 'install'.  Actions defined so far include:
+action), 'test', and 'install'.  Other actions defined so far include:
 
   build                          fakeinstall   
   clean                          help          
@@ -198,7 +198,7 @@ the default 'test' action.  You could also add a method called
 C<ACTION_whatever>, and then you could perform the action C<Build
 whatever>.
 
-For information on providing backward compatibility with
+For information on providing compatibility with
 C<ExtUtils::MakeMaker>, see L<Module::Build::Compat> and
 L<http://www.makemaker.org/wiki/index.cgi?ModuleBuildConversionGuide>.
 
@@ -680,6 +680,10 @@ one in C<t/colortest.t>.  It is our goal to minimize these differences
 in future releases of Module::Build, so please report any anomalies
 you find.
 
+One important caveat: in its current implementation, C<current()> will
+B<NOT> work correctly if you have changed out of the directory that
+C<Module::Build> was invoked from.
+
 =item notes()
 
 =item notes($key)
@@ -887,6 +891,16 @@ same thing as C<script_files()>.  C<scripts()> is deprecated, but it
 will stay around for several versions to give people time to
 transition.
 
+=item add_build_element($type)
+
+Adds a new type of entry to the build process.  Accepts a single
+string specifying its type-name.  There must also be a method defined
+to process things of that type, e.g. if you add a build element called
+C<'foo'>, then you must also define a method called
+C<process_foo_files()>.
+
+See also L<Module::Build::Compat/Adding new elements to the build process>.
+
 =item copy_if_modified(%parameters)
 
 Takes the file in the C<from> parameter and copies it to the file in
@@ -1085,6 +1099,11 @@ or use a C<glob()>-style pattern:
 
  ./Build test --test_files 't/01-*.t'
 
+=item testcover
+
+Runs the C<test> action using C<Devel::Cover>, generating a
+code-coverage report showing which parts of the code were actually
+exercised during the tests.
 
 =item testdb
 
@@ -1570,12 +1589,12 @@ build/install process to do what they want.
 
 There are several architectural decisions in MakeMaker that make it
 very difficult to customize its behavior.  For instance, when using
-MakeMaker you do C<use MakeMaker>, but the object created in
+MakeMaker you do C<use ExtUtils::MakeMaker>, but the object created in
 C<WriteMakefile()> is actually blessed into a package name that's
 created on the fly, so you can't simply subclass
 C<ExtUtils::MakeMaker>.  There is a workaround C<MY> package that lets
 you override certain MakeMaker methods, but only certain explicitly
-predefined (by MakeMaker) methods can be overridden.  Also, the method
+preselected (by MakeMaker) methods can be overridden.  Also, the method
 of customization is very crude: you have to modify a string containing
 the Makefile text for the particular target.  Since these strings
 aren't documented, and I<can't> be documented (they take on different
@@ -1588,7 +1607,7 @@ perl.
 
 It is risky to make major changes to MakeMaker, since it does so many
 things, is so important, and generally works.  C<Module::Build> is an
-entirely seperate package so that I can work on it all I want, without
+entirely separate package so that I can work on it all I want, without
 worrying about backward compatibility.
 
 =item *
@@ -1597,7 +1616,8 @@ Finally, Perl is said to be a language for system administration.
 Could it really be the case that Perl isn't up to the task of building
 and installing software?  Even if that software is a bunch of stupid
 little C<.pm> files that just need to be copied from one place to
-another?  Are you getting riled up yet??
+another?  My sense was that we could design a system to accomplish
+this in a flexible, extensible, and friendly manner.  Or die trying.
 
 =back
 

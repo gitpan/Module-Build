@@ -1,5 +1,63 @@
 Revision history for Perl extension Module::Build.
 
+0.25_01
+
+ - Removed some language from the Module::Build::Compat documentation
+   that encouraged people to include a Build.PL without a Makefile.PL.
+   Also changed "a replacement for MakeMaker" to "an alternative to
+   MakeMaker" in the main documentation, which is basically what I
+   meant all along (i.e. a replacement for MakeMaker in your
+   particular build process - MakeMaker is never going to be fully
+   replaced in the perl world at large, of course), but some people
+   got the impression I was a little more truculent toward MakeMaker
+   than I really am.
+
+ - Added the 'testcover' action, which runs a test suite using
+   Devel::Cover.  [Dave Rolsky]
+
+ - Fixed a problem in htmlify_pods() that would produce test failures
+   on Cygwin (and probably elsewhere).  [Yitzchak Scott-Thoennes]
+
+ - Fixed a problem in t/compat.t that prevented it from being run
+   individually using 'make test TEST_FILES=t/compat.t'.  The problem
+   was that a couple environment variables (TEST_FILES, MAKEFLAGS)
+   were being passed through to subprocesses, and confused them.
+
+ - The pass-through Makefiles (type 'small' or 'passthrough') now
+   support the TEST_FILES parameter to 'make test'.
+
+ - Fixed a fatal error that would occur on perl 5.005 when building
+   HTML documentation, because its version of Pod::Html was old and
+   didn't like some of the parameters we fed it. [Spotted by Blair
+   Zajac]
+
+ - The final line of the generated pass-through Makefile was missing
+   its trailing newline, which is now fixed. [Chip Salzenberg]
+
+ - We now depend on YAML version at least 0.35 and at most version
+   0.49, so that we don't pick up a new (and backward-incompatible) beta
+   version from CPAN.
+
+ - Squashed a warning in t/basic.t about '"Foo::Module::VERSION" used
+   only once', and one in PPMMaker about $^V being undefined. [Blair
+   Zajac]
+
+ - Added a couple temporary output files from HTML documentation
+   generation to the cleanup list.  [Toby Ovod-Everett]
+
+ - The PodParser module will now only extract paragraphs in the
+   'AUTHOR' section of the pod if they contain an '@' character.  This
+   tends to do a better job, heuristically speaking, of returning
+   relevant stuff.
+
+ - Added regression tests and a helper method ( add_build_elements() )
+   for adding new elements to the build process.  Also some
+   documentation.
+
+ - Wrote a recipe in the Cookbook for adding new elements to the build
+   process, and a recipe for changing the order in which the steps in
+   the build process will occur.
+
 0.25  Sun Apr 25 11:12:36 CDT 2004
 
  - During the 'distdir' action, if no MANIFEST.SKIP file exists, we

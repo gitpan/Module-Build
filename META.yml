@@ -1,18 +1,11 @@
 --- #YAML:1.0
 name: Module-Build
-version: 0.25
+version: 0.25_01
 author:
   - Ken Williams, kwilliams@cpan.org
   - |-
     Development questions, bug reports, and patches should be sent to the
     Module-Build mailing list at module-build-general@lists.sourceforge.net .
-  - |-
-    Bug reports are also welcome at
-    http://rt.cpan.org/NoAuth/Bugs.html?Dist=Module-Build .
-  - |-
-    An anonymous CVS repository containing the latest development version
-    is available; see http://sourceforge.net/cvs/?group_id=45731 for the
-    details of how to access it.
 abstract: Build and install Perl modules
 license: perl
 requires:
@@ -30,16 +23,18 @@ requires:
   perl: 5.005_03
 recommends:
   Archive::Tar: 1.08
+  ExtUtils::CBuilder: 0.02
   ExtUtils::Install: 0.3
   ExtUtils::ParseXS: 2.02
+  Module::Signature: 0.21
   Pod::Text: 0
-  YAML: 0.35
+  YAML: ' >= 0.35, < 0.49 '
 build_requires:
   Test: 0
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: 0.25
+    version: 0.25_01
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
   Module::Build::Compat:
@@ -85,4 +80,4 @@ provides:
     file: lib/Module/Build/Platform/os2.pm
   Module::Build::PodParser:
     file: lib/Module/Build/PodParser.pm
-generated_by: Module::Build version 0.25
+generated_by: Module::Build version 0.25_01

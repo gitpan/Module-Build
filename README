@@ -19,7 +19,7 @@ SYNOPSIS
 
 DESCRIPTION
     "Module::Build" is a system for building, testing, and installing Perl
-    modules. It is meant to be a replacement for "ExtUtils::MakeMaker".
+    modules. It is meant to be an alternative to "ExtUtils::MakeMaker".
     Developers may alter the behavior of the module through subclassing in a
     much more straightforward way than with "MakeMaker". It also does not
     require a "make" on your system - most of the "Module::Build" code is
@@ -42,7 +42,7 @@ DESCRIPTION
 
     This illustrates initial configuration and the running of three
     'actions'. In this case the actions run are 'build' (the default
-    action), 'test', and 'install'. Actions defined so far include:
+    action), 'test', and 'install'. Other actions defined so far include:
 
       build                          fakeinstall   
       clean                          help          
@@ -99,8 +99,8 @@ DESCRIPTION
     "ACTION_whatever", and then you could perform the action "Build
     whatever".
 
-    For information on providing backward compatibility with
-    "ExtUtils::MakeMaker", see Module::Build::Compat and
+    For information on providing compatibility with "ExtUtils::MakeMaker",
+    see Module::Build::Compat and
     <http://www.makemaker.org/wiki/index.cgi?ModuleBuildConversionGuide>.
 
 METHODS
@@ -543,6 +543,10 @@ METHODS
         in future releases of Module::Build, so please report any anomalies
         you find.
 
+        One important caveat: in its current implementation, "current()"
+        will NOT work correctly if you have changed out of the directory
+        that "Module::Build" was invoked from.
+
     notes()
     notes($key)
     notes($key => $value)
@@ -734,6 +738,16 @@ METHODS
         will stay around for several versions to give people time to
         transition.
 
+    add_build_element($type)
+        Adds a new type of entry to the build process. Accepts a single
+        string specifying its type-name. There must also be a method defined
+        to process things of that type, e.g. if you add a build element
+        called 'foo', then you must also define a method called
+        "process_foo_files()".
+
+        See also "Adding new elements to the build process" in
+        Module::Build::Compat.
+
     copy_if_modified(%parameters)
         Takes the file in the "from" parameter and copies it to the file in
         the "to" parameter, or the directory in the "to_dir" parameter, if
@@ -915,6 +929,11 @@ ACTIONS
         or use a "glob()"-style pattern:
 
          ./Build test --test_files 't/01-*.t'
+
+    testcover
+        Runs the "test" action using "Devel::Cover", generating a
+        code-coverage report showing which parts of the code were actually
+        exercised during the tests.
 
     testdb
         This is a synonym for the 'test' action with the "debugger=1"
@@ -1338,12 +1357,12 @@ MOTIVATIONS
 
     *   There are several architectural decisions in MakeMaker that make it
         very difficult to customize its behavior. For instance, when using
-        MakeMaker you do "use MakeMaker", but the object created in
-        "WriteMakefile()" is actually blessed into a package name that's
+        MakeMaker you do "use ExtUtils::MakeMaker", but the object created
+        in "WriteMakefile()" is actually blessed into a package name that's
         created on the fly, so you can't simply subclass
         "ExtUtils::MakeMaker". There is a workaround "MY" package that lets
         you override certain MakeMaker methods, but only certain explicitly
-        predefined (by MakeMaker) methods can be overridden. Also, the
+        preselected (by MakeMaker) methods can be overridden. Also, the
         method of customization is very crude: you have to modify a string
         containing the Makefile text for the particular target. Since these
         strings aren't documented, and *can't* be documented (they take on
@@ -1354,14 +1373,16 @@ MOTIVATIONS
 
     *   It is risky to make major changes to MakeMaker, since it does so
         many things, is so important, and generally works. "Module::Build"
-        is an entirely seperate package so that I can work on it all I want,
+        is an entirely separate package so that I can work on it all I want,
         without worrying about backward compatibility.
 
     *   Finally, Perl is said to be a language for system administration.
         Could it really be the case that Perl isn't up to the task of
         building and installing software? Even if that software is a bunch
         of stupid little ".pm" files that just need to be copied from one
-        place to another? Are you getting riled up yet??
+        place to another? My sense was that we could design a system to
+        accomplish this in a flexible, extensible, and friendly manner. Or
+        die trying.
 
 MIGRATION
     Note that if you want to provide both a Makefile.PL and a Build.PL for

@@ -29,6 +29,7 @@ t/basic.t
 t/common.pl
 t/compat.t
 t/extend.t
+t/files.t
 t/install.t
 t/lib/ModuleBuildOne.pm
 t/MANIFEST
@@ -44,6 +45,7 @@ t/Sample/lib/Sample/Script.PL
 t/Sample/MANIFEST
 t/Sample/META.yml
 t/Sample/script
+t/Sample/test.foo
 t/Sample/test.pl
 t/signature.t
 t/versions.t
