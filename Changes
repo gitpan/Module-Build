@@ -1,5 +1,105 @@
 Revision history for Perl extension Module::Build.
 
+0.19 TODO:
+
+ - Add tests for verifying signatures as well as creating them.  Skip
+   signature tests if we're testing noninteractively, or if the user's
+   gpg setup isn't right, etc.
+ 
+ - Get the installation to nonstandard locations figured out and
+   working, finally
+
+0.18_01
+
+ - Alternative distribution layouts are now supported via the
+   'pm_files', 'pod_files', 'xs_files', 'PL_files', and 'script_files'
+   parameters to new().  This should help people transition from
+   MakeMaker, and might even help us write an automatic transition
+   tool.
+
+ - Added tests to t/runthrough.t that check to see installation is
+   happening correctly.
+
+ - Added an 'add_to_cleanup' parameter to new() that calls
+   add_to_cleanup() immediately for the given files.
+
+ - Added experimental code to build a .ppd file, in support of
+   ActiveState's "Perl Package Manager". [original patch by Dave
+   Rolsky]
+ 
+ - For authors who use Module::Signature to sign their distributions,
+   we now create the SIGNATURE file right in the distribution
+   directory, rather than creating it in the top-level directory and
+   copying it into place.  This solves problems related to having
+   files get out of date with respect to their signatures.
+ 
+ - The distribution directory (e.g. Sample-Module-0.13/ ) will now be
+   deleted during the 'clean' or 'realclean' actions.
+ 
+ - During testing of modules, blib/lib and blib/arch are now added as
+   absolute paths, not relative.  This helps tests that load the
+   modules at runtime and may change the current working directory
+   (like Module::Build itself does during testing).
+ 
+ - The $Config{cc} entry on some people's systems is something like
+   'ccache gcc', so we now split that string using split_like_shell().
+   [Richard Clamp]
+
+ - Added documentation for 'extra_linker_flags' parameter, and added a
+   corresponding 'extra_compiler_flags' parameter. [original patch by
+   Richard Clamp]
+
+ - The pass-through Makefile created by Module::Build::Compat now
+   supports MakeMaker options like POLLUTE=1 and INC.  We also just
+   warn & skip when we see any unknown MM parameters, rather than
+   dying.  [Dave Rolsky]
+
+ - Fixed an error about how @INC and $ENV{PERL5LIB} interact during
+   the testing of M::B itself. [jk <billy2000@fastmail.fm>]
+
+ - The pass-through Makefile doesn't include 'recommended' M::B
+   dependencies in the Makefile anymore, since they're not strictly
+   necessary.  In particular, this makes installing M::B itself
+   easier.
+
+ - A new 'create_makefile_pl' parameter lets you use
+   Module::Build::Compat during the 'distdir' (or 'dist') action to
+   automatically create a Makefile.PL for compatibility with
+   ExtUtils::MakeMaker.  The parameter's value should be one of the
+   styles named in the Module::Build::Compat documentation.
+
+ - When compiling C code, we now respect 'pollute' and 'inc'
+   parameters. (XXX - needs docs) [Dave Rolsky]
+   
+ - Made the creation of the "install map" more generic.  (XXX - needs
+   documentation)
+
+ - Fixed a problem in which add_to_cleanup() didn't note cleanup files
+   unless create_build_script() had been called already. [Dave Rolsky]
+
+ - During 'Build dist', we no longer have to load each .pm file (via
+   Module::Info) to determine the $VERSION numbers inside.  Instead,
+   we call our internal version_from_file() method, which is the same
+   thing MakeMaker and PAUSE and search.cpan.org do.  Also fixes a
+   failure when Module::Info is installed in a nonstandard directory.
+   [reported by Teun Burgers]
+
+ - Fixed some failing test code on Windows - open files can't be
+   deleted. [Andrew Savage]
+
+ - The Cygwin platform is now treated as a flavor of Unix rather than
+   a flavor of Windows. [chocolateboy]
+
+ - We're now more aggressive about adding temporary C compilation
+   files (*.c, *.bs) to the cleanup list. [Dave Rolsky]
+
+ - When constructing the list in META.yml of packages provided by this
+   distribution, we now use the same rules as the PAUSE scanner does
+   when a single .pm file contains multiple VERSIONs.  [Andreas Koenig]
+
+ - check_installed_status() now works as both a class method and an
+   object method (and is documented so).  [Spotted by Dave Rolsky]
+
 0.18  Tue Apr  8 13:24:23 CDT 2003
 
  - We now rewrite the shebang lines of scripts ourselves, rather than

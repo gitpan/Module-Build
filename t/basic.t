@@ -2,7 +2,7 @@
 
 use strict;
 use Test;
-BEGIN { plan tests => 12 }
+BEGIN { plan tests => 15 }
 use Module::Build;
 ok(1);
 
@@ -12,9 +12,6 @@ require File::Spec->catfile('t', 'common.pl');
 ######################### End of black magic.
 
 ok $INC{'Module/Build.pm'}, '/blib/', "Make sure Module::Build was loaded from blib/";
-
-# So 'test' and 'disttest' in Sample/ can see the not-yet-installed Module::Build.
-unshift @INC, $ENV{PERL5LIB} = File::Spec->catdir( Module::Build->cwd, 'blib', 'lib' );
 
 chdir 't';
 
@@ -55,6 +52,15 @@ chdir 't';
   ok $m->prereq_failures->{requires}{ModuleBuildOne}{need}, 3;
 
   $m->dispatch('realclean');
+
+  # Make sure check_installed_status() works as a class method
+  my $info = Module::Build->check_installed_status('File::Spec', 0);
+  ok $info->{ok}, 1;
+  ok $info->{have}, $File::Spec::VERSION;
+
+  # Make sure check_installed_status() works with an advanced spec
+  my $info = Module::Build->check_installed_status('File::Spec', '> 0');
+  ok $info->{ok}, 1;
 }
 
 # Test verbosity

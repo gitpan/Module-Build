@@ -12,7 +12,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.18';
+$VERSION = '0.18_01';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -39,10 +39,10 @@ my %OSTYPES = qw(
 		 unicosmk  Unix
 		 solaris   Unix
 		 sunos     Unix
+		 cygwin    Unix
 		 
 		 dos       Windows
 		 MSWin32   Windows
-		 cygwin    Windows
 
 		 os390     EBCDIC
 		 os400     EBCDIC
@@ -384,6 +384,14 @@ Modules listed in this section conflict in some serious way with the
 given module.  C<Module::Build> will refuse to install the given
 module if
 
+=item create_makefile_pl
+
+This parameter lets you use Module::Build::Compat during the
+C<distdir> (or C<dist>) action to automatically create a Makefile.PL
+for compatibility with ExtUtils::MakeMaker.  The parameter's value
+should be one of the styles named in the Module::Build::Compat
+documentation.
+
 =item c_source
 
 An optional C<c_source> argument specifies a directory which contains
@@ -392,14 +400,79 @@ files in the directory will be compiled to object files.  The
 directory will be added to the search path during the compilation and
 linking phases of any C or XS files.
 
+=item pm_files
+
+An optional parameter specifying the set of C<.pm> files in this
+distribution, specified as a hash reference whose keys are the files'
+locations in the distributions, and whose values are their logical
+locations based on their package name, i.e. where they would be found
+in a "normal" Module::Build-style distribution.  This parameter is
+mainly intended to support alternative layouts of files.
+
+For instance, if you have an old-style MakeMaker distribution for a
+module called C<Foo::Bar> and a F<Bar.pm> file at the top level of the
+distribution, you could specify your layout in your C<Build.PL> like
+this:
+
+ my $build = Module::Build->new
+   ( module_name => 'Foo::Bar',
+     ...
+     pm_files => { 'Bar.pm' => 'lib/Foo/Bar.pm' },
+   );
+
+Note that the values should include C<lib/>, because this is where
+they would be found in a "normal" Module::Build-style distribution.
+
+Note also that the path specifications are I<always> given in
+Unix-like format, not in the style of the local system.
+
+=item pod_files
+
+Just like C<pm_files>, but used for specifying the set of C<.pod>
+files in your distribution.
+
+=item xs_files
+
+Just like C<pm_files>, but used for specifying the set of C<.xs>
+files in your distribution.
+
+=item PL_files
+
+An optional parameter specifying a set of C<.PL> files in your
+distribution.  These will be run as Perl scripts prior to processing
+the rest of the files in your distribution.  They are usually used as
+templates for creating other files dynamically, so that a file like
+C<lib/Foo/Bar.pm.PL> might create the file C<lib/Foo/Bar.pm>.
+
+The files are specified with the C<.PL> files as hash keys, and the
+file(s) they generate as hash values, like so:
+
+ my $build = Module::Build->new
+   ( module_name => 'Foo::Bar',
+     ...
+     PL_files => { 'lib/Bar.pm.PL' => 'lib/Bar.pm',
+                   'lib/Foo.PL' => [ 'lib/Foo1.pm', 'lib/Foo2.pm' ],
+                 },
+   );
+
+Note that the path specifications are I<always> given in Unix-like
+format, not in the style of the local system.
+
 =item script_files
 
-An array reference containing a list of files that should be installed
-as perl scripts when the module is installed.
+An optional parameter specifying a set of files that should be
+installed as executable perl scripts when the module is installed.
+May be given as an array reference of the files, or as a hash
+reference whose keys are the files (and whose values will currently be
+ignored).
+
+The default is to install no script files - in other words, there is
+no default location where Module::Build will look for script files to
+install.
 
 For backward compatibility, you may use the parameter C<scripts>
 instead of C<script_files>.  Please consider this usage deprecated,
-though it will continue to exists for several version releases.
+though it will continue to exist for several version releases.
 
 =item autosplit
 
@@ -423,6 +496,11 @@ Currently C<Module::Build> doesn't actually do anything with this flag
 something useful with it.  It can potentially bring lots of security,
 packaging, and convenience improvements.
 
+=item add_to_cleanup
+
+An array reference of files to be cleaned up when the C<clean> action
+is performed.  See also the add_to_cleanup() method.
+
 =item sign
 
 If a true value is specified for this parameter, C<Module::Signature>
@@ -430,6 +508,29 @@ will be used (via the 'distsign' action) to create a SIGNATURE file
 for your distribution during the 'distdir' action.  The default is
 false.  In the future, the default may change to true if you have
 C<Module::Signature> installed on your system.
+
+=item extra_compiler_flags
+
+=item extra_linker_flags
+
+These parameters can contain array references (or strings, in which
+case they will be split into arrays) to pass through to the compiler
+and linker phases when compiling/linking C code.  For example, to tell
+the compiler that your code is C++, you might do:
+
+ my build = Module::Build->new(
+     module_name          => 'Spangly',
+     extra_compiler_flags => ['-x', 'c++'],
+ );
+
+To link your XS code against glib you might write something like:
+
+ my build = Module::Build->new(
+     module_name          => 'Spangly',
+     dynamic_config       => 1,
+     extra_compiler_flags => `glib-config --cflags`,
+     extra_linker_flags   => `glib-config --libs`,
+ );
 
 =back
 
@@ -442,15 +543,15 @@ by C<ExtUtils::MakeMaker>.  This method also creates some temporary
 data in a directory called C<_build/>.  Both of these will be removed
 when the C<realclean> action is performed.
 
-=item add_to_cleanup()
+=item add_to_cleanup(@files)
 
-A C<Module::Build> method may call C<< $self->add_to_cleanup(@files) >>
+You may call C<< $self->add_to_cleanup(@files) >>
 to tell C<Module::Build> that certain files should be removed when the
-user performs the C<Build clean> action.  I decided to make this a
-dynamic method, rather than a static list of files, because these
-static lists can get difficult to manage.  I preferred to keep the
-responsibility for registering temporary files close to the code that
-creates them.
+user performs the C<Build clean> action.  I decided to provide a
+dynamic method, rather than just use a static list of files, because these
+static lists can get difficult to manage.  I usually prefer to keep
+the responsibility for registering temporary files close to the code
+that creates them.
 
 =item resume()
 
@@ -460,7 +561,7 @@ called once, when the user runs C<perl Build.PL>.  Thereafter, when
 the user runs C<Build test> or another action, the C<Module::Build>
 object is created using the C<resume()> method.
 
-=item dispatch()
+=item dispatch($action, %args)
 
 This method is also called from the auto-generated C<Build> script.
 It parses the command-line arguments into an action and an argument
@@ -553,6 +654,10 @@ that if C<$module> is installed but doesn't define a version number,
 the C<have> value will be C<undef> - this is why we don't use C<undef>
 for the case when C<$module> isn't installed at all.
 
+This method may be called either as an object method
+(C<< $build->check_installed_status($module, $version) >>)
+or as a class method 
+(C<< Module::Build->check_installed_status($module, $version) >>).
 
 =item check_installed_version($module, $version)
 
@@ -584,7 +689,7 @@ In general you might prefer to use C<check_installed_status> if you
 need detailed information, or this method if you just need a yes/no
 answer.
 
-=item prompt()
+=item prompt($message, $default)
 
 Asks the user a question and returns their response as a string.  The
 first argument specifies the message to display to the user (for
@@ -597,7 +702,9 @@ C<STDIN> and C<STDOUT> look like they're attached to files or
 something, not terminals), we'll just use the default without
 letting the user provide an answer.
 
-=item y_n()
+This method may be called as a class or object method.
+
+=item y_n($message, $default)
 
 Asks the user a yes/no question using C<prompt()> and returns true or
 false accordingly.  The user will be asked the question repeatedly
@@ -612,6 +719,8 @@ and the return value is a Perl boolean value like 1 or 0.  I thought
 about this for a while and this seemed like the most useful way to do
 it.
 
+This method may be called as a class or object method.
+
 =item script_files()
 
 Returns an array reference specifying the perl script files to be
@@ -623,6 +732,21 @@ For backward compatibility, the C<scripts()> method does exactly the
 same thing as C<script_files()>.  C<scripts()> is deprecated, but it
 will stay around for several versions to give people time to
 transition.
+
+=item copy_if_modified(%parameters)
+
+Takes the file in the C<from> parameter and copies it to the file in
+the C<to> parameter, or the directory in the C<to_dir> parameter, if
+the file has changed since it was last copied (or if it doesn't exist
+in the new location).  By default the entire directory structure of
+C<from> will be copied into C<to_dir>; an optional C<flatten>
+parameter will copy into C<to_dir> without doing so.
+
+Returns the path to the destination file, or C<undef> if nothing
+needed to be copied.
+
+Any directories that need to be created in order to perform the
+copying will be automatically created.
 
 =item base_dir()
 
@@ -643,7 +767,7 @@ packaging, etc. tasks.
 
 Second, arguments are processed in a very systematic way.  Arguments
 are always key=value pairs.  They may be specified at C<perl Build.PL>
-time (i.e.  C<perl Build.PL sitelib=/my/secret/place>), in which case
+time (i.e.  C<perl Build.PL destdir=/my/secret/place>), in which case
 their values last for the lifetime of the C<Build> script.  They may
 also be specified when executing a particular action (i.e.
 C<Build test verbose=1>), in which case their values last only for the
@@ -656,12 +780,12 @@ all the key=value pairs in C<Config.pm> are available in
 C<< $self->{config} >>.  If the user wishes to override any of the
 values in C<Config.pm>, she may specify them like so:
 
-  perl Build.PL config='sitelib=/foo perlpath=/wacky/stuff'
+  perl Build.PL config='cc=gcc ld=gcc'
 
 Not the greatest interface, I'm looking for alternatives.  Speak now!
 Maybe:
 
-  perl Build.PL config-sitelib=/foo config-perlpath=/wacky/stuff
+  perl Build.PL config=cc:gcc config=ld:gcc
 
 or something.
 
@@ -774,46 +898,12 @@ parameters it will accept - a good one is C<-u>:
 =item install
 
 This action will use C<ExtUtils::Install> to install the files from
-C<blib/> into the correct system-wide module directory.  The directory
-is determined from the C<sitelib> entry in the C<Config.pm> module.
-To install into a different directory, pass a different value for the
-C<sitelib> parameter, like so:
+C<blib/> into the system.  Under normal circumstances, you'll need
+superuser privileges to install into your system's default C<sitelib>
+directory.
 
- Build install sitelib=/my/secret/place/
-
-Alternatively, you could specify the C<sitelib> parameter when you run
-the C<Build.PL> script:
-
- perl Build.PL sitelib=/my/secret/place/
-
-Under normal circumstances, you'll need superuser privileges to
-install into your system's default C<sitelib> directory.
-
-If you want to install everything into a temporary directory first
-(for instance, if you want to create a directory tree that a package
-manager like C<rpm> or C<dpkg> could create a package from), you can
-use the C<destdir> parameter:
-
- perl Build.PL destdir=/tmp/foo
-
-or
-
- Build install destdir=/tmp/foo
-
-This will effectively install to "$destdir/$sitelib",
-"$destdir/$sitearch", and the like, except that it will use
-C<File::Spec> to make the pathnames work correctly on whatever
-platform you're installing on.
-
-If you want the installation process to look around in C<@INC> for
-other versions of the stuff you're installing and try to delete it,
-you can use the C<uninst> parameter:
-
- Build install uninst=1
-
-This can be a good idea, as it helps prevent multiple versions of a
-module from being present on your system, which can be a confusing
-situation indeed.
+See L<How Installation Works> for details about how Module::Build
+determines where to install things, and how to influence this process.
 
 =item fakeinstall
 
@@ -909,9 +999,9 @@ and unpack it.
 While performing the 'distdir' action, a file containing various bits
 of "metadata" will be created.  The metadata includes the module's
 name, version, dependencies, license, and the C<dynamic_config>
-flag.  This file is created as F<META.yaml> in YAML format, so you
+flag.  This file is created as F<META.yml> in YAML format, so you
 must have the C<YAML> module installed in order to create it.  You
-should also ensure that the F<META.yaml> file is listed in your
+should also ensure that the F<META.yml> file is listed in your
 F<MANIFEST> - if it's not, a warning will be issued.
 
 =item disttest
@@ -919,6 +1009,67 @@ F<MANIFEST> - if it's not, a warning will be issued.
 Performs the 'distdir' action, then switches into that directory and
 runs a C<perl Build.PL>, followed by the 'build' and 'test' actions in
 that directory.
+
+=back
+
+=head2 How Installation Works
+
+When you invoke Module::Build's C<build> action, it needs to figure
+out where to install things.  Natively, Module::Build provides default
+installation locations for several types of installable items.  The
+determination of the default locations is reminiscent of the way
+MakeMaker does it:
+
+ (XXX blah blah blah how installation works)
+
+=over 4
+
+=item installdirs
+
+                            'installdirs' set to:
+                     core          site                vendor
+ 
+             results in the following defaults from Config.pm:
+ 
+ arch   =>   installarchlib  installsitearch     installvendorarch
+ lib    =>   installprivlib  installsitelib      installvendorlib
+ bin    =>   installbin      installsitebin      installvendorbin
+ script =>   installscript   installscript       installscript
+ man1   =>   installman1dir  installsiteman1dir  installvendorman1dir
+ man3   =>   installman3dir  installsiteman3dir  installvendorman3dir
+
+
+ (XXX blah blah blah how installation works)
+
+=item destdir
+
+If you want to install everything into a temporary directory first
+(for instance, if you want to create a directory tree that a package
+manager like C<rpm> or C<dpkg> could create a package from), you can
+use the C<destdir> parameter:
+
+ perl Build.PL destdir=/tmp/foo
+
+or
+
+ Build install destdir=/tmp/foo
+
+This will effectively install to "$destdir/$sitelib",
+"$destdir/$sitearch", and the like, except that it will use
+C<File::Spec> to make the pathnames work correctly on whatever
+platform you're installing on.
+
+=item uninst
+
+If you want the installation process to look around in C<@INC> for
+other versions of the stuff you're installing and try to delete it,
+you can use the C<uninst> parameter:
+
+ Build install uninst=1
+
+This can be a good idea, as it helps prevent multiple versions of a
+module from being present on your system, which can be a confusing
+situation indeed.
 
 =back
 
@@ -1100,10 +1251,13 @@ requires tracing all dependencies backward, it runs into problems on
 NFS, and it's just generally flimsy.  It would be better to use an MD5
 signature or the like, if available.  See C<cons> for an example.
 
-The current dependency-checking is prone to errors.  You
-can make 'widowed' files by doing C<Build>, C<perl Build.PL>, and then
-C<Build realclean>.  Should be easy to fix, but it's got me wondering
-whether the dynamic declaration of dependencies is a good idea.
+When generating META.yml, you may see errors from Module::Info.  This
+is because to build the I<provides> section, Module::Info compiles
+each source file to determine what packages it contains.  If that
+module requires dependencies, they will not be loaded if they are part
+of the same distribution, because they might not have been built yet.
+Patches to fix this welcome.  The right solution may be to make C<use>
+not die if it encounters an error, but that might be hard to do.
 
 - make man pages and install them.
 - append to perllocal.pod

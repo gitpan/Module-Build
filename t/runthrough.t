@@ -1,32 +1,46 @@
+use strict;
+
 use Test; 
-BEGIN { plan tests => 13 }
+BEGIN { plan tests => 22 }
 use Module::Build;
 use File::Spec;
 use File::Path;
+use Config;
 my $HAVE_YAML = eval {require YAML; 1};
-my $HAVE_SIGNATURE = eval {require Module::Signature; 1};
 
 ok(1);
 require File::Spec->catfile('t', 'common.pl');
 
 ######################### End of black magic.
 
-# So 'test' and 'disttest' can see the not-yet-installed Module::Build.
-unshift @INC,     # For 'test'
-$ENV{PERL5LIB} =  # For 'disttest'
-File::Spec->catdir( Module::Build->cwd, 'blib', 'lib' );
+my $start_dir = Module::Build->cwd;
 
-my $goto = File::Spec->catdir( Module::Build->cwd, 't', 'Sample' );
+# Would be nice to just have a 'base_dir' parameter for M::B->new()
+my $goto = File::Spec->catdir( $start_dir, 't', 'Sample' );
 chdir $goto or die "can't chdir to $goto: $!";
 
-my $build = new Module::Build( module_name => 'Sample', scripts => [ 'script' ],
+my $build = new Module::Build( module_name => 'Sample',
+			       script_files => [ 'script' ],
+			       requires => { 'File::Spec' => 0 },
 			       license => 'perl' );
 ok $build;
 
+# Make sure cleanup files added before create_build_script() get respected
+$build->add_to_cleanup('before_script');
+
 eval {$build->create_build_script};
 ok $@, '';
+ok $build->cleanup_is_flushed;
+
+# The 'cleanup' file doesn't exist yet
+ok grep $_ eq 'before_script', $build->cleanup;
 
 $build->add_to_cleanup('save_out');
+
+# The 'cleanup' file now exists
+ok grep $_ eq 'before_script', $build->cleanup;
+ok grep $_ eq 'save_out',      $build->cleanup;
+
 my $output = eval {
   stdout_of( sub { $build->dispatch('test', verbose => 1) } )
 };
@@ -65,28 +79,60 @@ if ($HAVE_YAML) {
   skip "skip YAML.pm is not installed", 1 for 1..6;
 }
 
-if (0 && $HAVE_SIGNATURE) {
-  my $sigfile = File::Spec->catdir('Sample-0.01', 'SIGNATURE');
-  $build->add_to_cleanup( $sigfile );
-
-  chdir 'Sample-0.01' or warn "Couldn't chdir to Sample-0.01: $!";
-  eval {$build->dispatch('distsign')};
-  ok $@, '';
-  chdir $goto;
-
-  ok -e $sigfile;
-} else {
-  # skip "skip Module::Signature is not installed", 1 for 1..2;
+{
+  # Check that a shebang line is rewritten
+  my $blib_script = File::Spec->catdir( qw( blib script script ) );
+  ok -e $blib_script; 
+  
+  my $fh = IO::File->new($blib_script);
+  my $first_line = <$fh>;
+  print "# rewritten shebang?\n$first_line";
+  
+  ok $first_line ne "#!perl -w\n";
 }
 
-my $blib_script = File::Spec->catdir( qw( blib script script ) );
-ok -e $blib_script; 
+{
+  # Check installation
+  my $destdir = File::Spec->catdir($start_dir, 't', 'install_test');
+  $build->add_to_cleanup($destdir);
+  
+  eval {$build->dispatch('install', destdir => $destdir)};
+  ok $@, '';
+  
+  my $install_to = File::Spec->catfile($destdir, $build->install_destination('lib'), 'Sample.pm');
+  print "Should have installed to $install_to\n";
+  ok -e $install_to;
 
-my $fh = IO::File->new($blib_script);
-my $first_line = <$fh>;
-print "# rewritten shebang?\n$first_line";
+  eval {$build->dispatch('install', installdirs => 'core', destdir => $destdir)};
+  ok $@, '';
+  
+  $install_to = File::Spec->catfile($destdir, $Config{installprivlib}, 'Sample.pm');
+  print "Should have installed to $install_to\n";
+  ok -e $install_to;
+}
 
-ok $first_line ne "#!perl -w\n";
+{
+  # Check PPD
+  $build->dispatch('ppd', args => {codebase => '/path/to/codebase'});
+
+  my $ppd = slurp('Sample.ppd');
+
+  # This test is quite a hack since with XML you don't really want to
+  # do a strict string comparison, but absent an XML parser it's the
+  # best we can do.
+  ok $ppd, <<'EOF';
+<SOFTPKG NAME="Sample" VERSION="0,01,0,0">
+    <TITLE>Sample</TITLE>
+    <ABSTRACT>Foo foo sample foo</ABSTRACT>
+    <AUTHOR>Sample Man &lt;sample@example.com&gt;</AUTHOR>
+    <IMPLEMENTATION>
+        <DEPENDENCY NAME="File-Spec" VERSION="0,0,0,0" />
+        <CODEBASE HREF="/path/to/codebase" />
+    </IMPLEMENTATION>
+</SOFTPKG>
+EOF
+}
+
 
 eval {$build->dispatch('realclean')};
 ok $@, '';

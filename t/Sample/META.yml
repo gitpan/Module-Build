@@ -3,7 +3,8 @@ name: Sample
 version: 0.01
 license: perl
 distribution_type: module
-requires: {}
+requires:
+  File::Spec: 0
 recommends: {}
 build_requires: {}
 conflicts: {}
@@ -11,4 +12,4 @@ provides:
   Sample:
     file: lib/Sample.pm
     version: 0.01
-generated_by: Module::Build version 0.18
+generated_by: Module::Build version 0.18_01
