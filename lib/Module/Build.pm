@@ -1,6 +1,6 @@
 package Module::Build;
 
-# $Id: Build.pm,v 1.30 2002/06/28 01:06:43 ken Exp $
+# $Id: Build.pm,v 1.31 2002/08/07 09:34:38 ken Exp $
 
 # This module doesn't do much of anything itself, it inherits from the
 # modules that do the real work.  The only real thing it has to do is
@@ -14,7 +14,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.09';
+$VERSION = '0.10';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values

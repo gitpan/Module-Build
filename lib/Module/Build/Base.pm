@@ -1,6 +1,6 @@
 package Module::Build::Base;
 
-# $Id: Base.pm,v 1.26 2002/06/27 14:58:22 ken Exp $
+# $Id: Base.pm,v 1.28 2002/07/11 13:56:30 ken Exp $
 
 use strict;
 use Config;
@@ -702,9 +702,8 @@ sub write_metadata {
   my $p = $self->{properties};
 
   $p->{license} ||= 'unknown';
-  unless (grep /^$p->{license}$/, qw(perl gpl restrictive artistic unknown)) {
-    warn "Uknown license type '$p->{license}', setting to 'unknown'\n";
-    $p->{license} = 'unknown';
+  unless (grep {$p->{license} eq $_} qw(perl gpl restrictive artistic unknown)) {
+    die "Unknown license type '$p->{license}";
   }
 
   my %metadata = (
@@ -713,14 +712,19 @@ sub write_metadata {
 		  name => $p->{module_name},
 		  version => $p->{module_version},
 		  license => $p->{license},
+		  generated_by => (ref($self) || $self) . " version " . $self->VERSION,
 		 );
   
   foreach (qw(requires build_depends recommends conflicts dynamic_config)) {
     $metadata{$_} = $p->{$_} if exists $p->{$_};
   }
   
-  require YAML;
-  YAML::StoreFile($file, \%metadata);
+  unless (eval {require YAML; 1}) {
+    warn "Couldn't load YAML.pm: $@\n";
+    return;
+  }
+  return YAML::StoreFile($file, \%metadata) if $YAML::VERSION le '0.30';
+  return YAML::DumpFile( $file, \%metadata);
 }
 
 sub make_tarball {
