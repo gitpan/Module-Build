@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: Module-Build
-version: 0.18_01
+version: 0.18_02
 license: perl
 distribution_type: module
 requires:
@@ -28,7 +28,7 @@ conflicts: {}
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: 0.18_01
+    version: 0.18_02
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
     version: ~
@@ -80,4 +80,4 @@ provides:
   Module::Build::Platform::darwin:
     file: lib/Module/Build/Platform/darwin.pm
     version: ~
-generated_by: Module::Build version 0.18_01
+generated_by: Module::Build version 0.18_02

@@ -1,6 +1,6 @@
 package Module::Build::Base;
 
-# $Id: Base.pm,v 1.123 2003/05/22 15:50:48 kwilliams Exp $
+# $Id: Base.pm,v 1.125 2003/05/27 16:57:47 kwilliams Exp $
 
 use strict;
 BEGIN { require 5.00503 }
@@ -1375,7 +1375,12 @@ sub install_map {
   }
 
   if (length(my $destdir = $self->{properties}{destdir} || '')) {
-    $map{$_} = File::Spec->catdir($destdir, $map{$_}) foreach keys %map;
+    foreach (keys %map) {
+      # Need to remove volume from $map{$_} using splitpath, or else
+      # we'll create something crazy like C:\Foo\Bar\E:\Baz\Quux
+      my ($volume, $path) = File::Spec->splitpath( $map{$_}, 1 );
+      $map{$_} = File::Spec->catdir($destdir, $path);
+    }
   }
   
   $map{read} = '';  # To keep ExtUtils::Install quiet
@@ -1609,7 +1614,11 @@ sub up_to_date {
 
   my $most_recent_source = time / (24*60*60);
   foreach my $file (@$source) {
-    $most_recent_source = -M $file if -M $file < $most_recent_source;
+    unless (-e $file) {
+      warn "Can't find source file $file for up-to-date check";
+      next;
+    }
+    $most_recent_source = -M _ if -M _ < $most_recent_source;
   }
   
   foreach my $derived (@$derived) {

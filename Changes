@@ -9,7 +9,26 @@ Revision history for Perl extension Module::Build.
  - Get the installation to nonstandard locations figured out and
    working, finally
 
-0.18_01
+0.19 (Future release)
+
+
+0.18_02  Sun Jun  1 18:32:22 CDT 2003
+
+ - Fixed a problem with a bareword 'File::Spec' in one of the test
+   scripts that caused it not to compile under 5.8.0 (but is fine
+   under 5.6).
+
+ - Fixed a problem with the 'destdir' installation parameter on
+   platforms that have volume identifiers in path names (like "C:" on
+   Win32).  The identifier is now stripped from installation
+   directories before prepending the destdir path.  The destdir path
+   may still have a volume identifier on it.
+
+ - The t/compat.t test now uses $Config{make} instead of just 'make'
+   to test makefile compatibility.  This fixes some failures on Win32.
+   We also skip this test entirely if no make utility is available.
+
+0.18_01  Thu May 22 12:20:00 CDT 2003
 
  - Alternative distribution layouts are now supported via the
    'pm_files', 'pod_files', 'xs_files', 'PL_files', and 'script_files'

@@ -1,10 +1,13 @@
 use Test;
-BEGIN { plan tests => 11 }
-
 use Module::Build;
 use Module::Build::Compat;
 use File::Spec;
 use File::Path;
+use Config;
+require File::Spec->catfile('t', 'common.pl');
+
+skip_test("Don't know how to invoke 'make'") unless $Config{make};
+plan tests => 11;
 ok(1);  # Loaded
 
 
@@ -25,7 +28,7 @@ foreach my $type (qw(small passthrough traditional)) {
   my $result = $build->run_perl_script('Makefile.PL');
   ok $result;
 
-  ok $build->do_system('make', 'realclean');
+  ok $build->do_system($Config{make}, 'realclean');
   $build->dispatch('realclean');
   ok not -e 'Makefile.PL';
 }
