@@ -19,18 +19,6 @@ sub new {
   my $args   = delete $input{args}   || {};
   my $config = delete $input{config} || {};
 
-  my ($action, $cmd_args) = __PACKAGE__->cull_args(@ARGV);
-  die "Too early to specify a build action '$action'.  Do 'Build $action' instead.\n"
-    if $action;
-
-  # Extract our 'properties' from $cmd_args, the rest are put in 'args'
-  my $cmd_properties = {};
-  foreach my $key (keys %$cmd_args) {
-    $cmd_properties->{$key} = delete $cmd_args->{$key} if __PACKAGE__->valid_property($key);
-  }
-
-  my $cmd_config = delete $cmd_args->{config};
-
   # The following warning could be unnecessary if the user is running
   # an embedded perl, but there aren't too many of those around, and
   # embedded perls aren't usually used to install modules, and the
@@ -39,30 +27,37 @@ sub new {
   my $perl = $package->find_perl_interpreter
     or warn "Warning: Can't locate your perl binary";
 
+  my $self = bless {
+		    args => {%$args},
+		    config => {%Config, %$config},
+		    properties => {
+				   build_script    => 'Build',
+				   base_dir        => $package->cwd,
+				   config_dir      => '_build',
+				   requires        => {},
+				   recommends      => {},
+				   build_requires  => {},
+				   conflicts       => {},
+				   perl            => $perl,
+				   install_types   => [qw( lib arch script bindoc libdoc )],
+				   installdirs     => 'site',
+				   include_dirs    => [],
+				   bindoc_dirs     => [ 'blib/script' ],
+				   libdoc_dirs     => [ 'blib/lib', 'blib/arch' ],
+				   %input,
+				  },
+		   }, $package;
+
+  $self->cull_args(@ARGV);
+  
+  die "Too early to specify a build action '$self->{action}'.  Do 'Build $self->{action}' instead.\n"
+    if $self->{action};
+
   # 'args' are arbitrary user args.
   # 'config' is Config.pm and its overridden values.
   # 'properties' is stuff Module::Build needs in order to work.  They get saved in _build/.
   # Anything else in $self doesn't get saved.
 
-  my $self = bless {
-		    args => {%$args, %$cmd_args},
-		    config => {%Config, %$config, %$cmd_config},
-		    properties => {
-				   build_script => 'Build',
-				   base_dir => $package->cwd,
-				   config_dir => '_build',
-				   requires => {},
-				   recommends => {},
-				   build_requires => {},
-				   conflicts => {},
-				   perl => $perl,
-				   install_types => [qw(lib arch script)],
-				   installdirs => 'site',
-				   include_dirs => [],
-				   %input,
-				   %$cmd_properties,
-				  },
-		   }, $package;
   my $p = $self->{properties};
 
   # Synonyms
@@ -100,16 +95,16 @@ sub _set_install_paths {
 		arch    => $c->{installsitearch},
 		bin     => $c->{installsitebin} || $c->{installbin},
 		script  => $c->{installsitescript} || $c->{installsitebin} || $c->{installscript},
-		bindoc  => $c->{installsiteman1dir},
-		libdoc  => $c->{installsiteman3dir},
+		bindoc  => $c->{installsiteman1dir} || $c->{installman1dir},
+		libdoc  => $c->{installsiteman3dir} || $c->{installman3dir},
 	       },
      vendor => {
 		lib     => $c->{installvendorlib},
 		arch    => $c->{installvendorarch},
 		bin     => $c->{installvendorbin} || $c->{installbin},
 		script  => $c->{installvendorscript} || $c->{installvendorbin} || $c->{installscript},
-		bindoc  => $c->{installvendorman1dir},
-		libdoc  => $c->{installvendorman3dir},
+		bindoc  => $c->{installvendorman1dir} || $c->{installman1dir},
+		libdoc  => $c->{installvendorman3dir} || $c->{installman3dir},
 	       },
     };
 }
@@ -184,18 +179,9 @@ sub resume {
        "   but we are now using '$perl'.\n")
     unless $perl eq $self->{properties}{perl};
   
-
-  ($self->{action}, my $args) = $self->cull_args(@ARGV);
+  $self->cull_args(@ARGV);
   $self->{action} ||= 'build';
   
-  # Extract our 'properties' from $args
-  my %p;
-  foreach my $key (keys %$args) {
-    $p{$key} = delete $args->{$key} if __PACKAGE__->valid_property($key);
-  }
-  $self->{args} = {%{$self->{args}}, %$args};
-  $self->{properties} = {%{$self->{properties}}, %p};
-
   return $self;
 }
 
@@ -232,6 +218,8 @@ sub resume {
        create_makefile_pl
        pollute
        include_dirs
+       bindoc_dirs
+       libdoc_dirs
       );
 
   sub valid_property { exists $valid_properties{$_[1]} }
@@ -362,28 +350,42 @@ sub find_module_by_name {
   return;
 }
 
+sub _next_code_line {
+  my ($self, $fh, $pat) = @_;
+  my $inpod = 0;
+  
+  local $_;
+  while (<$fh>) {
+    $inpod = /^=(?!cut)/ ? 1 : /^=cut/ ? 0 : $inpod;
+    next if $inpod || /^\s*#/;
+    return wantarray ? ($_, /$pat/) : $_
+      if $_ =~ $pat;
+  }
+  return;
+}
+
 sub version_from_file {
   my ($self, $file) = @_;
 
   # Some of this code came from the ExtUtils:: hierarchy.
   my $fh = IO::File->new($file) or die "Can't open '$file' for version: $!";
-  local $_;
-  while (<$fh>) {
-    if ( my ($sigil, $var) = /([\$*])(([\w\:\']*)\bVERSION)\b.*\=/ ) {
-      my $eval = qq{
-		    package Module::Build::Base::_version;
-		    no strict;
+
+  my $match = qr/([\$*])(([\w\:\']*)\bVERSION)\b.*\=/;
+  my ($v_line, $sigil, $var) = $self->_next_code_line($fh, $match) or return undef;
+
+  my $eval = qq{q#  Hide from _packages_inside()
+		 #; package Module::Build::Base::_version;
+		 no strict;
 		    
-		    local $sigil$var;
-		    \$$var=undef; do {
-		      $_
-		    }; \$$var
-		   };
-      local $^W;
-      return scalar eval $eval;
-    }
-  }
-  return undef;
+		 local $sigil$var;
+		 \$$var=undef; do {
+		   $v_line
+		 }; \$$var
+		};
+  local $^W;
+  my $result = eval $eval;
+  warn "Error evaling version line '$eval' in $file: $@\n" if $@;
+  return $result;
 }
 
 sub _write_cleanup {
@@ -757,8 +759,12 @@ sub cull_args {
   }
   $args{ARGV} = \@argv;
 
+  # 'config' and 'install_path' are additive by hash key
+  my %additive = (config => 1,
+		  install_path => 1);
+
   # Hashify these parameters
-  for ('config', 'install_path') {
+  for (keys %additive) {
     my %hash;
     $args{$_} ||= [];
     $args{$_} = [ $args{$_} ] unless ref $args{$_};
@@ -770,7 +776,20 @@ sub cull_args {
     $args{$_} = \%hash;
   }
 
-  return ($action, \%args);
+  # Now merge data into $self.
+  $self->{action} = $action if defined $action;
+
+  # Extract our 'properties' from $cmd_args, the rest are put in 'args'.
+  foreach my $key (keys %args) {
+    my $add_to = $self->valid_property($key) ? $self->{properties} : $self->{args};
+
+    if ($additive{$key}) {
+      $add_to->{$key}{$_} = $args{$key}{$_} foreach keys %{$args{$key}};
+    } else {
+      $add_to->{$key} = $args{$key};
+    }
+  }
+
 }
 
 sub super_classes {
@@ -1077,17 +1096,105 @@ eval 'exec $interpreter $arg -S \$0 \${1+"\$\@"}'
 }
 
 
-sub ACTION_manifypods {
+sub ACTION_builddocs {
   my $self = shift;
-  warn "Sorry, the 'manifypods' action is not yet implemented.\n"; return;
   require Pod::Man;
+  $self->manify_bin_pods();
+  $self->manify_lib_pods();
+  return $self;
+}
+
+sub manify_bin_pods {
+  my $self    = shift;
+  my $parser  = Pod::Man->new( section => 1 ); # binary manpages go in section 1
+  my $files   = $self->_find_pods($self->{properties}{bindoc_dirs});
+  return unless keys %$files;
   
-  my $p = Pod::Man->new(section => 3);
-  my $files = $self->rscan_dir('lib', qr{\.(pm|pod)$});
-  foreach my $file (@$files) {
-    my @path = File::Spec->splitdir($file);
-    # ...
+  my $mandir = File::Spec->catdir( 'blib', 'bindoc' );
+  File::Path::mkpath( $mandir, 0, 0777 );
+
+  foreach my $file (keys %$files) {
+    my $manpage = $self->man1page_name( $file ) . '.' . $self->{config}{man1ext};
+    my $outfile = File::Spec->catfile( $mandir, $manpage);
+    print "Manifying $file -> $outfile\n";
+    $parser->parse_from_file( $file, $outfile );
+    $files->{$file} = $outfile;
   }
+
+  return $self;
+}
+
+sub manify_lib_pods {
+  my $self    = shift;
+  my $parser  = Pod::Man->new( section => 3 ); # library manpages go in section 3
+  my $files   = $self->_find_pods($self->{properties}{libdoc_dirs});
+  return unless keys %$files;
+  
+  my $mandir = File::Spec->catdir( 'blib', 'libdoc' );
+  File::Path::mkpath( $mandir, 0, 0777 );
+
+  foreach my $file (keys %$files) {
+    my $manpage = $self->man3page_name( $file ) . '.' . $self->{config}{man3ext};
+    my $outfile = File::Spec->catfile( $mandir, $manpage);
+    print "Manifying $file -> $outfile\n";
+    $parser->parse_from_file( $file, $outfile );
+    $files->{$file} = $outfile;
+  }
+
+  return $self;
+}
+
+sub _find_pods {
+  my ($self, $dirs) = @_;
+  my %files;
+  foreach my $spec (@$dirs) {
+    my $dir = $self->localize_file_path($spec);
+    next unless -e $dir;
+    do { $files{$_} = $_ if $self->contains_pod( $_ ) }
+      for @{ $self->rscan_dir( $dir, sub { -f $File::Find::name } ) };
+  }
+  return \%files;
+}
+
+sub contains_pod {
+  my ($self, $file) = @_;
+  return 0 unless -T $file;  # Only look at text files
+  
+  my $fh = IO::File->new( $file ) or die "Can't open $file: $!";
+  while (my $line = <$fh>) {
+    return 1 if $line =~ /^\=(?:head|pod|item)/;
+  }
+  
+  return 0;
+}
+
+# Adapted from ExtUtils::MM_Unix
+sub man1page_name {
+  my $self = shift;
+  return File::Basename::basename( shift );
+}
+
+# Adapted from ExtUtils::MM_Unix and Pod::Man
+# Depending on M::B's dependency policy, it might make more sense to refactor
+# Pod::Man::begin_pod() to extract a name() methods, and use them...
+#    -spurkis
+sub man3page_name {
+  my $self = shift;
+  my $file = File::Spec->canonpath( shift ); # clean up file path
+  my @dirs = File::Spec->splitdir( $file );
+
+  # more clean up - assume all man3 pods are under 'blib/lib' or 'blib/arch'
+  # to avoid the complexity found in Pod::Man::begin_pod()
+  shift @dirs while ($dirs[0] =~ /^(?:blib|lib|arch)$/i);
+
+  # remove known exts from the base name
+  $dirs[-1] =~ s/\.p(?:od|m|l)\z//i;
+
+  return join( $self->manpage_separator, @dirs );
+}
+
+sub manpage_separator {
+  return '::';
 }
 
 # For systems that don't have 'diff' executable, should use Algorithm::Diff
@@ -1134,14 +1241,14 @@ sub ACTION_diff {
 sub ACTION_install {
   my ($self) = @_;
   require ExtUtils::Install;
-  $self->depends_on('build');
+  $self->depends_on('build', 'builddocs');
   ExtUtils::Install::install($self->install_map('blib'), 1, 0, $self->{args}{uninst}||0);
 }
 
 sub ACTION_fakeinstall {
   my ($self) = @_;
   require ExtUtils::Install;
-  $self->depends_on('build');
+  $self->depends_on('build', 'builddocs');
   ExtUtils::Install::install($self->install_map('blib'), 1, 1, $self->{args}{uninst}||0);
 }
 
@@ -1151,7 +1258,7 @@ sub ACTION_versioninstall {
   die "You must have only.pm 0.25 or greater installed for this operation: $@\n"
     unless eval { require only; 'only'->VERSION(0.25); 1 };
   
-  $self->depends_on('build');
+  $self->depends_on('build', 'builddocs');
   
   my %onlyargs = map {exists($self->{args}{$_}) ? ($_ => $self->{args}{$_}) : ()}
     qw(version versionlib);
@@ -1271,7 +1378,8 @@ sub ACTION_disttest {
   my $dist_dir = $self->dist_dir;
   chdir $dist_dir or die "Cannot chdir to $dist_dir: $!";
   # XXX could be different names for scripts
-  # XXX doesn't propagate @INC
+  
+  local $ENV{'PERL5LIB'} = join $self->{config}{path_sep}, @INC;
   $self->run_perl_script('Build.PL') or die "Error executing 'Build.PL' in dist directory: $!";
   $self->run_perl_script('Build') or die "Error executing 'Build' in dist directory: $!";
   $self->run_perl_script('Build', [], ['test']) or die "Error executing 'Build test' in dist directory";
@@ -1385,10 +1493,11 @@ sub _packages_inside {
   # XXX this SUCKS SUCKS SUCKS!  Damn you perl!
   my ($self, $file) = @_;
   my $fh = IO::File->new($file) or die "Can't read $file: $!";
-  my @packages;
-  while (defined(my $line = <$fh>)) {
-    push @packages, $1 if $line =~ /^[\s\{;]*package\s+([\w:]+)/;
-  }
+  
+  my (@packages, $p);
+  push @packages, $p while (undef, $p) = 
+    $self->_next_code_line($fh, qr/^[\s\{;]*package\s+([\w:]+)/);
+  
   return @packages;
 }
 

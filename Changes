@@ -1,5 +1,28 @@
 Revision history for Perl extension Module::Build.
 
+0.19_02
+
+ - The installation process will now create man(1) and man(3) pages
+   from POD in modules & scripts, and install them. [large patch by
+   Steve Purkis]
+
+ - version_from_file() now ignores $VERSION variables that are defined
+   in POD or comments.  It can still be tricked by $VERSIONs in string
+   literals, though.  [Steve Purkis]
+
+ - The code to find packages in module files now uses Steve's scanning
+   method (above) to skip package-declaration-lookalikes in POD or
+   comments.
+
+ - The 'disttest' action will now propagate its @INC settings to its
+   subprocesses.
+
+0.19_01  Sat Jul 12 10:12:52 CDT 2003
+
+ - Fixed a problem with the 'install_path' parameter given to
+   'Build.PL' being lost in subsequent actions. [Reported by Mathieu
+   Arnold]
+
 0.19  Wed Jul  9 22:34:02 CDT 2003
 
  - Added support for the 'install_path' parameter, which allows custom
