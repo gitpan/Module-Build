@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.25_01';
+$VERSION = '0.25_02';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -615,7 +615,88 @@ it gets the distribution's version.  It looks for the first line
 matching C<$package\s-\s(.+)>, and uses the captured text as the
 abstract.
 
+=item get_options
+
+You can pass arbitrary options to F<Build.PL> or F<Build>, and they will be
+stored in the Module::Build object and can be accessed via the C<args()>
+method. However, sometimes you want more flexibility out of your argument
+processing than this allows. In such cases, use the C<get_options> parameter
+to pass in a hash reference of argument specifications, and the list of
+arguments to F<Build.PL> or F<Build> will be processed according to those
+specifications before they're passed on to C<Module::Build>'s own argument
+processing.
+
+The supported option specification hash keys are:
+
+=over 4
+
+=item type
+
+The type of option. The types are those supported by Getopt::Long; consult
+its documentation for a complete list. Typical types are C<=s> for strings,
+C<+> for additive options, and C<!> for negatable options.
+
+=item store
+
+A reference to a scalar in which to store the value passed to the option.
+If not specified, the value will be stored under the option name in the
+hash returned by the C<args()> method.
+
+=item default
+
+A default value for the option. If no default value is specified and no option
+is passed, then the option key will not exist in the hash returned by
+C<args()>.
+
 =back
+
+You can combine references to your own variables or subroutines with
+unreferenced specifications, for which the result will also be stored in the
+has returned by C<args()>. For example:
+
+ my $loud = 0;
+ my $build = Module::Build->new(
+     module_name => 'Spangly',
+     get_options => {
+                      loud =>     { store => \$loud },
+                      dbd  =>     { type  => '=s'   },
+                      quantity => { type  => '+'    },
+                    }
+ );
+
+ print STDERR "HEY, ARE YOU LISTENING??\n" if $loud;
+ print "We'll use the ", $build->args('dbd'), " DBI driver\n";
+ print "Are you sure you want that many?\n"
+   if $build->args('quantity') > 2;
+
+The arguments for such a specification can be called like so:
+
+ % perl Build.PL --loud --dbd=DBD::pg --quantity --quantity --quantity
+
+B<WARNING:> Any option specifications that conflict with Module::Build's own
+options (defined by its properties) will throw an exception.
+
+Consult the Getopt::Long documentation for details on its usage.
+
+=back
+
+=item args()
+
+  my $args_href = $build->args;
+  my %args = $build->args;
+  my $arg_value = $build->args($key);
+  $build->args($key, $value);
+
+This method is the preferred interface for retreiving the arguments passed via
+command-line options to F<Build.PL> or F<Build>, minus the Module-Build
+specific options.
+
+When called in in a scalar context with no arguments, this method returns a
+reference to the hash storing all of the arguments; in an array context, it
+returns the hash itself. When passed a single argument, it returns the value
+stored in the args hash for that option key. When called with two arguments,
+the second argument is assigned to the args hash under the key passed as the
+first argument.
 
 =item subclass()
 
@@ -974,6 +1055,51 @@ Returns true if the given file appears to contain POD documentation.
 Currently this checks whether the file has a line beginning with
 '=pod', '=head', or '=item', but the exact semantics may change in the
 future.
+
+=item feature($name)
+
+=item feature($name => $value)
+
+With a single argument, returns true if the given feature is set.
+With two arguments, sets the given feature to the given boolean value.
+In this context, a "feature" is any optional functionality of an
+installed module.  For instance, if you write a module that could
+optionally support a MySQL or PostgreSQL backend, you might create
+features called C<mysql_support> and C<postgres_support>, and set them
+to true/false depending on whether the user has the proper databases
+installed and configured.
+
+Features set in this way using the Module::Build object will be
+available for querying during the build/test process and after
+installation via the generated C<...::BuildConfig> module, as 
+C<< ...::BuildConfig->feature($name) >>.
+
+The C<feature()> and C<build_config()> methods represent
+Module::Build's main support for configuration of installed modules.
+See also L<SAVING CONFIGURATION INFORMATION>.
+
+=item build_config($name)
+
+=item build_config($name => $value)
+
+With a single argument, returns the value of the configuration
+variable C<$name>.  With two arguments, sets the given configuration
+variable to the given value.  The value may be any perl scalar that's
+serializable with C<Data::Dumper>.  For instance, if you write a
+module that can use a MySQL or PostgreSQL backend, you might create
+configuration variables called C<mysql_connect> and
+C<postgres_connect>, and set each to an array of connection parameters
+for C<< DBI->connect() >>.
+
+Configuration values set in this way using the Module::Build object
+will be available for querying during the build/test process and after
+installation via the generated C<...::BuildConfig> module, as 
+C<< ...::BuildConfig->config($name) >>.
+
+The C<feature()> and C<build_config()> methods represent
+Module::Build's main support for configuration of installed modules.
+See also L<SAVING CONFIGURATION INFORMATION>.
+
 
 =back
 
@@ -1350,7 +1476,12 @@ pages belonging to the 'man1' category.
 
 =back
 
-=head3 installdirs
+Four other parameters let you control various aspects of how
+installation paths are determined:
+
+=over 4
+
+=item installdirs
 
 The default destinations for these installable things come from
 entries in your system's C<Config.pm>.  You can select from three
@@ -1391,7 +1522,7 @@ unfortunately there's no such thing as "installsitescript" or
 general location right.  In the future, if C<Config.pm> adds some more
 appropriate entries, we'll start using those.)
 
-=head3 install_path
+=item install_path
 
 Once the defaults have been set, you can override them.  You can set
 individual entries by using the C<install_path> parameter:
@@ -1409,7 +1540,7 @@ or this:
 
  Build install --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
 
-=head3 install_base
+=item install_base
 
 You can also set the whole bunch of installation paths by supplying the
 C<install_base> parameter to point to a directory on your system.  For
@@ -1420,8 +1551,8 @@ system, you'll install as follows:
  arch    => /home/ken/lib/i386-linux
  script  => /home/ken/scripts
  bin     => /home/ken/bin
- libdoc  => /home/ken/man/man1
- bindoc  => /home/ken/man/man3
+ bindoc  => /home/ken/man/man1
+ libdoc  => /home/ken/man/man3
 
 Note that this is I<different> from how MakeMaker's C<PREFIX>
 parameter works.  C<PREFIX> tries to create a mini-replica of a
@@ -1434,7 +1565,7 @@ C<installdirs=site> layout.
 The exact layout under the directory you specify may vary by system -
 we try to do the "sensible" thing on each platform.
 
-=head3 destdir
+=item destdir
 
 If you want to install everything into a temporary directory first
 (for instance, if you want to create a directory tree that a package
@@ -1451,6 +1582,24 @@ This will effectively install to "/tmp/foo/$sitelib",
 "/tmp/foo/$sitearch", and the like, except that it will use
 C<File::Spec> to make the pathnames work correctly on whatever
 platform you're installing on.
+
+=back
+
+=head1 SAVING CONFIGURATION INFORMATION
+
+Module::Build provides a very convenient way to save configuration
+information that your installed modules (or your regression tests) can
+access.  If your Build process calls the C<feature()> or
+C<build_config()> methods, then a C<Foo::Bar::BuildConfig> module will
+automatically be created for you, where C<Foo::Bar> is the
+C<module_name> parameter as passed to C<new()>.  This module provides
+access to the data saved by these methods, and a way to update the
+values.  There is also a utility script called C<build_config>
+distributed with Module::Build that provides a command-line interface
+to this same functionality.  See also the generated
+C<Foo::Bar::BuildConfig> documentation, and the C<build_config>
+script's documentation, for more information.
+
 
 
 =head1 AUTOMATION

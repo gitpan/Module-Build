@@ -1,6 +1,6 @@
 Revision history for Perl extension Module::Build.
 
-0.25_01
+0.26  (Pending, still in beta release)
 
  - Removed some language from the Module::Build::Compat documentation
    that encouraged people to include a Build.PL without a Makefile.PL.
@@ -12,16 +12,58 @@ Revision history for Perl extension Module::Build.
    got the impression I was a little more truculent toward MakeMaker
    than I really am.
 
+ - Added the formal concepts of "features" and "config notes" for
+   distributions.  This allows the module author to define a certain
+   set of features that the user can switch on and off (usually
+   according to whether they have the proper prerequisites for them),
+   and to save build-time configuration information in a standardized
+   format.  See the main documentation of Module::Build for more
+   details.
+
+ - Added the 'get_options' parameter, which lets module authors
+   declare certain command-line arguments their Build.PL can accept
+   [David Wheeler]
+
+ - Passing a PREFIX value to a pass-through Makefile 'make install'
+   now has the same effect as passing it to 'perl Makefile.PL' (it
+   dies with a helpful message).
+
  - Added the 'testcover' action, which runs a test suite using
    Devel::Cover.  [Dave Rolsky]
 
+ - The "=head3" POD directive isn't supported in older podlators
+   (particularly Pod::Man), so we don't use it anymore.
+
  - Fixed a problem in htmlify_pods() that would produce test failures
    on Cygwin (and probably elsewhere).  [Yitzchak Scott-Thoennes]
+
+ - Fixed a fatal error that occurred when the author specified
+   'dist_author' manually in their Build.PL script. [Spotted by Ron
+   Savage]
+
+ - The 'provides' section of the META.yml file wasn't being built
+   properly on Win32, because of a mismatch between URL-format and
+   native-format pathnames.  Fixed.  [Reported by Robert Rothenberg]
+
+ - The progress message "lib/Foo.xs -> lib/Foo.c" was previously being
+   output even when the Foo.c file wasn't being rebuilt.  It's now
+   fixed.
+
+ - Fixed a couple of places in Compat.pm where it could have forgotten
+   which perl interpreter it had been run with ($^X isn't very
+   trustworthy).
+
+ - On some systems, the way we updated the timestamp on the
+   "lib/Foo.bs" file (one of the output files for XS-based modules)
+   was failing.  It's been replaced by a simple call to utime().
 
  - Fixed a problem in t/compat.t that prevented it from being run
    individually using 'make test TEST_FILES=t/compat.t'.  The problem
    was that a couple environment variables (TEST_FILES, MAKEFLAGS)
    were being passed through to subprocesses, and confused them.
+
+ - Fixed an important typo in the documentation for the 'install_base'
+   parameter ('libdoc' and 'bindoc' were switched). [Ray Zimmerman]
 
  - The pass-through Makefiles (type 'small' or 'passthrough') now
    support the TEST_FILES parameter to 'make test'.

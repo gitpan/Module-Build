@@ -2,7 +2,7 @@
 
 use strict;
 use Test;
-BEGIN { plan tests => 23 }
+BEGIN { plan tests => 37 }
 use Module::Build;
 ok(1);
 
@@ -110,16 +110,48 @@ chdir 't';
   chdir $cwd or die "Can't change back to $cwd: $!";
 }
 
-# Make sure 'config' entries are respected on the command line
+# Make sure 'config' entries are respected on the command line, and that
+# Getopt::Long specs work as expected.
 {
   my $cwd = Cwd::cwd();
   use Config;
   
   chdir 'Sample';
-  eval {Module::Build->run_perl_script('Build.PL', [], ['--config', "foocakes=barcakes"])};
+
+  eval {Module::Build->run_perl_script('Build.PL', [], ['--config', "foocakes=barcakes", '--foo', '--bar', '--bar', '-bat=hello', 'gee=whiz', '--any', 'hey'])};
   ok $@, '';
   
   my $b = Module::Build->resume();
   ok $b->config->{cc}, $Config{cc};
   ok $b->config->{foocakes}, 'barcakes';
+
+  # Test args().
+  ok $b->args('foo'), 1;
+  ok $b->args('bar'), 2, 'bar';
+  ok $b->args('bat'), 'hello', 'bat';
+  ok $b->args('gee'), 'whiz';
+  ok $b->args('any'), 'hey';
+  ok $b->args('dee'), 'goo';
+
+  ok my $argsref = $b->args;
+  ok $argsref->{foo}, 1;
+  $argsref->{doo} = 'hee';
+  ok $b->args('doo'), 'hee';
+  ok my %args = $b->args;
+  ok $args{foo}, 1;
+
+  chdir $cwd or die "Can't change back to $cwd: $!";
 }
+
+# Test author stuff
+{
+  my $build = new Module::Build
+    (
+     module_name => 'ModuleBuildOne',
+     dist_author => 'Foo Meister <foo@example.com>',
+    );
+  ok $build;
+  ok ref($build->dist_author);
+  ok $build->dist_author->[0], 'Foo Meister <foo@example.com>';
+}
+

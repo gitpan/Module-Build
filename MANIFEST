@@ -57,5 +57,4 @@ t/XSTest/lib/XSTest.pm
 t/XSTest/lib/XSTest.xs
 t/XSTest/MANIFEST
 t/XSTest/test.pl
-
 SIGNATURE    Added here by Module::Build

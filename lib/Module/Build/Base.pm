@@ -110,6 +110,8 @@ sub _construct {
   $p->{bindoc_dirs} ||= [ "$p->{blib}/script" ];
   $p->{libdoc_dirs} ||= [ "$p->{blib}/lib", "$p->{blib}/arch" ];
 
+  $p->{dist_author} = [ $p->{dist_author} ] if exists $p->{dist_author} and not ref $p->{dist_author};
+
   # Synonyms
   $p->{requires} = delete $p->{prereq} if exists $p->{prereq};
   $p->{script_files} = delete $p->{scripts} if exists $p->{scripts};
@@ -294,18 +296,18 @@ sub feature_names { keys %%$features }
 sub config_names  { keys %%$config }
 
 sub write {
-  my $file = __FILE__;
+  my $me = __FILE__;
   require IO::File;
   require Data::Dumper;
 
-  my $mode_orig = (stat __FILE__)[2] & 07777;
-  chmod($mode_orig | 0222, __FILE__); # Make it writeable
-  my $fh = IO::File->new(__FILE__, 'r+') or die "Can't rewrite ", __FILE__, ": $!";
+  my $mode_orig = (stat $me)[2] & 07777;
+  chmod($mode_orig | 0222, $me); # Make it writeable
+  my $fh = IO::File->new($me, 'r+') or die "Can't rewrite $me: $!";
   seek($fh, 0, 0);
   while (<$fh>) {
     last if /^__DATA__$/;
   }
-  die "Couldn't find __DATA__ token in ", __FILE__ if eof($fh);
+  die "Couldn't find __DATA__ token in $me" if eof($fh);
 
   local $Data::Dumper::Terse = 1;
   seek($fh, tell($fh), 0);
@@ -313,8 +315,8 @@ sub write {
   truncate($fh, tell($fh));
   $fh->close;
 
-  chmod($mode_orig, __FILE__)
-    or warn "Couldn't restore permissions on ", __FILE__, ": $!";
+  chmod($mode_orig, $me)
+    or warn "Couldn't restore permissions on $me: $!";
 }
 
 EOF
@@ -367,9 +369,12 @@ EOF
        include_dirs
        bindoc_dirs
        libdoc_dirs
+       get_options
       );
 
   sub valid_property { exists $valid_properties{$_[1]} }
+
+  sub valid_properties { keys %valid_properties }
 
   # Create an accessor for each property that doesn't already have one
   foreach my $property (keys %valid_properties) {
@@ -930,6 +935,45 @@ sub _call_action {
   return $self->$method();
 }
 
+sub cull_options {
+    my $self = shift;
+    my $specs = $self->get_options or return ({}, @_);
+    require Getopt::Long;
+    # XXX Should we let Getopt::Long handle M::B's options? That would
+    # be easy-ish to add to @specs right here, but wouldn't handle options
+    # passed without "--" as M::B currently allows. We might be able to
+    # get around this by setting the "prefix_pattern" Configure option.
+    my @specs;
+    my $args = {};
+    # Construct the specifications for GetOptions.
+    while (my ($k, $v) = each %$specs) {
+        # Throw an error if specs conflict with our own.
+        die "Option specification '$k' conflicts with a " . ref $self
+          . " option of the same name"
+          if $self->valid_property($k);
+        # XXX Are there other options we should check? Contents of
+        # %additive elsewhere in this package?
+        push @specs, $k . (defined $v->{type} ? $v->{type} : '');
+        push @specs, $v->{store} if exists $v->{store};
+        $args->{$k} = $v->{default} if exists $v->{default};
+    }
+
+    # Get the options values and return them.
+    # XXX Add option to allow users to set options?
+    Getopt::Long::Configure('pass_through');
+    local @ARGV = @_; # No other way to dupe Getopt::Long
+    Getopt::Long::GetOptions($args, @specs);
+    return $args, @ARGV;
+}
+
+sub args {
+    my $self = shift;
+    return wantarray ? %{ $self->{args} } : $self->{args} unless @_;
+    my $key = shift;
+    $self->{args}{$key} = shift if @_;
+    return $self->{args}{$key};
+}
+
 sub _read_arg {
   my ($self, $args, $key, $val) = @_;
 
@@ -943,7 +987,10 @@ sub _read_arg {
 
 sub read_args {
   my $self = shift;
-  my ($action, %args, @argv);
+  my ($action, @argv);
+  (my $args, @_) = $self->cull_options(@_);
+  my %args = %$args;
+
   while (@_) {
     local $_ = shift;
     if ( /^(\w+)=(.*)/ ) {
@@ -1734,6 +1781,24 @@ sub ACTION_distcheck {
   ExtUtils::Manifest::fullcheck();
 }
 
+sub _add_to_manifest {
+  my ($self, $manifest, $lines) = @_;
+  $lines = [$lines] unless ref $lines;
+
+  my $mode = (stat $manifest)[2];
+  chmod($mode | 0222, $manifest) or die "Can't make $manifest writable: $!";
+  
+  my $fh = IO::File->new("< $manifest") or die "Can't read $manifest: $!";
+  my $has_newline = (<$fh>)[-1] =~ /\n$/;
+  $fh->close;
+
+  $fh = IO::File->new(">> $manifest") or die "Can't write to $manifest: $!";
+  print $fh "\n" unless $has_newline;
+  print $fh map "$_\n", @$lines;
+  close $fh;
+  chmod($mode, $manifest);
+}
+
 sub _sign_dir {
   my ($self, $dir) = @_;
 
@@ -1746,13 +1811,7 @@ sub _sign_dir {
   {
     my $manifest = File::Spec->catfile($dir, 'MANIFEST');
     die "Signing a distribution requires a MANIFEST file" unless -e $manifest;
-    my $mode = (stat $manifest)[2];
-    chmod($mode | 0222, $manifest) or die "Can't make $manifest writable: $!";
-    
-    my $fh = IO::File->new(">> $manifest") or die "Can't add SIGNATURE to $manifest: $!";
-    print $fh "\nSIGNATURE    Added here by Module::Build\n";
-    close $fh;
-    chmod($mode, $manifest);
+    $self->_add_to_manifest($manifest, "SIGNATURE    Added here by Module::Build");
   }
   
   # We protect the signing with an eval{} to make sure we get back to
@@ -2024,8 +2083,13 @@ sub find_dist_packages {
   # Only packages in .pm files are candidates for inclusion here.
   # Only include things in the MANIFEST, not things in developer's
   # private stock.
-  my $dist_files = $self->_read_manifest('MANIFEST');
-  my @pm_files = grep {exists $dist_files->{$_}} keys %{ $self->find_pm_files };
+
+  # Localize
+  my %dist_files = (map
+		    {$self->localize_file_path($_) => $_}
+		    keys %{ $self->_read_manifest('MANIFEST') });
+
+  my @pm_files = grep {exists $dist_files{$_}} keys %{ $self->find_pm_files };
   
   my %out;
   foreach my $file (@pm_files) {
@@ -2035,7 +2099,7 @@ sub find_dist_packages {
     my $version = $self->version_from_file( $localfile );
     
     foreach my $package ($self->_packages_inside($localfile)) {
-      $out{$package}{file} = $file;
+      $out{$package}{file} = $dist_files{$file};
       $out{$package}{version} = $version if defined $version;
     }
   }
@@ -2288,6 +2352,8 @@ sub link_c {
 sub compile_xs {
   my ($self, $file, %args) = @_;
   
+  print "$file -> $args{outfile}\n";
+
   if (eval {require ExtUtils::ParseXS; 1}) {
     
     ExtUtils::ParseXS::process_file(
@@ -2364,7 +2430,6 @@ sub process_xs {
 
   # .xs -> .c
   $self->add_to_cleanup($c_file);
-  print "$file -> $c_file\n";
   
   unless ($self->up_to_date($file, $c_file)) {
     $self->compile_xs($file, outfile => $c_file);
@@ -2387,7 +2452,8 @@ sub process_xs {
     require ExtUtils::Mkbootstrap;
     print "ExtUtils::Mkbootstrap::Mkbootstrap('$file_base')\n";
     ExtUtils::Mkbootstrap::Mkbootstrap($file_base);  # Original had $BSLOADLIBS - what's that?
-    {my $fh = IO::File->new(">> $file_base.bs")}  # touch
+    {my $fh = IO::File->new(">> $file_base.bs")}  # create
+    utime((time)x2, "$file_base.bs");  # touch
   }
   $self->copy_if_modified("$file_base.bs", $archdir, 1);
   

@@ -22,15 +22,6 @@ my %makefile_to_build =
    LIB => sub { ('--install_path', 'lib='.shift()) },
   );
 
-# I sort of wonder whether we can use the same hash from above here.
-my %known_make_macros = 
-  (
-   TEST_VERBOSE => 'verbose',
-   VERBINST     => 'verbose',
-   UNINST       => 'uninst',
-   TEST_FILES   => sub { map {('test_files', $_)} Module::Build->split_like_shell(shift) },
-  );
-
 
 
 sub create_makefile_pl {
@@ -86,8 +77,8 @@ EOF
 	or die " *** Cannot install without Module::Build.  Exiting ...\n";
       
       chdir $cwd or die "Cannot chdir() back to $cwd: $!";
-      exec $^X, $makefile, @ARGV;  # Redo now that we have Module::Build
     }
+    eval "use Module::Build::Compat 0.02; 1" or die $@;
     use lib '%s';
     Module::Build::Compat->run_build_pl(args => \@ARGV);
     require %s;
@@ -158,7 +149,7 @@ sub makefile_to_build_args {
 
 sub makefile_to_build_macros {
   my @out;
-  while (my ($macro, $trans) = each %known_make_macros) {
+  while (my ($macro, $trans) = each %makefile_to_build) {
     next unless exists $ENV{$macro};
     my $val = $ENV{$macro};
     push @out, ref($trans) ? $trans->($val) : ($trans => $val);
@@ -170,8 +161,8 @@ sub run_build_pl {
   my ($pack, %in) = @_;
   $in{script} ||= 'Build.PL';
   my @args = $in{args} ? $pack->makefile_to_build_args(@{$in{args}}) : ();
-  print "$^X $in{script} @args\n";
-  system($^X, $in{script}, @args) == 0 or die "Couldn't run $in{script}: $!";
+  print "# running $in{script} @args\n";
+  Module::Build->run_perl_script($in{script}, [], \@args) or die "Couldn't run $in{script}: $!";
 }
 
 sub fake_makefile {
@@ -208,7 +199,7 @@ $action : force_do_it
 EOF
   }
   
-  $maketext .= "\n.EXPORT : " . join(' ', keys %known_make_macros) . "\n\n";
+  $maketext .= "\n.EXPORT : " . join(' ', keys %makefile_to_build) . "\n\n";
   
   return $maketext;
 }

@@ -486,6 +486,83 @@ METHODS
             first line matching "$package\s-\s(.+)", and uses the captured
             text as the abstract.
 
+        get_options
+            You can pass arbitrary options to Build.PL or Build, and they
+            will be stored in the Module::Build object and can be accessed
+            via the "args()" method. However, sometimes you want more
+            flexibility out of your argument processing than this allows. In
+            such cases, use the "get_options" parameter to pass in a hash
+            reference of argument specifications, and the list of arguments
+            to Build.PL or Build will be processed according to those
+            specifications before they're passed on to "Module::Build"'s own
+            argument processing.
+
+            The supported option specification hash keys are:
+
+            type
+                The type of option. The types are those supported by
+                Getopt::Long; consult its documentation for a complete list.
+                Typical types are "=s" for strings, "+" for additive
+                options, and "!" for negatable options.
+
+            store
+                A reference to a scalar in which to store the value passed
+                to the option. If not specified, the value will be stored
+                under the option name in the hash returned by the "args()"
+                method.
+
+            default
+                A default value for the option. If no default value is
+                specified and no option is passed, then the option key will
+                not exist in the hash returned by "args()".
+
+            You can combine references to your own variables or subroutines
+            with unreferenced specifications, for which the result will also
+            be stored in the has returned by "args()". For example:
+
+             my $loud = 0;
+             my $build = Module::Build->new(
+                 module_name => 'Spangly',
+                 get_options => {
+                                  loud =>     { store => \$loud },
+                                  dbd  =>     { type  => '=s'   },
+                                  quantity => { type  => '+'    },
+                                }
+             );
+
+             print STDERR "HEY, ARE YOU LISTENING??\n" if $loud;
+             print "We'll use the ", $build->args('dbd'), " DBI driver\n";
+             print "Are you sure you want that many?\n"
+               if $build->args('quantity') > 2;
+
+            The arguments for such a specification can be called like so:
+
+             % perl Build.PL --loud --dbd=DBD::pg --quantity --quantity --quantity
+
+            WARNING: Any option specifications that conflict with
+            Module::Build's own options (defined by its properties) will
+            throw an exception.
+
+            Consult the Getopt::Long documentation for details on its usage.
+
+    args()
+          my $args_href = $build->args;
+          my %args = $build->args;
+          my $arg_value = $build->args($key);
+          $build->args($key, $value);
+
+        This method is the preferred interface for retreiving the arguments
+        passed via command-line options to Build.PL or Build, minus the
+        Module-Build specific options.
+
+        When called in in a scalar context with no arguments, this method
+        returns a reference to the hash storing all of the arguments; in an
+        array context, it returns the hash itself. When passed a single
+        argument, it returns the value stored in the args hash for that
+        option key. When called with two arguments, the second argument is
+        assigned to the args hash under the key passed as the first
+        argument.
+
     subclass()
         This creates a new "Module::Build" subclass on the fly, as described
         in the "SUBCLASSING" section. The caller must provide either a
@@ -812,6 +889,46 @@ METHODS
         Currently this checks whether the file has a line beginning with
         '=pod', '=head', or '=item', but the exact semantics may change in
         the future.
+
+    feature($name)
+    feature($name => $value)
+        With a single argument, returns true if the given feature is set.
+        With two arguments, sets the given feature to the given boolean
+        value. In this context, a "feature" is any optional functionality of
+        an installed module. For instance, if you write a module that could
+        optionally support a MySQL or PostgreSQL backend, you might create
+        features called "mysql_support" and "postgres_support", and set them
+        to true/false depending on whether the user has the proper databases
+        installed and configured.
+
+        Features set in this way using the Module::Build object will be
+        available for querying during the build/test process and after
+        installation via the generated "...::BuildConfig" module, as
+        "...::BuildConfig->feature($name)".
+
+        The "feature()" and "build_config()" methods represent
+        Module::Build's main support for configuration of installed modules.
+        See also "SAVING CONFIGURATION INFORMATION".
+
+    build_config($name)
+    build_config($name => $value)
+        With a single argument, returns the value of the configuration
+        variable $name. With two arguments, sets the given configuration
+        variable to the given value. The value may be any perl scalar that's
+        serializable with "Data::Dumper". For instance, if you write a
+        module that can use a MySQL or PostgreSQL backend, you might create
+        configuration variables called "mysql_connect" and
+        "postgres_connect", and set each to an array of connection
+        parameters for "DBI->connect()".
+
+        Configuration values set in this way using the Module::Build object
+        will be available for querying during the build/test process and
+        after installation via the generated "...::BuildConfig" module, as
+        "...::BuildConfig->config($name)".
+
+        The "feature()" and "build_config()" methods represent
+        Module::Build's main support for configuration of installed modules.
+        See also "SAVING CONFIGURATION INFORMATION".
 
 ACTIONS
     There are some general principles at work here. First, each task when
@@ -1145,100 +1262,119 @@ ACTIONS
         from the POD in those files. Under Unix, these are manual pages
         belonging to the 'man1' category.
 
-   installdirs
-    The default destinations for these installable things come from entries
-    in your system's "Config.pm". You can select from three different sets
-    of default locations by setting the "installdirs" parameter as follows:
+    Four other parameters let you control various aspects of how
+    installation paths are determined:
 
-                              'installdirs' set to:
-                       core          site                vendor
+    installdirs
+        The default destinations for these installable things come from
+        entries in your system's "Config.pm". You can select from three
+        different sets of default locations by setting the "installdirs"
+        parameter as follows:
+
+                                  'installdirs' set to:
+                           core          site                vendor
  
-                  uses the following defaults from Config.pm:
+                      uses the following defaults from Config.pm:
  
-     lib     => installprivlib  installsitelib      installvendorlib
-     arch    => installarchlib  installsitearch     installvendorarch
-     script  => installscript   installsitebin      installvendorbin
-     bin     => installbin      installsitebin      installvendorbin
-     libdoc  => installman3dir  installsiteman3dir  installvendorman3dir
-     bindoc  => installman1dir  installsiteman1dir  installvendorman1dir
+         lib     => installprivlib  installsitelib      installvendorlib
+         arch    => installarchlib  installsitearch     installvendorarch
+         script  => installscript   installsitebin      installvendorbin
+         bin     => installbin      installsitebin      installvendorbin
+         libdoc  => installman3dir  installsiteman3dir  installvendorman3dir
+         bindoc  => installman1dir  installsiteman1dir  installvendorman1dir
 
-    The default value of "installdirs" is "site". If you're creating vendor
-    distributions of module packages, you may want to do something like
-    this:
+        The default value of "installdirs" is "site". If you're creating
+        vendor distributions of module packages, you may want to do
+        something like this:
 
-     perl Build.PL installdirs=vendor
+         perl Build.PL installdirs=vendor
 
-    or
+        or
 
-     Build install installdirs=vendor
+         Build install installdirs=vendor
 
-    If you're installing an updated version of a module that was included
-    with perl itself (i.e. a "core module"), then you may set "installdirs"
-    to "core" to overwrite the module in its present location.
+        If you're installing an updated version of a module that was
+        included with perl itself (i.e. a "core module"), then you may set
+        "installdirs" to "core" to overwrite the module in its present
+        location.
 
-    (Note that the 'script' line is different from MakeMaker - unfortunately
-    there's no such thing as "installsitescript" or "installvendorscript"
-    entry in "Config.pm", so we use the "installsitebin" and
-    "installvendorbin" entries to at least get the general location right.
-    In the future, if "Config.pm" adds some more appropriate entries, we'll
-    start using those.)
+        (Note that the 'script' line is different from MakeMaker -
+        unfortunately there's no such thing as "installsitescript" or
+        "installvendorscript" entry in "Config.pm", so we use the
+        "installsitebin" and "installvendorbin" entries to at least get the
+        general location right. In the future, if "Config.pm" adds some more
+        appropriate entries, we'll start using those.)
 
-   install_path
-    Once the defaults have been set, you can override them. You can set
-    individual entries by using the "install_path" parameter:
+    install_path
+        Once the defaults have been set, you can override them. You can set
+        individual entries by using the "install_path" parameter:
 
-     my $m = Module::Build->new
-      (...other options...,
-       install_path => {lib  => '/foo/lib',
-                        arch => '/foo/lib/arch'});
+         my $m = Module::Build->new
+          (...other options...,
+           install_path => {lib  => '/foo/lib',
+                            arch => '/foo/lib/arch'});
 
-    On the command line, that would look like this:
+        On the command line, that would look like this:
 
-     perl Build.PL --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
+         perl Build.PL --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
 
-    or this:
+        or this:
 
-     Build install --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
+         Build install --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
 
-   install_base
-    You can also set the whole bunch of installation paths by supplying the
-    "install_base" parameter to point to a directory on your system. For
-    instance, if you set "install_base" to "/home/ken" on a Linux system,
-    you'll install as follows:
+    install_base
+        You can also set the whole bunch of installation paths by supplying
+        the "install_base" parameter to point to a directory on your system.
+        For instance, if you set "install_base" to "/home/ken" on a Linux
+        system, you'll install as follows:
 
-     lib     => /home/ken/lib
-     arch    => /home/ken/lib/i386-linux
-     script  => /home/ken/scripts
-     bin     => /home/ken/bin
-     libdoc  => /home/ken/man/man1
-     bindoc  => /home/ken/man/man3
+         lib     => /home/ken/lib
+         arch    => /home/ken/lib/i386-linux
+         script  => /home/ken/scripts
+         bin     => /home/ken/bin
+         bindoc  => /home/ken/man/man1
+         libdoc  => /home/ken/man/man3
 
-    Note that this is *different* from how MakeMaker's "PREFIX" parameter
-    works. "PREFIX" tries to create a mini-replica of a "site"-style
-    installation under the directory you specify, which is not always
-    possible (and the results are not always pretty in this case).
-    "install_base" just gives you a default layout under the directory you
-    specify, which may have little to do with the "installdirs=site" layout.
+        Note that this is *different* from how MakeMaker's "PREFIX"
+        parameter works. "PREFIX" tries to create a mini-replica of a
+        "site"-style installation under the directory you specify, which is
+        not always possible (and the results are not always pretty in this
+        case). "install_base" just gives you a default layout under the
+        directory you specify, which may have little to do with the
+        "installdirs=site" layout.
 
-    The exact layout under the directory you specify may vary by system - we
-    try to do the "sensible" thing on each platform.
+        The exact layout under the directory you specify may vary by system
+        - we try to do the "sensible" thing on each platform.
 
-   destdir
-    If you want to install everything into a temporary directory first (for
-    instance, if you want to create a directory tree that a package manager
-    like "rpm" or "dpkg" could create a package from), you can use the
-    "destdir" parameter:
+    destdir
+        If you want to install everything into a temporary directory first
+        (for instance, if you want to create a directory tree that a package
+        manager like "rpm" or "dpkg" could create a package from), you can
+        use the "destdir" parameter:
 
-     perl Build.PL destdir=/tmp/foo
+         perl Build.PL destdir=/tmp/foo
 
-    or
+        or
 
-     Build install destdir=/tmp/foo
+         Build install destdir=/tmp/foo
 
-    This will effectively install to "/tmp/foo/$sitelib",
-    "/tmp/foo/$sitearch", and the like, except that it will use "File::Spec"
-    to make the pathnames work correctly on whatever platform you're
-    installing on.
+        This will effectively install to "/tmp/foo/$sitelib",
+        "/tmp/foo/$sitearch", and the like, except that it will use
+        "File::Spec" to make the pathnames work correctly on whatever
+        platform you're installing on.
+
+SAVING CONFIGURATION INFORMATION
+    Module::Build provides a very convenient way to save configuration
+    information that your installed modules (or your regression tests) can
+    access. If your Build process calls the "feature()" or "build_config()"
+    methods, then a "Foo::Bar::BuildConfig" module will automatically be
+    created for you, where "Foo::Bar" is the "module_name" parameter as
+    passed to "new()". This module provides access to the data saved by
+    these methods, and a way to update the values. There is also a utility
+    script called "build_config" distributed with Module::Build that
+    provides a command-line interface to this same functionality. See also
+    the generated "Foo::Bar::BuildConfig" documentation, and the
+    "build_config" script's documentation, for more information.
 
 AUTOMATION
     One advantage of Module::Build is that since it's implemented as Perl
