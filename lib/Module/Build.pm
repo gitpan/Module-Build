@@ -1,6 +1,6 @@
 package Module::Build;
 
-# $Id $
+# $Id: Build.pm,v 1.23 2002/03/31 12:37:54 ken Exp $
 
 # This module doesn't do much of anything itself, it inherits from the
 # modules that do the real work.  The only real thing it has to do is
@@ -14,7 +14,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.05_01';
+$VERSION = '0.06';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -109,11 +109,13 @@ To install C<Module::Build>, and any other module that uses
 C<Module::Build> for its installation process, do the following:
 
    perl Build.PL
-   ./Build             # this script is created by 'perl Build.PL'
-   ./Build test
-   ./Build install
+   Build             # this script is created by 'perl Build.PL'
+   Build test
+   Build install
 
-Actions defined so far include:
+This illustrates initial configuration and the running of three
+'actions'.  In this case the actions run are 'build' (the default
+action), 'test', and 'install'.  Actions defined so far include:
 
   build                          help        
   clean                          install     
@@ -124,15 +126,17 @@ Actions defined so far include:
   disttest                       testdb      
   fakeinstall                                
 
+You can run the 'help' action for a complete list of actions.
 
 It's like the C<MakeMaker> metaphor, except that C<Build> is a short
 Perl script, not a long Makefile.  State is stored in a directory called
 C<_build/>.
 
-Any customization can be done simply by subclassing C<Module::Build> and
-adding a method called (for example) C<ACTION_test>, overriding the
-default action.  You could also add a method called C<ACTION_whatever>,
-and then you could perform the action C<./Build whatever>.
+Any customization can be done simply by subclassing C<Module::Build>
+and adding a method called (for example) C<ACTION_test>, overriding
+the default 'test' action.  You could also add a method called
+C<ACTION_whatever>, and then you could perform the action C<Build
+whatever>.
 
 More actions will certainly be added to the core - it should be easy
 to do everything that the MakeMaker process can do.  It's going to
@@ -145,9 +149,7 @@ C<ExtUtils::MakeMaker>, see L<Module::Build::Compat>.
 
 =head1 METHODS
 
-I list here some of the most important methods in the
-C<Module::Build>.  As the interface is still very unstable, I must ask
-that for now, you read the source to get more information on them.
+I list here some of the most important methods in C<Module::Build>.
 Normally you won't need to deal with these methods unless you want to
 subclass C<Module::Build>.  But since one of the reasons I created
 this module in the first place was so that subclassing is possible
@@ -199,6 +201,18 @@ more verbose value C<'E<gt>= 1.2, != 1.5, E<lt> 2.0'> means that
 C<Ken::Module>'s version must be B<at least> 1.2, B<less than> 2.0,
 and B<not equal to> 1.5.  The list of criteria is separated by commas,
 and all criteria must be satisfied.
+
+One note: currently we don't actually I<requre> the user to have these
+modules installed, we just strongly urge.  In the future we may
+require it.  There's now a C<recommended> section for things that
+aren't absolutely required.
+
+=item * recommended
+
+This is just like the C<prereq> argument, except that modules in this
+list aren't essential, just a good idea.  We'll just print a friendly
+warning if one of these modules aren't found, but we'll continue
+running.
 
 =item * c_source
 
@@ -327,25 +341,42 @@ actions too.
 
 =item * build
 
-This is analogous to the MakeMaker 'make' target with no arguments.
+If you run the C<Build> script without any arguments, it runs the
+C<build> action.
+
+This is analogous to the MakeMaker 'make all' target.
 By default it just creates a C<blib/> directory and copies any C<.pm>
 and C<.pod> files from your C<lib/> directory into the C<blib/>
 directory.  It also compiles any C<.xs> files from C<lib/> and places
 them in C<blib/>.  Of course, you need a working C compiler
-(preferably the same one that built perl itself) for this to work
+(probably the same one that built perl itself) for this to work
 properly.
 
-Note that in contrast to MakeMaker, this module only (currently)
-handles C<.pm>, C<.pod>, and C<.xs> files.  They must all be in the
-C<lib/> directory, in the directory structure that they should have
-when installed.
+The C<build> action also runs any C<.PL> files in your F<lib/>
+directory.  Typically these create other files, named the same but
+without the C<.PL> ending.  For example, a file F<lib/Foo/Bar.pm.PL>
+could create the file F<lib/Foo/Bar.pm>.  The C<.PL> files are
+processed first, so any C<.pm> files (or other kinds that we deal
+with) will get copied correctly.
 
-If you run the C<Build> script without any arguments, it runs the
-C<build> action.
+If your C<.PL> scripts don't create any files, or if they create files
+with unexpected names, or even if they create multiple files, you
+should tell us that so that we can clean up properly after these
+created files.  Use the C<PL_files> parameter to C<new()>:
 
-In future releases of C<Module::Build> the C<build> action should be
-able to process C<.PL> files.  The C<.xs> support is currently in
-alpha.  Please let me know if it works for you.
+ PL_files => { 'lib/Foo/Bar_pm.PL' => 'lib/Foo/Bar.pm',
+               'lib/something.PL'  => ['/lib/something', '/lib/else'],
+               'lib/funny.PL'      => [] }
+
+Note that in contrast to MakeMaker, the C<build> action only
+(currently) handles C<.pm>, C<.pod>, C<.PL>, and C<.xs> files.  They
+must all be in the C<lib/> directory, in the directory structure that
+they should have when installed.  We also handle C<.c> files that can
+be in the place of your choosing - see the C<c_source> argument to
+C<new()>.
+
+The C<.xs> support is currently in alpha.  Please let me know whether
+it works for you.
 
 =item * test
 
@@ -622,8 +653,8 @@ worrying about backward compatibility.
 
 Finally, Perl is said to be a language for system administration.
 Could it really be the case that Perl isn't up to the task of building
-and installing software?  Absolutely not - see the C<Cons> package for
-one example, at L<"http://www.dsmit.com/cons/"> .
+and installing software?  Even if that software is a bunch of stupid
+little C<.pm> files?  Are you getting riled up yet??
 
 =back
 
@@ -637,7 +668,7 @@ requires tracing all dependencies backward, it runs into problems on
 NFS, and it's just generally flimsy.  It would be better to use an MD5
 signature or the like, if available.  See C<cons> for an example.
 
-The current dependency-checking for .xs files is prone to errors.  You
+The current dependency-checking is prone to errors.  You
 can make 'widowed' files by doing C<Build>, C<perl Build.PL>, and then
 C<Build realclean>.  Should be easy to fix, but it's got me wondering
 whether the dynamic declaration of dependencies is a good idea.
@@ -645,6 +676,7 @@ whether the dynamic declaration of dependencies is a good idea.
 - make man pages and install them.
 - append to perllocal.pod
 - write .packlist in appropriate location (needed for un-install)
+- write dependency list in _build
 
 =head1 AUTHOR
 
