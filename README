@@ -113,7 +113,9 @@ METHODS
 
     new()
         Creates a new Module::Build object. Arguments to the new() method
-        are listed below. Most arguments are optional, but you must provide
+        are listed below. Unless otherwise documented, there's also a
+        corresponding get/set method on the "Module::Build" object to access
+        their values. Most arguments are optional, but you must provide
         either the "module_name" argument, or "dist_name" and one of
         "dist_version" or "dist_version_from". In other words, you must
         provide enough information to determine both a distribution name and
@@ -303,6 +305,18 @@ METHODS
             "dist_version_from" and put the result in the README file. This
             is by no means the only recommended style for writing a README,
             but it seems to be one common one used on the CPAN.
+
+        create_packlist
+            If true, this parameter tells Module::Build to create a
+            .packlist file during the "install" action, just like
+            ExtUtils::MakeMaker does. The file is created in a subdirectory
+            of the "arch" installation location. It is used by some other
+            tools (CPAN, CPANPLUS, etc.) for determining what files are part
+            of an install.
+
+            The default value is true. This parameter was introduced in
+            Module::Build version 0.2609; previously no packlists were ever
+            created by Module::Build.
 
         c_source
             An optional "c_source" argument specifies a directory which

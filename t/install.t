@@ -1,7 +1,7 @@
 use strict;
 
 use Test; 
-BEGIN { plan tests => 28 }
+BEGIN { plan tests => 29 }
 use Module::Build;
 use File::Spec;
 use File::Path;
@@ -39,6 +39,12 @@ $build->add_to_cleanup($destdir);
   local @INC = (@INC, File::Spec->catdir($destdir, $libdir));
   eval {require Sample};
   ok $@, '';
+
+  # Make sure there's a packlist installed
+  my $archdir = $build->install_destination('arch');
+  my ($v, $d) = File::Spec->splitpath($archdir, 1);
+  my $packlist = File::Spec->catdir($destdir, $d, 'auto', 'Sample', '.packlist');
+  ok -e $packlist, 1, "$packlist should be written";
 }
 
 {

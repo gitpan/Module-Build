@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.2608';
+$VERSION = '0.2609';
 $VERSION = eval $VERSION;
 
 # Okay, this is the brute-force method of finding out what kind of
@@ -218,7 +218,9 @@ stabilizes.
 =item new()
 
 Creates a new Module::Build object.  Arguments to the new() method are
-listed below.  Most arguments are optional, but you must provide
+listed below.  Unless otherwise documented, there's also a
+corresponding get/set method on the C<Module::Build> object to access
+their values.  Most arguments are optional, but you must provide
 either the C<module_name> argument, or C<dist_name> and one of
 C<dist_version> or C<dist_version_from>.  In other words, you must
 provide enough information to determine both a distribution name and
@@ -426,6 +428,18 @@ use C<Pod::Text> on the file indicated by C<dist_version_from> and put
 the result in the F<README> file.  This is by no means the only
 recommended style for writing a README, but it seems to be one common
 one used on the CPAN.
+
+=item create_packlist
+
+If true, this parameter tells Module::Build to create a F<.packlist>
+file during the C<install> action, just like ExtUtils::MakeMaker does.
+The file is created in a subdirectory of the C<arch> installation
+location.  It is used by some other tools (CPAN, CPANPLUS, etc.) for
+determining what files are part of an install.
+
+The default value is true.  This parameter was introduced in
+Module::Build version 0.2609; previously no packlists were ever
+created by Module::Build.
 
 =item c_source
 
