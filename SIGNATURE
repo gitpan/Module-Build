@@ -15,13 +15,13 @@ not run its Makefile.PL or Build.PL.
 Hash: SHA1
 
 SHA1 21ca54124abfb59c43b072dbd15cf192d9702048 Build.PL
-SHA1 b320f271eab38c189d1b2eee7fb3b07b06d4d632 Changes
+SHA1 c778a8591c122119eb7836ae01a961b6af482425 Changes
 SHA1 7ffbdcf27feba9f2ea5e3800f378835b0c3154a2 INSTALL
 SHA1 f33cc1c1ecfebc11065cd31d90a8b2757a9f19ad MANIFEST
-SHA1 c1c149960d67cb9f0313b408a8e26ee69c3dc350 META.yml
+SHA1 289549217791bc3090e1711878c985d8973c9408 META.yml
 SHA1 709de66c0beb8832da066b9f865d8693db5eb504 Makefile.PL
 SHA1 f719356e7cf3ebe89f1384344a27b3d99dcfa851 README
-SHA1 fce65e2e201f318159353de2c146392c7536667c lib/Module/Build.pm
+SHA1 a32d51b8d32e318324f1c6e4baa3892372a0f91b lib/Module/Build.pm
 SHA1 acebe3eafbd12dd73a668c70b9f3bdc2e39cbac6 lib/Module/Build/Base.pm
 SHA1 55f1e27c6b82f31b510d1271647fa84a5fc78b3e lib/Module/Build/Compat.pm
 SHA1 864781d62840a87229f38f2e6cbd9cc8ea21de89 lib/Module/Build/Cookbook.pm
@@ -30,12 +30,12 @@ SHA1 1fe1ca7ad1f147c90cfa1b7bafde1a4517994d78 lib/Module/Build/Platform/Amiga.pm
 SHA1 1413589413096217b3e0d6dd1993f82a1f95216c lib/Module/Build/Platform/Default.pm
 SHA1 e62cd8b2c99ccc4d615fb9343910b25c2ec1b74c lib/Module/Build/Platform/EBCDIC.pm
 SHA1 2a7723e3030e25f3862865722f1c4822e08e00c1 lib/Module/Build/Platform/MPEiX.pm
-SHA1 c5ac437b03654d01c83dd8adbedf03b521502aa7 lib/Module/Build/Platform/MacOS.pm
+SHA1 a956cf58c0ac7a31c5e45a239c5dcc09c01627a3 lib/Module/Build/Platform/MacOS.pm
 SHA1 8f70f897d4f6fe8e3a826e2109a2e7f551a07933 lib/Module/Build/Platform/RiscOS.pm
 SHA1 441cfc4b3a9ff6093ce7a356d4f20ace06a7435b lib/Module/Build/Platform/Unix.pm
 SHA1 6d61a37998276e77fbe00c52d1e23cb6cbb8738e lib/Module/Build/Platform/VMS.pm
 SHA1 e6a23eea2e080113d360078d7440fde3ec44a6f6 lib/Module/Build/Platform/VOS.pm
-SHA1 14e3eb112df00bb9c48ce8475619f871a9cd2d4c lib/Module/Build/Platform/Windows.pm
+SHA1 a011eca15f9708a361c6a3ad04c21f5123d09043 lib/Module/Build/Platform/Windows.pm
 SHA1 e6dca6cc5477e9697a7a83a33f8bc042929e20bc lib/Module/Build/Platform/aix.pm
 SHA1 dc62cfd31e74bf0320b7ff87d10a65992d1f5062 lib/Module/Build/Platform/cygwin.pm
 SHA1 2c131caaa8af6c27362bd4256a51a4a4fad67e26 lib/Module/Build/Platform/darwin.pm
@@ -45,7 +45,7 @@ SHA1 0e46514e13c624d0482645e9c43db2ae058ab621 scripts/config_data
 SHA1 da39a3ee5e6b4b0d3255bfef95601890afd80709 t/MANIFEST
 SHA1 e4a8fef58cb2ae43255ec6c5770b65af9904d29a t/Sample/Build.PL
 SHA1 62c8cb035cdc7856bb22c17ebabe5dee996741f8 t/Sample/MANIFEST
-SHA1 d0a8cf8a4cd4d118969295aaa1a7f7d7ed817f1e t/Sample/META.yml
+SHA1 c4506aeeaa6e6759f1e691b0f40fc133b8d38d9b t/Sample/META.yml
 SHA1 3312164e04d55d9673543d4fa5ed5762568a88ab t/Sample/bin/sample.pl
 SHA1 db0fe43e93fc01be595fd3205ef00d724fbbf7e1 t/Sample/lib/Sample.pm
 SHA1 5214d81ceb135e0733bd4debd6b0c02c4e4842c6 t/Sample/lib/Sample/Docs.pod
@@ -78,7 +78,7 @@ SHA1 08a3d4730b676656e58b693e2838191aaec077a6 t/xs.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.2.2 (Darwin)
 
-iD8DBQFBiZH4grvMBLfvlHYRAkHPAJ9lWVvtADzq2CmO/ro2l/n//jZMkgCfT175
-Nw15mQT5f7xNqhUKg+BF6Uw=
-=IoKf
+iD8DBQFBimgwgrvMBLfvlHYRAjBLAJ9tC6hjLuh79RVvOAYO9C8UQBTeEgCgrRAs
+kNg+59ILosmgkZ9GYHwsDM4=
+=a1PZ
 -----END PGP SIGNATURE-----
