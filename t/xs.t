@@ -3,7 +3,7 @@
 use strict;
 use Test;
 
-BEGIN { plan tests => 6 }
+BEGIN { plan tests => 7 }
 
 use Module::Build;
 use File::Spec;
@@ -22,15 +22,17 @@ my $m = new Module::Build
 ok(1);
 
 eval {$m->dispatch('clean')};
-ok !$@;
+ok $@, '';
 
 eval {$m->dispatch('build')};
-ok !$@;
+ok $@, '';
 
 # We can't be verbose in the sub-test, because Test::Harness will think that the output is for the top-level test.
 eval {$m->dispatch('test')};
-ok !$@;
+ok $@, '';
 
 eval {$m->dispatch('realclean')};
-ok !$@;
+ok $@, '';
 
+# Make sure blib/ is gone after 'realclean'
+ok not -e 'blib';
