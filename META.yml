@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: Module-Build
-version: 0.14
+version: 0.15
 license: perl
 distribution_type: module
 requires:
@@ -23,4 +23,4 @@ recommends:
 build_requires:
   Test: 0
 conflicts: {}
-generated_by: Module::Build version 0.14
+generated_by: Module::Build version 0.15
