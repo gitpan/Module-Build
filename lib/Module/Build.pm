@@ -9,8 +9,12 @@ package Module::Build;
 # done in Module::Build::Base.
 
 use strict;
+use File::Spec ();
+use File::Path ();
+use File::Basename ();
+
 use vars qw($VERSION @ISA);
-$VERSION = '0.04_01';
+$VERSION = '0.05';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -55,8 +59,6 @@ my %OSTYPES = qw(
 		 mpeix     MPEiX
 		);
 
-use File::Spec;
-
 # We only use this once - don't waste a symbol table entry on it.
 # More importantly, don't make it an inheritable method.
 my $load = sub {
@@ -79,16 +81,6 @@ if (grep {-e File::Spec->catfile($_, qw(Module Build Platform), $^O) . '.pm'} @I
 }
 
 sub os_type { $OSTYPES{$^O} }
-
-# XXX This doesn't work yet - it'll allow easier subclassing of Module::Build
-sub import {
-  my $pack = shift;
-  return $pack->SUPER::import unless @_;
-  my %opts = @_;
-  if ($opts{custom}) {
-    
-  }
-}
 
 1;
 __END__
@@ -147,6 +139,9 @@ to do everything that the MakeMaker process can do.  It's going to
 take some time, though.  In the meantime, I may implement some
 pass-through functionality so that unknown actions are passed to
 MakeMaker.
+
+For information on providing backward compatibility with
+C<ExtUtils::MakeMaker>, see L<Module::Build::Compat>.
 
 =head1 METHODS
 
@@ -261,6 +256,33 @@ whatever is appropriate.  If you're running on an unknown platform, it
 will return C<undef> - there shouldn't be many unknown platforms
 though.
 
+=head2 $m->check_installed_version($module, $version)
+
+This method returns true or false, depending on whether (at least)
+version C<$version> of module C<$module> is installed.  The C<$module>
+argument is given as a string like C<"Data::Dumper">, and the
+C<$version> argument can take any of the forms described in L<prereq>
+above.  This allows very fine-grained version checking.
+
+If the check fails, we return false and set C<$@> to an informative
+error message.
+
+If the check succeeds, the return value is the actual version of
+C<$module> installed on the system.  This allows you to do the
+following:
+
+ my $installed = $m->check_installed_version('DBI', '1.15');
+ if ($installed) {
+   print "Congratulations, version $installed of DBI is installed.\n";
+ } else {
+   die "Sorry, you must install DBI.\n";
+ }
+
+If C<$version> is any nontrue value (notably zero) and any version of
+C<$module> is installed, we return true.  In this case, if C<$module>
+doesn't define a version, or if its version is zero, we return the
+special value "0 but true", which is numerically zero, but logically
+true.
 
 =head1 ACTIONS
 
@@ -484,11 +506,52 @@ Here is the parent-child class hierarchy in classy ASCII art:
    |   Module::Build::Base    |  (Most of the functionality of 
    \--------------------------/   Module::Build is defined here.)
 
+=head1 SUBCLASSING
 
-Right now, if you want to subclass Module::Build you must do so by
-including an actual .pm file somewhere in your distribution.  There
-will be much better ways to do this in the future.  Can't do
-everything at once...
+Right now, there are two ways to subclass Module::Build.  The first
+way is to create a regular module (in a C<.pm> file) that inherits
+from Module::Build, and use that module's class instead of using
+Module::Build directly:
+
+  ------ in Build.PL: ----------
+  #!/usr/bin/perl
+  
+  use lib qw(/nonstandard/library/path);
+  use My::Builder;  # Or whatever you want to call it
+  
+  my $m = My::Builder->new(module_name => 'Next::Big::Thing');
+  $m->create_build_script;
+
+This is relatively straightforward, and is the best way to do things
+if your My::Builder class contains lots of code.  The
+C<create_build_script()> method will ensure that the current value of
+C<@INC> (including the C</nonstandard/library/path>) is propogated to
+the Build script, so that My::Builder can be found when running build
+actions.
+
+For very small additions, Module::Build provides a C<subclass()>
+method that lets you subclass Module::Build more conveniently, without
+creating a separate file for your module:
+
+  ------ in Build.PL: ----------
+  #!/usr/bin/perl
+  
+  my $class = Module::Build->subclass
+    (
+     class => 'My::Builder',
+     code => q{
+      sub ACTION_foo {
+        print "I'm fooing to death!\n";
+      }
+     },
+    );
+  
+  my $m = $class->new(module_name => 'Module::Build');
+  $m->create_build_script;
+
+Behind the scenes, this actually does create a C<.pm> file, since the
+code you provide must persist after Build.PL is run if it is to be
+very useful.
 
 
 =head1 MOTIVATIONS
@@ -555,18 +618,6 @@ one example, at L<"http://www.dsmit.com/cons/"> .
 Please contact me if you have any questions or ideas.
 
 =head1 TO DO
-
-Need to implement a prerequisite mechanism, similar to MakeMaker's
-C<PREREQ_PM> stuff.
-
-There will also be a subclassing mechanism that doesn't require as
-much module infrastructure to use.  Something like this:
-
- use Module::Build subclass => <<'EOF';
-  sub ACTION_foo {
-    ... implement the 'foo' action ...
-  }
- EOF
 
 The current method of relying on time stamps to determine whether a
 derived file is out of date isn't likely to scale well, since it
