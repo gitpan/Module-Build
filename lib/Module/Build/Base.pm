@@ -14,8 +14,46 @@ use IO::File ();
 
 #################### Constructors ###########################
 sub new {
-  my $package = shift;
-  my %input = @_;
+  my $self = shift()->_construct(@_);
+
+  $self->cull_args(@ARGV);
+  
+  die "Too early to specify a build action '$self->{action}'.  Do 'Build $self->{action}' instead.\n"
+    if $self->{action};
+
+  $self->_set_install_paths;
+  $self->dist_name;
+  $self->check_manifest;
+  $self->check_prereq;
+  $self->dist_version;
+
+  return $self;
+}
+
+sub resume {
+  my $self = shift()->_construct(@_);
+  
+  $self->read_config;
+  
+  my $perl = $self->find_perl_interpreter;
+  warn(" * WARNING: Configuration was initially created with '$self->{properties}{perl}',\n".
+       "   but we are now using '$perl'.\n")
+    unless $perl eq $self->{properties}{perl};
+  
+  $self->cull_args(@ARGV);
+  $self->{action} ||= 'build';
+  
+  return $self;
+}
+
+sub current {
+  # hmm, wonder what the right thing to do here is
+  local @ARGV;
+  return shift()->resume;
+}
+
+sub _construct {
+  my ($package, %input) = @_;
 
   my $args   = delete $input{args}   || {};
   my $config = delete $input{config} || {};
@@ -56,49 +94,10 @@ sub new {
   $p->{requires} = delete $p->{prereq} if exists $p->{prereq};
   $p->{script_files} = delete $p->{scripts} if exists $p->{scripts};
 
-  $self->cull_args(@ARGV);
-  
-  die "Too early to specify a build action '$self->{action}'.  Do 'Build $self->{action}' instead.\n"
-    if $self->{action};
-
   $self->add_to_cleanup( @{delete $p->{add_to_cleanup}} )
     if $p->{add_to_cleanup};
   
-  $self->_set_install_paths;
-  $self->dist_name;
-  $self->check_manifest;
-  $self->check_prereq;
-  $self->dist_version;
-
   return $self;
-}
-
-sub resume {
-  my $package = shift;
-  my $self = bless {@_}, $package;
-  
-  $self->read_config;
-  
-  my $perl = $self->find_perl_interpreter;
-  warn(" * WARNING: Configuration was initially created with '$self->{properties}{perl}',\n".
-       "   but we are now using '$perl'.\n")
-    unless $perl eq $self->{properties}{perl};
-  
-  $self->cull_args(@ARGV);
-  $self->{action} ||= 'build';
-  
-  return $self;
-}
-
-sub current {
-  my $package = shift;
-  # hmm, wonder what the right thing to do here is
-  local @ARGV;
-  return $package->resume(
-			  properties => {
-					 config_dir => '_build',
-					},
-			 );
 }
 
 ################## End constructors #########################
@@ -496,8 +495,8 @@ sub cleanup {
 
 sub config_file {
   my $self = shift;
-  return unless -d $self->{properties}{config_dir};
-  return File::Spec->catfile($self->{properties}{config_dir}, @_);
+  return unless -d $self->config_dir;
+  return File::Spec->catfile($self->config_dir, @_);
 }
 
 sub read_config {
@@ -991,7 +990,7 @@ sub ACTION_test {
 
   if (@$tests) {
     # Work around a Test::Harness bug that loses the particular perl we're running under
-    local $^X = $self->{config}{perlpath} unless $Test::Harness::VERSION gt '2.01';
+    local $^X = $p->{perl} unless $Test::Harness::VERSION gt '2.01';
     Test::Harness::runtests(@$tests);
   } else {
     print("No tests defined.\n");
@@ -1094,7 +1093,10 @@ sub process_xs_files {
   my $self = shift;
   my $files = $self->find_xs_files;
   while (my ($from, $to) = each %$files) {
-    $self->copy_if_modified( from => $from, to => $to ) unless $from eq $to;
+    unless ($from eq $to) {
+      $self->add_to_cleanup($to);
+      $self->copy_if_modified( from => $from, to => $to );
+    }
     $self->process_xs($to);
   }
 }
@@ -1417,7 +1419,7 @@ sub ACTION_clean {
 sub ACTION_realclean {
   my ($self) = @_;
   $self->depends_on('clean');
-  $self->delete_filetree($self->{properties}{config_dir}, $self->{properties}{build_script});
+  $self->delete_filetree($self->config_dir, $self->build_script);
 }
 
 sub ACTION_ppd {
@@ -1507,7 +1509,7 @@ sub ACTION_distdir {
   my $dist_dir = $self->dist_dir;
   $self->delete_filetree($dist_dir);
   $self->add_to_cleanup($dist_dir);
-  ExtUtils::Manifest::manicopy($dist_files, $dist_dir, 'best');
+  ExtUtils::Manifest::manicopy($dist_files, $dist_dir, 'cp');
   warn "*** Did you forget to add $self->{metafile} to the MANIFEST?\n" unless exists $dist_files->{$self->{metafile}};
   
   $self->_sign_dir($dist_dir) if $self->{properties}{sign};
@@ -1595,6 +1597,9 @@ sub ACTION_distmeta {
     };
 
   $node->{generated_by} = "Module::Build version " . Module::Build->VERSION;
+  
+  # If we're in the distdir, the metafile may exist and be non-writable.
+  $self->delete_filetree($self->{metafile});
 
   # YAML API changed after version 0.30
   my $yaml_sub = $YAML::VERSION le '0.30' ? \&YAML::StoreFile : \&YAML::DumpFile;
@@ -1816,8 +1821,9 @@ sub compile_xs {
     
     my $typemap =  $self->find_module_by_name('ExtUtils::typemap', \@INC);
     my $cf = $self->{config};
+    my $perl = $self->{properties}{perl};
     
-    my $command = (qq{$^X "-I$cf->{installarchlib}" "-I$cf->{installprivlib}" "$xsubpp" -noprototypes } .
+    my $command = (qq{$perl "-I$cf->{installarchlib}" "-I$cf->{installprivlib}" "$xsubpp" -noprototypes } .
 		   qq{-typemap "$typemap" "$file"});
     
     print $command;
