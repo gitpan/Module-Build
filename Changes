@@ -1,8 +1,36 @@
 Revision history for Perl extension Module::Build.
 
+0.18  Tue Apr  8 13:24:23 CDT 2003
+
+ - We now rewrite the shebang lines of scripts ourselves, rather than
+   relying on MakeMaker routines to do it.  MakeMaker changed the way
+   this happened (not the result, but where the code lived) a few
+   times.  [Suggested by Richard Clamp]
+
+ - The scripts() method has changed to script_files(), and likewise
+   the 'scripts' parameter has changed to 'script_files'.  The old
+   names can still be used for backward compatibility.
+
+ - Support for the 'scripts' parameter (which is now 'script_files')
+   was broken in 0.17, now it's fixed.  [Richard Clamp]
+
+ - We now recommend ExtUtils::ParseXS 2.02, which will fail to load
+   with perl 5.005 or earlier (which is proper, because it doesn't
+   work with those versions).  When it fails to load, we still fall
+   back to using the xsubpp script for XS parsing. [spotted by Dave
+   Rolsky, fix suggested by Richard Clamp]
+
+ - Now works on VMS - the Build script's shebang-line-equivalent
+   wasn't being formed correctly there - though just about everything
+   else worked fine.  [Tested & patched by Michael Schwern]
+
+ - Eliminated a warning that occurred if 'perl Build.PL' or the
+   check_installed_status() method was run with -w.  [Spotted by
+   Michael Schwern]
+
 0.17  Sat Mar 29 18:06:01 CST 2003
 
- - Now works under perl 5.005_03.  [Richard Cramp]
+ - Now works under perl 5.005_03.  [Richard Clamp]
 
  - When building blib/ , .PL files are now processed before doing
    anything else.  This means .PL files can be used in any of the

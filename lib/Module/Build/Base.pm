@@ -1,6 +1,6 @@
 package Module::Build::Base;
 
-# $Id: Base.pm,v 1.77 2003/03/29 21:30:05 kwilliams Exp $
+# $Id: Base.pm,v 1.86 2003/04/06 04:45:14 kwilliams Exp $
 
 use strict;
 BEGIN { require 5.00503 }
@@ -64,7 +64,7 @@ sub new {
 				   recommends => {},
 				   build_requires => {},
 				   conflicts => {},
-				   scripts => [],
+				   script_files => [],
 				   perl => $perl,
 				   %input,
 				   %$cmd_properties,
@@ -74,6 +74,7 @@ sub new {
 
   # Synonyms
   $p->{requires} = delete $p->{prereq} if exists $p->{prereq};
+  $p->{script_files} = delete $p->{scripts} if exists $p->{scripts};
 
   # Shortcuts
   if (exists $p->{module_name}) {
@@ -160,6 +161,18 @@ sub resume {
        "   but we are now using '$perl'.\n")
     unless $perl eq $self->{properties}{perl};
   
+
+  ($self->{action}, my $args) = $self->cull_args(@ARGV);
+  $self->{action} ||= 'build';
+  
+  # Extract our 'properties' from $args
+  my %p;
+  foreach my $key (keys %$args) {
+    $p{$key} = delete $args->{$key} if __PACKAGE__->valid_property($key);
+  }
+  $self->{args} = {%{$self->{args}}, %$args};
+  $self->{properties} = {%{$self->{properties}}, %p};
+
   return $self;
 }
 
@@ -174,7 +187,7 @@ sub resume {
        requires
        recommends
        PL_files
-       scripts
+       script_files
        perl
        config_dir
        build_script
@@ -209,7 +222,7 @@ sub subclass {
   File::Path::mkpath($filedir);
   die "Can't create directory $filedir: $!" unless -d $filedir;
   
-  open my($fh), ">$filename" or die "Can't create $filename: $!";
+  my $fh = IO::File->new("> $filename") or die "Can't create $filename: $!";
   print $fh <<EOF;
 package $opts{class};
 use Module::Build;
@@ -426,6 +439,7 @@ sub check_installed_status {
       my ($op, $version) = ($1, $2);
       $_ = "$op " . $self->perl_version_to_float($version);
     }
+    next if $_ eq '>= 0';  # Module doesn't have to actually define a $VERSION
     unless (eval "\$status{have} $_") {
       $status{message} = "Version $status{have} is installed, but we need version $_";
       return \%status;
@@ -479,9 +493,10 @@ sub print_build_script {
   my $quoted_INC = join ', ', map "'$_'", @myINC;
 
   print $fh <<EOF;
-$self->{config}{startperl} -w
+$self->{config}{startperl}
 
 BEGIN {
+  \$^W = 1;  # Use warnings
   chdir('$base_dir') or die 'Cannot chdir to $base_dir: '.\$!;
   \@INC = ($quoted_INC);
 }
@@ -542,22 +557,13 @@ sub check_manifest {
 sub dispatch {
   my $self = shift;
   
-  my (%p, $args, $action);
   if (@_) {
-    ($action, %p) = @_;
-    $args = $p{args} ? delete($p{args}) : {};
-  } else {
-    ($action, $args) = $self->cull_args(@ARGV);
-
-    # Extract our 'properties' from $args
-    foreach my $key (keys %$args) {
-      $p{$key} = delete $args->{$key} if __PACKAGE__->valid_property($key);
-    }
+    ($self->{action}, my %p) = @_;
+    my $args = $p{args} ? delete($p{args}) : {};
+    
+    $self->{args} = {%{$self->{args}}, %$args};
+    $self->{properties} = {%{$self->{properties}}, %p};
   }
-
-  $self->{action} = $action || 'build';
-  $self->{args} = {%{$self->{args}}, %$args};
-  $self->{properties} = {%{$self->{properties}}, %p};
 
   my $method = "ACTION_$self->{action}";
   print("No action '$self->{action}' defined.\n"), return unless $self->can($method);
@@ -782,11 +788,59 @@ sub process_script_files {
   
   foreach my $file (@$files) {
     my $result = $self->copy_if_modified($file, $script_dir, 'flatten') or next;
-    require ExtUtils::MM;
-    ExtUtils::MM->fixin($result);
+    $self->fix_shebang_line($result);
     $self->make_executable($result);
   }
 }
+
+sub fix_shebang_line { # Adapted from fixin() in ExtUtils::MM_Unix 1.35
+  my ($self, @files) = @_;
+  my $c = $self->{config};
+  
+  my ($does_shbang) = $c->{sharpbang} =~ /^\s*\#\!/;
+  for my $file (@files) {
+    my $FIXIN = IO::File->new($file) or die "Can't process '$file': $!";
+    local $/ = "\n";
+    chomp(my $line = <$FIXIN>);
+    next unless $line =~ s/^\s*\#!\s*//;     # Not a shbang file.
+    
+    my ($cmd, $arg) = (split(' ', $line, 2), '');
+    my $interpreter = $self->{properties}{perl};
+    
+    print STDOUT "Changing sharpbang in $file to $interpreter" if $self->{verbose};
+    my $shb = '';
+    $shb .= "$c->{sharpbang}$interpreter $arg\n" if $does_shbang;
+    
+    # I'm not smart enough to know the ramifications of changing the
+    # embedded newlines here to \n, so I leave 'em in.
+    $shb .= qq{
+eval 'exec $interpreter $arg -S \$0 \${1+"\$\@"}'
+    if 0; # not running under some shell
+} unless $self->os_type eq 'Windows'; # this won't work on win32, so don't
+    
+    my $FIXOUT = IO::File->new(">$file.new")
+      or die "Can't create new $file: $!\n";
+    
+    # Print out the new #! line (or equivalent).
+    local $\;
+    undef $/; # Was localized above
+    print $FIXOUT $shb, <$FIXIN>;
+    close $FIXIN;
+    close $FIXOUT;
+    
+    rename($file, "$file.bak")
+      or die "Can't rename $file to $file.bak: $!";
+    
+    rename("$file.new", $file)
+      or die "Can't rename $file.new to $file: $!";
+    
+    unlink "$file.bak"
+      or warn "Couldn't clean up $file.bak, leaving it there";
+    
+    $self->do_system($c->{eunicefix}, $file) if $c->{eunicefix} ne ':';
+  }
+}
+
 
 sub ACTION_manifypods {
   my $self = shift;
@@ -989,13 +1043,14 @@ sub dist_dir {
   return "$self->{properties}{dist_name}-$self->{properties}{dist_version}";
 }
 
-sub scripts {
+sub script_files {
   my $self = shift;
   if (@_) {
-    $self->{properties}{scripts} = ref($_[0]) ? $_[0] : [@_];
+    $self->{properties}{script_files} = ref($_[0]) ? $_[0] : [@_];
   }
-  return $self->{properties}{scripts};
+  return $self->{properties}{script_files};
 }
+*scripts = \&script_files;
 
 sub valid_licenses {
   return { map {$_, 1} qw(perl gpl artistic lgpl bsd open_source unrestricted restrictive unknown) };
@@ -1030,10 +1085,45 @@ sub write_metadata {
     $node->{$_} = $p->{$_} if exists $p->{$_};
   }
   
+  $node->{provides} = $self->find_dist_packages
+    or do {
+      warn "Module::Info was not available, no 'provides' will be created in $file";
+      delete $node->{provides};
+    };
+
   $node->{generated_by} = "Module::Build version " . Module::Build->VERSION;
 
   return YAML::StoreFile($file, $node ) if $YAML::VERSION le '0.30';
   return YAML::DumpFile( $file, $node );
+}
+
+sub find_dist_packages {
+  my $self = shift;
+  
+  # Only packages in .pm files are candidates for inclusion here.
+  require ExtUtils::Manifest;
+  my $dist_files = ExtUtils::Manifest::maniread('MANIFEST');
+  my @pm_files = sort grep /\.pm$/, keys %$dist_files;
+  
+  my %out;
+  foreach my $file (@pm_files) {
+    next if $file =~ m{^t/};  # Skip things in t/
+    
+    return unless eval {require Module::Info; Module::Info->VERSION(0.19); 1};
+    
+    my $localfile = File::Spec->catfile( split m{/}, $file );
+    my $module = Module::Info->new_from_file( $localfile );
+
+    print "Scanning $localfile for packages\n";
+    my %packages = $module->package_versions;
+    while (my ($package, $version) = each %packages) {
+      $out{$package} = {
+			file => $file,
+			version => $version,
+		       };
+    }
+  }
+  return \%out;
 }
 
 sub make_tarball {
@@ -1056,7 +1146,7 @@ sub install_map {
 	     $arch => $self->{config}{sitearch});
   
   $map{$script} = $self->{config}{installscript}
-    if @{$self->{properties}{scripts}};
+    if @{$self->{properties}{script_files}};
   
   if (length(my $destdir = $self->{properties}{destdir} || '')) {
     $_ = File::Spec->catdir($destdir, $_) foreach values %map;
@@ -1171,7 +1261,7 @@ sub compile_xs {
 		   qq{-typemap "$typemap" "$file"});
     
     print $command;
-    open my($fh), "> $file_base.c" or die "Couldn't write $file_base.c: $!";
+    my $fh = IO::File->new("> $file_base.c") or die "Couldn't write $file_base.c: $!";
     print $fh `$command`;
     close $fh;
   }
