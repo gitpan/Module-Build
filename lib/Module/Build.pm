@@ -12,7 +12,7 @@ use File::Path ();
 use File::Basename ();
 
 use vars qw($VERSION @ISA);
-$VERSION = '0.20';
+$VERSION = '0.20_01';
 
 # Okay, this is the brute-force method of finding out what kind of
 # platform we're on.  I don't know of a systematic way.  These values
@@ -569,6 +569,15 @@ or URLs, to be used as the value for the C<< <CODEBASE> >> tag in the
 generated PPD.
 
 =back
+
+=item subclass()
+
+This creates a new C<Module::Build> subclass on the fly, as described
+in the L<SUBCLASSING> section.  The caller must provide either a
+C<class> or C<code> parameter, or both.  The C<class> parameter
+indicates the name to use for the new subclass, and defaults to
+C<MyModuleBuilder>.  The C<code> parameter specifies Perl code to use
+as the body of the subclass.
 
 =item create_build_script()
 
@@ -1391,6 +1400,8 @@ creating a separate file for your module:
 Behind the scenes, this actually does create a C<.pm> file, since the
 code you provide must persist after Build.PL is run if it is to be
 very useful.
+
+See also the documentation for the C<subclass()> method.
 
 
 =head1 MOTIVATIONS

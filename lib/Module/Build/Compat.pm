@@ -13,7 +13,7 @@ my %makefile_to_build =
    VERBINST     => 'verbose',
    INC     => sub { map "extra_compiler_flags=-I$_", Module::Build->split_like_shell(shift) },
    POLLUTE => sub { 'extra_compiler_flags=-DPERL_POLLUTE' },
-   INSTALLDIRS => sub {local $_ = shift; 'installdirs=' . /^perl$/ ? 'core' : $_ }
+   INSTALLDIRS => sub {local $_ = shift; 'installdirs=' . (/^perl$/ ? 'core' : $_) }
   );
 
 sub create_makefile_pl {
@@ -96,7 +96,9 @@ sub makefile_to_build_args {
   shift;
   my @out;
   foreach my $arg (@_) {
-    my ($key, $val) = $arg =~ /^(\w+)=(.+)/ or die "Malformed argument '$arg'";
+    my ($key, $val) = ($arg =~ /^(\w+)=(.+)/ ? ($1, $2) :
+		       $arg =~ /^(verbose)$/ ? ($1, 1)  :
+		       die "Malformed argument '$arg'");
     if (exists $Config{lc($key)}) {
       push @out, 'config=' . lc($key) . "=$val";
     } elsif (exists $makefile_to_build{$key}) {

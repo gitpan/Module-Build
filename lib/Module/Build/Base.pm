@@ -86,7 +86,7 @@ sub _construct {
 				  },
 		   }, $package;
 
-  my $p = $self->{properties};
+  my ($p, $c) = ($self->{properties}, $self->{config});
   $p->{bindoc_dirs} ||= [ "$p->{blib}/script" ];
   $p->{libdoc_dirs} ||= [ "$p->{blib}/lib", "$p->{blib}/arch" ];
 
@@ -96,6 +96,12 @@ sub _construct {
 
   $self->add_to_cleanup( @{delete $p->{add_to_cleanup}} )
     if $p->{add_to_cleanup};
+
+  # perl 5.8.1-RC[1-3] had some broken %Config entries, and
+  # unfortunately Red Hat 9 shipped it like that.  Fix 'em up here.
+  for (qw(siteman1 siteman3 vendorman1 vendorman3)) {
+    $c->{"install${_}dir"} ||= $c->{"install${_}"};
+  }
   
   return $self;
 }
@@ -440,11 +446,8 @@ sub _persistent_hash_write {
   if (my $file = $self->config_file($name)) {
     return if -e $file and !keys %{ $ph->{new} };  # Nothing to do
     
-    local $Data::Dumper::Terse = 1;
-    my $fh = IO::File->new("> $file") or die "Can't write to $file: $!";
     @{$ph->{disk}}{ keys %{$ph->{new}} } = values %{$ph->{new}};  # Merge
-    print $fh Data::Dumper::Dumper($ph->{disk});
-    close $fh;
+    $self->_write_dumper($name, $ph->{disk});
     
     $ph->{new} = {};
   }
@@ -515,24 +518,24 @@ sub read_config {
   }
 }
 
+sub _write_dumper {
+  my ($self, $filename, $data) = @_;
+  
+  my $file = $self->config_file($filename);
+  my $fh = IO::File->new("> $file") or die "Can't create '$file': $!";
+  local $Data::Dumper::Terse = 1;
+  print $fh Data::Dumper::Dumper($data);
+}
+
 sub write_config {
   my ($self) = @_;
   
   File::Path::mkpath($self->{properties}{config_dir});
   -d $self->{properties}{config_dir} or die "Can't mkdir $self->{properties}{config_dir}: $!";
   
-  local $Data::Dumper::Terse = 1;
-
-  my $file = $self->config_file('build_params');
-  my $fh = IO::File->new("> $file") or die "Can't create '$file': $!";
-  print $fh Data::Dumper::Dumper([$self->{args}, $self->{config}, $self->{properties}]);
-  close $fh;
-
-  $file = $self->config_file('prereqs');
-  open $fh, "> $file" or die "Can't create '$file': $!";
   my @items = qw(requires build_requires conflicts recommends);
-  print $fh Data::Dumper::Dumper( { map { $_, $self->$_() } @items } );
-  close $fh;
+  $self->_write_dumper('prereqs', { map { $_, $self->$_() } @items });
+  $self->_write_dumper('build_params', [$self->{args}, $self->{config}, $self->{properties}]);
 
   $self->_persistent_hash_write('cleanup');
 }
@@ -1456,14 +1459,27 @@ sub _sign_dir {
     warn "Couldn't load Module::Signature for 'distsign' action:\n $@\n";
     return;
   }
-
+  
+  # Add SIGNATURE to the MANIFEST
+  {
+    my $manifest = File::Spec->catfile($dir, 'MANIFEST');
+    die "Signing a distribution requires a MANIFEST file" unless -e $manifest;
+    my $mode = (stat $manifest)[2];
+    chmod($mode | 0222, $manifest) or die "Can't make $manifest writable: $!";
+    
+    my $fh = IO::File->new(">> $manifest") or die "Can't add SIGNATURE to $manifest: $!";
+    print $fh "\nSIGNATURE    Added here by Module::Build\n";
+    close $fh;
+    chmod($mode, $manifest);
+  }
+  
   # We protect the signing with an eval{} to make sure we get back to
   # the right directory after a signature failure.  Would be nice if
   # Module::Signature took a directory argument.
   
   my $start_dir = $self->cwd;
   chdir $dir or die "Can't chdir() to $dir: $!";
-  eval {Module::Signature::sign()};
+  eval {local $Module::Signature::Quiet = 1; Module::Signature::sign()};
   my @err = $@ ? ($@) : ();
   chdir $start_dir or push @err, "Can't chdir() back to $start_dir: $!";
   die join "\n", @err if @err;
@@ -1922,9 +1938,21 @@ sub copy_if_modified {
   my %args = @_ > 3 ? @_ : ( from => shift, to_dir => shift, flatten => shift );
   
   my $file = $args{from};
-  my $to_path = $args{to} || File::Spec->catfile( $args{to_dir}, $args{flatten}
-						  ? File::Basename::basename($file)
-						  : $file );
+  unless (defined $file and length $file) {
+    die "No 'from' parameter given to copy_if_modified";
+  }
+  
+  my $to_path;
+  if (defined $args{to} and length $args{to}) {
+    $to_path = $args{to};
+  } elsif (defined $args{to_dir} and length $args{to_dir}) {
+    $to_path = File::Spec->catfile( $args{to_dir}, $args{flatten}
+				    ? File::Basename::basename($file)
+				    : $file );
+  } else {
+    die "No 'to' or 'to_dir' parameter given to copy_if_modified";
+  }
+  
   return if $self->up_to_date($file, $to_path); # Already fresh
   
   # Create parent directories

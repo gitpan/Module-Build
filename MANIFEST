@@ -49,3 +49,5 @@ t/runthrough.t
 t/signature.t
 t/versions.t
 t/xs.t
+
+SIGNATURE    Added here by Module::Build

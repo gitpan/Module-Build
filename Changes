@@ -1,5 +1,29 @@
 Revision history for Perl extension Module::Build.
 
+0.20_01  Mon Sep  8 21:25:39 CDT 2003
+
+ - When signing distributions with Module::Signature, we now
+   automatically add the SIGNATURE file to the MANIFEST, avoiding an
+   unpleasant chicken/egg problem for the module author.
+   [unpleasantness spotted by sungo]
+
+ - In Module::Build::Compat, added support for the 'verbose' parameter
+   to Makefile.PL [spotted by Soren Andersen, fixed by Michael
+   Schwern]
+
+ - The Module::Build distribution now has a cryptographic 'SIGNATURE'
+   file created by Module::Signature.
+
+ - Added proper documentation for the subclass() method. [spotted by
+   Jonathan Steinert]
+
+ - Worked around a Config.pm bug in Red Hat 9 which prevented man
+   pages from being installed in the correct places. [spotted by Ville
+   Skytta]
+
+ - Fixed a Module::Build::Compat bug in which setting INSTALLDIRS
+   caused a crash. [spotted by Ilya Martynov]
+
 0.20  Tue Aug 26 14:34:07 CDT 2003
 
  - Separated the 'build' action into two separate actions, 'code' and
