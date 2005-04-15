@@ -1122,6 +1122,11 @@ ACTIONS
         code-coverage report showing which parts of the code were actually
         exercised during the tests.
 
+        To pass options to "Devel::Cover", set the $DEVEL_COVER_OPTIONS
+        environment variable:
+
+          DEVEL_COVER_OPTIONS=-ignore,Build ./Build testcover
+
     testdb
         This is a synonym for the 'test' action with the "debugger=1"
         argument.

@@ -60,10 +60,8 @@ sub new_from_context {
   # XXX Read the META.yml and see whether we need to run the Build.PL
   
   # Run the Build.PL
-  $package->run_perl_script('Build.PL');
-  my $self = $package->resume;
-  $self->merge_args(undef, %args);
-  return $self;
+  $package->run_perl_script('Build.PL', [], [$package->unparse_args(\%args)]);
+  return $package->resume;
 }
 
 sub current {
@@ -723,6 +721,7 @@ sub read_config {
     next unless -e $self->config_file($_);
     $self->_persistent_hash_restore($_);
   }
+  $self->has_config_data(1) if keys(%{$self->config_data}) || keys(%{$self->feature});
 }
 
 sub _write_dumper {
@@ -1126,6 +1125,17 @@ sub cull_options {
     return $args, @ARGV;
 }
 
+sub unparse_args {
+  my ($self, $args) = @_;
+  my @out;
+  while (my ($k, $v) = each %$args) {
+    push @out, (UNIVERSAL::isa($v, 'HASH')  ? map {+"--$k", "$_=$v->{$_}"} keys %$v :
+		UNIVERSAL::isa($v, 'ARRAY') ? map {+"--$k", $_} @$v :
+                ("--$k", $v));
+  }
+  return @out;
+}
+
 sub args {
     my $self = shift;
     return wantarray ? %{ $self->{args} } : $self->{args} unless @_;
@@ -1157,6 +1167,8 @@ sub read_args {
       $self->_read_arg(\%args, $1, $2);
     } elsif ( /^--(\w+)$/ ) {
       $self->_read_arg(\%args, $1, shift());
+    } elsif ( /^--(\w+)=(.*)$/ ) {
+      $self->_read_arg(\%args, $1, $2);
     } elsif ( /^(\w+)$/ and !defined($action)) {
       $action = $1;
     } else {
@@ -2358,10 +2370,10 @@ sub install_destination {
   my ($self, $type) = @_;
   my $p = $self->{properties};
   
+  return $p->{install_path}{$type} if exists $p->{install_path}{$type};
   if ($p->{install_base}) {
     return File::Spec->catdir($p->{install_base}, $self->install_base_relative($type));
   }
-  return $p->{install_path}{$type} if exists $p->{install_path}{$type};
   return $p->{install_sets}{ $p->{installdirs} }{$type};
 }
 

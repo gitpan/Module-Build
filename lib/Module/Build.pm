@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.2609';
+$VERSION = '0.2610';
 $VERSION = eval $VERSION;
 
 # Okay, this is the brute-force method of finding out what kind of
@@ -1302,6 +1302,11 @@ or use a C<glob()>-style pattern:
 Runs the C<test> action using C<Devel::Cover>, generating a
 code-coverage report showing which parts of the code were actually
 exercised during the tests.
+
+To pass options to C<Devel::Cover>, set the C<$DEVEL_COVER_OPTIONS>
+environment variable:
+
+  DEVEL_COVER_OPTIONS=-ignore,Build ./Build testcover
 
 =item testdb
 

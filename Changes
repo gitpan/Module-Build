@@ -1,5 +1,24 @@
 Revision history for Perl extension Module::Build.
 
+0.2610  Fri Apr 15 08:25:01 CDT 2005
+
+ - new_from_context() was losing its arguments in some cases (and not
+   because of inadequate training in debate) - we now pass its
+   arguments directly to the Build.PL script rather than merging them
+   in afterwards. [Ray Zimmerman]
+
+ - Fixed a bug in which config_data and feature data were being
+   forgotten and no ConfigData.pm module would get written. [Ray
+   Zimmerman]
+
+ - Added a recipe to the cookbook showing how to run a single test
+   file from the command line. [William McKee]
+
+ - For command-line arguments, we now accept the syntax "--foo=bar" in
+   addition to "--foo bar" and "foo=bar".  This seems to fit well with
+   what GNU getopt and Getopt::Long do, and with people's
+   expectations. [Adam Spiers]
+
 0.2609  Wed Mar 16 22:18:35 CST 2005
 
  - The html docs that were created during the first invokation of
