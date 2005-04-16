@@ -8,13 +8,14 @@ use lib File::Spec->catdir('lib');
 # We use Module::Build to test & install itself.
 use Module::Build;
 
+# 
+
 my $build = new Module::Build
   (
    module_name => 'Module::Build',   
    license => 'perl',
    requires => {
 		'perl'           => '5.005_03',
-		'Config'         => 0,
 		'Data::Dumper'   => 0,
 		'File::Basename' => 0,
 		'File::Compare'  => 0,
@@ -23,15 +24,17 @@ my $build = new Module::Build
 		'File::Path'     => 0,
 		'File::Spec'     => 0,
 		'ExtUtils::Install' => 0,
+		'ExtUtils::Manifest' => 0,
+		'ExtUtils::Mkbootstrap' => 0,
 		'IO::File'       => 0,
 		'Cwd'            => 0,
 		'Text::ParseWords' => 0,
+		'Getopt::Long'   => 0,
 	       },
    recommends => {
 		  'Archive::Tar' => '1.08',
 		  'ExtUtils::Install' => 0.30,
 		  'ExtUtils::ParseXS' => 2.02,
-		  'ExtUtils::CBuilder' => 0.02,
 		  'Pod::Text' => 0,
 		  'Module::Signature' => 0.21,
 		 },
@@ -46,6 +49,21 @@ my $build = new Module::Build
 		     {
 		      description => "Can write fully-functional META.yml files",
 		      requires => { YAML => ' >= 0.35, < 0.49 ' },
+		     },
+		     C_support =>
+		     {
+		      description => "Can compile/link C & XS code",
+		      requires => { 'ExtUtils::CBuilder' => 0.02 },
+		     },
+		     manpage_support =>
+		     {
+		      description => "Can create Unix man pages",
+		      requires => { 'Pod::Man' => 0 },
+		     },
+		     HTML_support =>
+		     {
+		      description => "Can create HTML documentation",
+		      requires => { 'Pod::Html' => 0 },
 		     },
 		    },
 

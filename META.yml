@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: Module-Build
-version: 0.2610
+version: 0.27_01
 author:
   - Ken Williams, kwilliams@cpan.org
   - |-
@@ -9,22 +9,23 @@ author:
 abstract: Build and install Perl modules
 license: perl
 requires:
-  Config: 0
   Cwd: 0
   Data::Dumper: 0
   ExtUtils::Install: 0
+  ExtUtils::Manifest: 0
+  ExtUtils::Mkbootstrap: 0
   File::Basename: 0
   File::Compare: 0
   File::Copy: 0
   File::Find: 0
   File::Path: 0
   File::Spec: 0
+  Getopt::Long: 0
   IO::File: 0
   Text::ParseWords: 0
   perl: 5.005_03
 recommends:
   Archive::Tar: 1.08
-  ExtUtils::CBuilder: 0.02
   ExtUtils::Install: 0.3
   ExtUtils::ParseXS: 2.02
   Module::Signature: 0.21
@@ -34,52 +35,71 @@ build_requires:
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: 0.2610
+    version: 0.27_01
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
+    version: ~
   Module::Build::Compat:
     file: lib/Module/Build/Compat.pm
     version: 0.03
   Module::Build::Cookbook:
     file: lib/Module/Build/Cookbook.pm
+    version: ~
+  Module::Build::ModuleInfo:
+    file: lib/Module/Build/ModuleInfo.pm
+    version: ~
+  Module::Build::Notes:
+    file: lib/Module/Build/Notes.pm
+    version: ~
   Module::Build::PPMMaker:
     file: lib/Module/Build/PPMMaker.pm
+    version: ~
   Module::Build::Platform::Amiga:
     file: lib/Module/Build/Platform/Amiga.pm
+    version: ~
   Module::Build::Platform::Default:
     file: lib/Module/Build/Platform/Default.pm
+    version: ~
   Module::Build::Platform::EBCDIC:
     file: lib/Module/Build/Platform/EBCDIC.pm
+    version: ~
   Module::Build::Platform::MPEiX:
     file: lib/Module/Build/Platform/MPEiX.pm
+    version: ~
   Module::Build::Platform::MacOS:
     file: lib/Module/Build/Platform/MacOS.pm
+    version: ~
   Module::Build::Platform::RiscOS:
     file: lib/Module/Build/Platform/RiscOS.pm
+    version: ~
   Module::Build::Platform::Unix:
     file: lib/Module/Build/Platform/Unix.pm
+    version: ~
   Module::Build::Platform::VMS:
     file: lib/Module/Build/Platform/VMS.pm
+    version: ~
   Module::Build::Platform::VOS:
     file: lib/Module/Build/Platform/VOS.pm
+    version: ~
   Module::Build::Platform::Windows:
     file: lib/Module/Build/Platform/Windows.pm
-  Module::Build::Platform::Windows::BCC:
-    file: lib/Module/Build/Platform/Windows.pm
-  Module::Build::Platform::Windows::GCC:
-    file: lib/Module/Build/Platform/Windows.pm
-  Module::Build::Platform::Windows::MSVC:
-    file: lib/Module/Build/Platform/Windows.pm
+    version: ~
   Module::Build::Platform::aix:
     file: lib/Module/Build/Platform/aix.pm
+    version: ~
   Module::Build::Platform::cygwin:
     file: lib/Module/Build/Platform/cygwin.pm
+    version: ~
   Module::Build::Platform::darwin:
     file: lib/Module/Build/Platform/darwin.pm
+    version: ~
   Module::Build::Platform::os2:
     file: lib/Module/Build/Platform/os2.pm
+    version: ~
   Module::Build::PodParser:
     file: lib/Module/Build/PodParser.pm
+    version: ~
   Module::Build::PodTester:
     file: lib/Module/Build/Base.pm
-generated_by: Module::Build version 0.261
+    version: ~
+generated_by: Module::Build version 0.2701

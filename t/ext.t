@@ -1,7 +1,12 @@
 
 use strict;
-use Test;
 use File::Spec;
+
+BEGIN {
+  my $t_lib = File::Spec->catdir('t', 'lib');
+  push @INC, $t_lib; # Let user's installed version override
+}
+use Test::More;
 
 my $common_pl = File::Spec->catfile('t', 'common.pl');
 require $common_pl;
@@ -55,7 +60,7 @@ my @win_splits =
    { 'a " b " c'            => [ 'a', ' b ', 'c' ] },
 );
 
-plan tests => 14 + 2*@unix_splits + 2*@win_splits;
+plan tests => 10 + 2*@unix_splits + 2*@win_splits;
 
 use Module::Build;
 ok(1);
@@ -64,8 +69,8 @@ ok(1);
 foreach my $platform ('', '::Platform::Unix', '::Platform::Windows') {
   my $pkg = "Module::Build$platform";
   my @result = $pkg->split_like_shell(['foo', 'bar', 'baz']);
-  ok @result, 3, "Split using $pkg";
-  ok "@result", "foo bar baz", "Split using $pkg";
+  is @result, 3, "Split using $pkg";
+  is "@result", "foo bar baz", "Split using $pkg";
 }
 
 use Module::Build::Platform::Unix;
@@ -83,20 +88,21 @@ foreach my $test (@win_splits) {
   # Make sure read_args() functions properly as a class method
   my @args = qw(foo=bar --food bard --foods=bards);
   my ($args) = Module::Build->read_args(@args);
+  is_deeply($args, {foo => 'bar', food => 'bard', foods => 'bards', ARGV => []});
+}
 
-  ok keys(%$args), 4;
-  ok $args->{foo}, 'bar';
-  ok $args->{food}, 'bard';
-  ok $args->{foods}, 'bards';
-  ok exists $args->{ARGV}, 1;
-  ok @{$args->{ARGV}}, 0;
+{
+  # Make sure data can make a round-trip through unparse_args() and read_args()
+  my %args = (foo => 'bar', food => 'bard', config => {a => 1, b => 2}, ARGV => []);
+  my ($args) = Module::Build->read_args( Module::Build->unparse_args(\%args) );
+  is_deeply($args, \%args);
 }
 
 {
   # Make sure run_perl_script() propagates @INC
   local @INC = ('whosiewhatzit', @INC);
   my $output = stdout_of( sub { Module::Build->run_perl_script('', ['-le', 'print for @INC']) } );
-  ok $output, qr{^whosiewhatzit}m;
+  like $output, qr{^whosiewhatzit}m;
 }
 
 ##################################################################
@@ -105,10 +111,8 @@ sub do_split_tests {
 
   my ($string, $expected) = %$test;
   my @result = $package->split_like_shell($string);
-  ok( 0 + grep( !defined(), @result ), # all defined
+  is( 0 + grep( !defined(), @result ), # all defined
       0,
       "'$string' result all defined" );
-  ok( join(' ', map "{$_}", @result),
-      join(' ', map "{$_}", @$expected),
-      join(' ', map "{$_}", @$expected) );
+  is_deeply(\@result, $expected);
 }

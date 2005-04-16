@@ -2,7 +2,7 @@
 
 use strict;
 use Test;
-BEGIN { plan tests => 41 }
+BEGIN { plan tests => 52 }
 use Module::Build;
 ok(1);
 
@@ -23,6 +23,7 @@ chdir 't';
   my $build = new Module::Build( module_name => 'ModuleBuildOne' );
   ok $build;
   ok $build->module_name, 'ModuleBuildOne';
+  ok $build->build_class, 'Module::Build';
   ok $build->dist_name, 'ModuleBuildOne';
   
   $build = Module::Build->new( dist_name => 'ModuleBuildOne', dist_version => 7 );
@@ -123,7 +124,7 @@ chdir 't';
   
   chdir 'Sample';
 
-  eval {Module::Build->run_perl_script('Build.PL', [], ['--config', "foocakes=barcakes", '--foo', '--bar', '--bar', '-bat=hello', 'gee=whiz', '--any', 'hey'])};
+  eval {Module::Build->run_perl_script('Build.PL', [], ['skip_rcfile=1', '--config', "foocakes=barcakes", '--foo', '--bar', '--bar', '-bat=hello', 'gee=whiz', '--any', 'hey', '--destdir', 'yo', '--verbose', '1'])};
   ok $@, '';
   
   my $b = Module::Build->resume();
@@ -137,6 +138,15 @@ chdir 't';
   ok $b->args('gee'), 'whiz';
   ok $b->args('any'), 'hey';
   ok $b->args('dee'), 'goo';
+  ok $b->destdir, 'yo';
+  ok $b->runtime_params('destdir'), 'yo';
+  ok $b->runtime_params('verbose'), '1';
+  ok !$b->runtime_params('license');
+  ok my %runtime = $b->runtime_params;
+  ok scalar keys %runtime, 4;
+  ok $runtime{destdir}, 'yo';
+  ok $runtime{verbose}, '1';
+  ok $runtime{config};
 
   ok my $argsref = $b->args;
   ok $argsref->{foo}, 1;
@@ -154,9 +164,10 @@ chdir 't';
     (
      module_name => 'ModuleBuildOne',
      dist_author => 'Foo Meister <foo@example.com>',
+     build_class => 'My::Big::Fat::Builder',
     );
   ok $build;
   ok ref($build->dist_author);
   ok $build->dist_author->[0], 'Foo Meister <foo@example.com>';
+  ok $build->build_class, 'My::Big::Fat::Builder';
 }
-

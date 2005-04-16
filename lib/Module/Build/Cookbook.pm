@@ -128,34 +128,6 @@ So then I can just execute C<t t/mytest.t> to run a single test.
 
 =head1 ADVANCED RECIPES
 
-=head2 Adding new elements to the build process
-
-If there's some new type of file (i.e. not a F<.pm> file, or F<.xs>
-file, or one of the other things C<Module::Build> knows how to
-process) that you'd like to handle during the building of your module,
-you can do something the following in your F<Build.PL> file:
-
-  use Module::Build;
-  
-  my $class = Module::Build->subclass( code => <<'EOC' );
-    sub process_foo_files {
-      my $self = shift;
-      ... locate and process foo files, and create something in blib/
-    }
-  }
-  
-  my $build = $class->new( ... );
-  
-  $build->add_build_element('foo');
-
-
-This creates a custom subclass of C<Module::Build> that knows how to
-build elements of type C<foo>.  It should place the elements in a
-subdirectory of F<blib/> corresponding to items that C<Module::Build>
-knows how to install - to add new capabilities in I<that> arena, see
-L</Adding new types to the install process>.
-
-
 =head2 Changing the order of the build process
 
 The C<build_elements> property specifies the steps C<Module::Build>
@@ -199,7 +171,7 @@ so:
   ./Build test --config perlpath=/foo/perl
 
 
-=head2 Adding new file types to the install process
+=head2 Adding new file types to the build process
 
 Sometimes you might have extra types of files that you want to install
 alongside the standard types like F<.pm> and F<.pod> files.  For
@@ -238,14 +210,16 @@ files:
   $build->create_build_script;
 
 If your extra files actually need to be created on the user's machine,
-you'll probably have to override the C<build> action to do so:
+or if they need some other kind of special processing, you'll probably
+want to create a special method to do so, named
+C<process_${kind}_files()>:
 
   use Module::Build;
   my $class = Module::Build->subclass(code => <<'EOF');
-    sub ACTION_build {
+    sub process_dat_files {
       my $self = shift;
-      $self->SUPER::ACTION_build(@_);
-      ... create the .dat files here ...
+      ... locate and process *.dat files,
+      ... and create something in blib/lib/
     }
   EOF
   my $build = $class->new
@@ -256,13 +230,63 @@ you'll probably have to override the C<build> action to do so:
   $build->add_build_element('dat');
   $build->create_build_script;
 
+If your extra files don't go in F<lib/> but in some other place, see
+L<"Adding new elements to the install process"> for how to actually
+get them installed.
+
 Please note that these examples use some capabilities of Module::Build
 that first appeared in version 0.26.  Before that it could certainly
 still be done, but the simple cases took a bit more work.
 
+=head2 Adding new elements to the install process
+
+By default, Module::Build creates seven subdirectories of the F<blib/>
+directory during the build process: F<lib/>, F<arch/>, F<bin/>,
+F<script/>, F<bindoc/>, F<libdoc/>, and F<html/> (some of these may be
+missing or empty if there's nothing to go in them).  Anything copied
+to these directories during the build will eventually be installed
+during the C<install> action (see L<Module::Build/"How Installation Paths are Determined">.
+
+If you need to create a new type of installable element, e.g. C<conf>,
+then you need to tell Module::Build where things in F<blib/conf/>
+should be installed.  To do this, use the C<install_path> parameter to
+the C<new()> method:
+
+  my $b = Module::Build->new
+   (...
+    install_path => { conf => $installation_path }
+   );
+
+Or you can call the C<install_path()> method later:
+
+  $b->install_path->{conf} || $installation_path;
+
+(Sneakily, or perhaps uglyly, C<install_path()> returns a reference to
+a hash of install paths, and you can modify that hash to your heart's
+content.)
+
+The user may also specify the path on the command line:
+
+  perl Build.PL --install_path conf=/foo/path/etc
+
+The important part, though, is that I<somehow> the install path needs
+to be set, or else nothing in the F<blib/conf/> directory will get
+installed.
+
+See also L<"Adding new file types to the build process"> for how to
+create the stuff in F<blib/conf/> in the first place.
+
+
 =head1 AUTHOR
 
 Ken Williams, ken@mathforum.org
+
+=head1 COPYRIGHT
+
+Copyright (c) 2001-2005 Ken Williams.  All rights reserved.
+
+This library is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
 
 =head1 SEE ALSO
 

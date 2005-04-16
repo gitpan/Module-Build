@@ -1,5 +1,143 @@
 Revision history for Perl extension Module::Build.
 
+
+0.27_01 (Beta for 0.28)  Fri Apr 15 21:12:57 CDT 2005
+
+ Backward-incompatible (but better) changes:
+
+ * When using the 'install_base' option to choose a directory for
+   installing everything, perl modules now go into lib/perl5/ instead
+   of just lib/.  It seems this is more consistent with people's
+   expectations, and the way I had it before was a bit peculiar to the
+   way I like things in my own home directory. [Michael Schwern]
+
+ * When the user is using the 'install_base' option, scripts will now
+   be installed by default in $install_base/bin/ rather than
+   $install_base/script/ . [Jan Hudec and Michael Schwern]
+
+ Major changes:
+
+ - The auto_features mechanism will now re-evaluate dependencies every
+   time feature() is called for an auto-feature, rather than freezing
+   the success/failure value during 'perl Build.PL' and using that
+   value for all eternity (or module update, whichever comes first).
+   This applies to both $build->feature() and
+   FooModule::ConfigData->feature() calls. [Requested by many]
+
+ - Added the meta_add and meta_merge mechanisms, which let the module
+   author add/merge arbitrary entries into the META.yml file.
+
+ - Now reads per-action default options from '$ENV{HOME}/.modulebuildrc'
+   if it exists. Command line options override anything set in the rc file.
+
+ - Extend prerequisite specifications to apply to all actions. It is
+   now a fatal error if 'requires' or 'conflicts' for a given action
+   are not satisfied, except where necessary for backwards compatability.
+   Also, added '--force' options to ignore the fatal errors. (NOTE:
+   this is a somewhat experimental feature, we may morph this around a
+   bit before final release!)
+
+ - The creation of Unix man pages is no longer a strict necessity - it
+   has now been turned into an 'auto-feature' contingent on the
+   presence of Pod::Man and a location specified for man pages to go.
+
+ - A user-specified 'install_path' setting will now take precedence
+   over an 'install_base' setting.  This allows the user to use
+   'install_base' to set the base for all elements in one go, and then
+   use 'install_path' to override specific paths or add paths for
+   additional kinds of targets.
+
+ - Split the main documentation from 'Module/Build.pm' into two
+   sections. The user level documentation and overview remains in
+   'Module/Build.pm', while a new document,
+   'Module/Build/Authoring.pod', has been created for module authors.
+
+ Minor changes:
+
+ - new_from_context() was losing its arguments in some cases (and not
+   because of inadequate training in forensic debate) - we now pass its
+   arguments directly to the Build.PL script rather than merging them
+   in afterwards.
+
+ - Let resume() return an object blessed into the appropriate class
+   if the user has provided a subclass, as specified by the
+   'build_class' property. This allows current() and new_from_context()
+   to behave more like factory methods returning objects of the correct
+   class based on context. [Ray Zimmerman]
+
+ - Refactored methods relating to parsing perl module files for
+   package, version, and pod data into a new class:
+   Module::Build::ModuleInfo.  It should not be considered part of
+   Module::Build's API, because we may split it out entirely as a
+   separate CPAN module that we depend on.
+
+ - Added new method Module::Build::prepare_metadata() for authors to
+   override in order to add custom fields to META.yml.
+
+ - We now use Test::More for our regression tests.  If the user
+   doesn't have it installed, we include a copy in t/lib/ that we can
+   use during testing.
+
+ - When copying files in the 'distdir' action, set permissions to match
+   the original files. [Julian Mehnle]
+
+ - When adding files like META.yml to the MANIFEST, we now tell the
+   user we're doing so by printing one of the "Added to MANIFEST: ..."
+   lines.  [Ron Savage]
+
+ - Added a runtime_params() method, which lets a module author see
+   which parameters were overridden by the user on the command line
+   (or in whatever paradigm the user originally invoked Module::Build
+   from). [David Wheeler]
+
+ - Added the current_action() method, which, surprisingly, returns the
+   name of the currently running action. [David Wheeler]
+
+ - Added docs for run_perl_script().
+
+ - Added some stuff to the docs about why PREFIX is unsupported, and
+   what to use instead. [Steve Purkis]
+
+ - The simple get/set accessor methods for all the 'parameters' like
+   verbose(), license(), etc. now have auto-generated documentation in
+   Module/Build.pm.
+
+ - Created a Cookbook entry for 'Adding new elements to the install
+   process'
+
+ - We now add META.yml to the MANIFEST when META.yml is created, not
+   when MANIFEST is created. [Spotted by Ron Savage]
+
+ - Added some additional patterns to the suggested MANIFEST.SKIP
+   contents, and changed the docs so that we encourage the user to use
+   the MANIFEST.SKIP.  [Ron Savage]
+
+ - Eliminated a redundant recipe from the Cookbook, now that there are
+   some more extensive recipes on how to add stuff to the
+   build/install sequences.
+
+ - Eliminated an undefined-variable warning when testing under perl 5.005
+
+ - When building HTML documentation, 'html_backlink' and 'html_css'
+   properties are now first-class properties, so they can be set from
+   the command line. [Suggested by Sagar R. Shah]
+
+ - Have script_files default to everything in bin.  I believe this is
+   the least surprising behavior. [Suggested by Michael Schwern]
+
+ - If script_files is given a directory, consider each file in that
+   directory tree as a script to be installed.  This avoids having to
+   remember to add to the script_files list every time you add a
+   program. [Suggested by Michael Schwern]
+
+ - We now only load Pod::Man when we actually need to build man pages.
+
+ - We now make Test::Harness use our carefully-selected path to a perl
+   executable regardless of Test::Harness's version.  Previously we
+   let it figure stuff out for itself if it was a reasonably modern
+   version, but it's safer to make sure we're using the same perl
+   everywhere.
+
 0.2610  Fri Apr 15 08:25:01 CDT 2005
 
  - new_from_context() was losing its arguments in some cases (and not

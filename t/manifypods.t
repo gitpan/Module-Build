@@ -3,18 +3,17 @@
 use strict;
 
 use File::Spec;
+use File::Path qw( rmtree );
 use Test;
+use Module::Build;
+
 BEGIN {
   my $common_pl = File::Spec->catfile('t', 'common.pl');
   require $common_pl;
+  skip_test("manpage_support feature is not enabled")
+    unless Module::Build->current->feature('manpage_support');
+  plan tests => 21;
 }
-
-use File::Path qw( rmtree );
-
-need_module('Pod::Man');
-plan tests => 21;
-
-use Module::Build;
 
 my $start = Module::Build->cwd;
 my $install = File::Spec->catdir( $start, 't', '_tmp' );

@@ -82,7 +82,7 @@ if ($have_yaml) {
   my $fh = IO::File->new(File::Spec->catfile($goto, 'META.yml'));
   my $contents = do {local $/; <$fh>};
   $contents =~ /Module::Build version ([0-9_.]+)/m;
-  ok 0+$1, 0+$build->VERSION, "Check version used to create META.yml";
+  ok $1 == $build->VERSION, 1, "Check version used to create META.yml: $1 == " . $build->VERSION;
   
   if ($build->check_installed_status('Archive::Tar', 0)
       or $build->isa('Module::Build::Platform::Unix')) {
@@ -95,7 +95,7 @@ if ($have_yaml) {
   }
 
 } else {
-  skip_subtest("YAML.pm is not installed, or disabled") for 1..7;
+  skip_subtest("YAML_support feature is not enabled") for 1..7;
 }
 
 {
@@ -140,6 +140,6 @@ EOF
 eval {$build->dispatch('realclean')};
 ok $@, '';
 
-ok !-e $build->build_script, 1;
-ok !-e $build->config_dir, 1;
-ok !-e $build->dist_dir, 1;
+ok not -e $build->build_script;
+ok not -e $build->config_dir;
+ok not -e $build->dist_dir;
