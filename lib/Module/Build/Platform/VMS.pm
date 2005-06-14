@@ -6,6 +6,7 @@ use Module::Build::Base;
 use vars qw(@ISA);
 @ISA = qw(Module::Build::Base);
 
+sub need_prelink_c { 1 }
 
 
 =head1 NAME

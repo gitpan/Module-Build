@@ -1,16 +1,14 @@
 use strict;
 
-use File::Spec;
-BEGIN {
-  my $common_pl = File::Spec->catfile('t', 'common.pl');
-  require $common_pl;
-}
-use Test::More (tests => 34);
-
+use Test; 
+BEGIN { plan tests => 31 }
 use Module::Build;
+use File::Spec;
 use File::Path;
 use Config;
 
+my $common_pl = File::Spec->catfile('t', 'common.pl');
+require $common_pl;
 
 my $start_dir = Module::Build->cwd;
 
@@ -31,7 +29,7 @@ $build->add_to_cleanup($destdir);
 
 {
   eval {$build->dispatch('install', destdir => $destdir)};
-  is $@, '';
+  ok $@, '';
   
   my $libdir = strip_volume( $build->install_destination('lib') );
   my $install_to = File::Spec->catfile($destdir, $libdir, 'Sample.pm');
@@ -40,18 +38,18 @@ $build->add_to_cleanup($destdir);
   
   local @INC = (@INC, File::Spec->catdir($destdir, $libdir));
   eval {require Sample};
-  is $@, '';
-  
+  ok $@, '';
+
   # Make sure there's a packlist installed
   my $archdir = $build->install_destination('arch');
   my ($v, $d) = File::Spec->splitpath($archdir, 1);
   my $packlist = File::Spec->catdir($destdir, $d, 'auto', 'Sample', '.packlist');
-  is -e $packlist, 1, "$packlist should be written";
+  ok -e $packlist, 1, "$packlist should be written";
 }
 
 {
   eval {$build->dispatch('install', installdirs => 'core', destdir => $destdir)};
-  is $@, '';
+  ok $@, '';
   my $libdir = strip_volume( $Config{installprivlib} );
   my $install_to = File::Spec->catfile($destdir, $libdir, 'Sample.pm');
   print "Should have installed module as $install_to\n";
@@ -61,7 +59,7 @@ $build->add_to_cleanup($destdir);
 {
   my $libdir = File::Spec->catdir(File::Spec->rootdir, 'foo', 'bar');
   eval {$build->dispatch('install', install_path => {lib => $libdir}, destdir => $destdir)};
-  is $@, '';
+  ok $@, '';
   my $install_to = File::Spec->catfile($destdir, $libdir, 'Sample.pm');
   print "Should have installed module as $install_to\n";
   ok -e $install_to;
@@ -70,40 +68,35 @@ $build->add_to_cleanup($destdir);
 {
   my $libdir = File::Spec->catdir(File::Spec->rootdir, 'foo', 'base');
   eval {$build->dispatch('install', install_base => $libdir, destdir => $destdir)};
-  is $@, '';
-  my $install_to = File::Spec->catfile($destdir, $libdir, 'lib', 'perl5', 'Sample.pm');
+  ok $@, '';
+  my $install_to = File::Spec->catfile($destdir, $libdir, 'lib', 'Sample.pm');
   print "Should have installed module as $install_to\n";
   ok -e $install_to;  
 }
 
 {
-  # Test the ConfigData stuff
-  
   $build->config_data(foo => 'bar');
-  $build->features(baz => 1);
-  $build->auto_features(auto_foo => {requires => {'File::Spec' => 0}});
+  $build->feature(baz => 1);
   eval {$build->dispatch('install', destdir => $destdir)};
-  is $@, '';
+  ok $@, '';
   
   my $libdir = strip_volume( $build->install_destination('lib') );
   local @INC = (@INC, File::Spec->catdir($destdir, $libdir));
   eval {require Sample::ConfigData};
-
-  is $build->feature('auto_foo'), 1;
   
- SKIP:
-  {
-    skip $@, 5 if @_;
+  if ($@) {
+    ok $@, '';  # Show what the failure was
+    skip_subtest("Couldn't reload ConfigData") for 1..3;
+
+  } else {
 
     # Make sure the values are present
-    is( Sample::ConfigData->config('foo'), 'bar' );
+    ok( Sample::ConfigData->config('foo'), 'bar' );
     ok( Sample::ConfigData->feature('baz') );
-    ok( Sample::ConfigData->feature('auto_foo') );
-    ok( not Sample::ConfigData->feature('nonexistent') );
 
     # Add a new value to the config set
     Sample::ConfigData->set_config(floo => 'bhlar');
-    is( Sample::ConfigData->config('floo'), 'bhlar' );
+    ok( Sample::ConfigData->config('floo'), 'bhlar' );
 
     # Make sure it actually got written
     Sample::ConfigData->write;
@@ -112,22 +105,22 @@ $build->add_to_cleanup($destdir);
       local $^W;  # Avoid warnings for subroutine redefinitions
       require Sample::ConfigData;
     }
-    is( Sample::ConfigData->config('floo'), 'bhlar' );
+    ok( Sample::ConfigData->config('floo'), 'bhlar' );
   }
 }
 
 
 eval {$build->dispatch('realclean')};
-is $@, '';
+ok $@, '';
 
 {
   # Try again by running the script rather than with programmatic interface
   my $libdir = File::Spec->catdir('', 'foo', 'lib');
   eval {$build->run_perl_script('Build.PL', [], ['--install_path', "lib=$libdir"])};
-  is $@, '';
+  ok $@, '';
   
   eval {$build->run_perl_script('Build', [], ['install', '--destdir', $destdir])};
-  is $@, '';
+  ok $@, '';
   my $install_to = File::Spec->catfile($destdir, $libdir, 'Sample.pm');
   print "# Should have installed module as $install_to\n";
   ok -e $install_to;
@@ -135,39 +128,41 @@ is $@, '';
   my $basedir = File::Spec->catdir('', 'bar');
   eval {$build->run_perl_script('Build', [], ['install', '--destdir', $destdir,
 					      '--install_base', $basedir])};
-  is $@, '';
+  ok $@, '';
   
-  $install_to = File::Spec->catfile($destdir, $libdir, 'Sample.pm');
-  is -e $install_to, 1, "Look for file at $install_to";
-  
-  eval {$build->dispatch('realclean')};
-  is $@, '';
-}
+  my $relpath = $build->install_base_relative('script');
+  $install_to = File::Spec->catfile($destdir, $basedir, $relpath, 'sample.pl');
+  ok -e $install_to, 1, "Should install script as $install_to";
 
-{
-  # Make sure 'install_path' overrides 'install_base'
-  my $build = Module::Build->new( module_name => 'Sample',
-				  install_base => File::Spec->catdir('', 'foo'),
-				  install_path => {lib => File::Spec->catdir('', 'bar')});
-  ok $build;
-  is $build->install_destination('lib'), File::Spec->catdir('', 'bar');
+  eval {$build->dispatch('realclean')};
+  ok $@, '';
 }
 
 {
   # _find_file_by_type() isn't a public method, but this is currently
   # the only easy way to test that it works properly.
   my $pods = $build->_find_file_by_type('pod', 'lib');
-  is keys %$pods, 1;
+  ok keys %$pods, 1;
   my $expect = $build->localize_file_path('lib/Sample/Docs.pod');
-  is $pods->{$expect}, $expect;
+  ok $pods->{$expect}, $expect;
   
   my $pms = $build->_find_file_by_type('awefawef', 'lib');
   ok $pms;
-  is keys %$pms, 0;
+  ok keys %$pms, 0;
   
   $pms = $build->_find_file_by_type('pod', 'awefawef');
   ok $pms;
-  is keys %$pms, 0;
+  ok keys %$pms, 0;
+}
+
+{
+  # Make sure install_path overrides install_base
+  my $build = new Module::Build( module_name => 'Sample',
+				 install_base => 'foo',
+				 install_path => { lib => 'bar' },
+				 license => 'perl' );
+  ok $build;
+  ok $build->install_destination('lib'), 'bar';
 }
 
 sub strip_volume {

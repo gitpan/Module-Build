@@ -11,30 +11,20 @@ require $common_pl;
 
 { local $SIG{__WARN__} = sub {};
 
-  my $m = Module::Build->current;
-  $m->verbose( 0 );
-
   my $have_c_compiler;
-  stderr_of( sub {$have_c_compiler = $m->have_c_compiler} );
-
-  if ( ! $m->feature('C_support') ) {
-    print("1..0 # Skipped: C_support not enabled\n");
-    exit(0);
-  } elsif ( !$have_c_compiler ) {
-    print("1..0 # Skipped: C_support enabled, but no compiler found\n");
-    exit(0);
-  }
+  stderr_of( sub {$have_c_compiler = Module::Build->current->have_c_compiler} );
+  print("1..0 # Skipped: no compiler found\n"), exit(0) unless $have_c_compiler;
 }
 
-######################### End of black magic.
-
 plan tests => 12;
+
+######################### End of black magic.
 
 # Pretend we're in the t/XSTest/ subdirectory
 my $build_dir = File::Spec->catdir('t','XSTest');
 chdir $build_dir or die "Can't change to $build_dir : $!";
 
-my $m = Module::Build->new_from_context('skip_rcfile' => '1');
+my $m = Module::Build->new_from_context;
 ok(1);
 
 eval {$m->dispatch('clean')};
