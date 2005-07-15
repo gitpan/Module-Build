@@ -1,69 +1,88 @@
-######################### We start with some black magic to print on failure.
+#!/usr/bin/perl -w
 
+use lib 't/lib';
 use strict;
-use Test;
-use Config;
-use Module::Build;
-use File::Spec;
 
-my $common_pl = File::Spec->catfile('t', 'common.pl');
+use Test::More;
+
+
+use File::Spec ();
+my $common_pl = File::Spec->catfile( 't', 'common.pl' );
 require $common_pl;
+
+
+use Module::Build;
 
 { local $SIG{__WARN__} = sub {};
 
+  my $mb = Module::Build->current;
+  $mb->verbose( 0 );
+
   my $have_c_compiler;
-  stderr_of( sub {$have_c_compiler = Module::Build->current->have_c_compiler} );
-  print("1..0 # Skipped: no compiler found\n"), exit(0) unless $have_c_compiler;
+  stderr_of( sub {$have_c_compiler = $mb->have_c_compiler} );
+
+  if ( ! $mb->feature('C_support') ) {
+    plan skip_all => 'C_support not enabled';
+  } elsif ( !$have_c_compiler ) {
+    plan skip_all => 'C_support enabled, but no compiler found';
+  } else {
+    plan tests => 11;
+  }
 }
 
-plan tests => 12;
+#########################
 
-######################### End of black magic.
 
-# Pretend we're in the t/XSTest/ subdirectory
-my $build_dir = File::Spec->catdir('t','XSTest');
-chdir $build_dir or die "Can't change to $build_dir : $!";
+use Cwd ();
+my $cwd = Cwd::cwd;
+my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
 
-my $m = Module::Build->new_from_context;
-ok(1);
+use DistGen;
+my $dist = DistGen->new( dir => $tmp, xs => 1 );
+$dist->regen;
 
-eval {$m->dispatch('clean')};
-ok $@, '';
+chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+my $mb = Module::Build->new_from_context( skip_rcfile => 1 );
 
-eval {$m->dispatch('build')};
-ok $@, '';
+
+eval {$mb->dispatch('clean')};
+ok ! $@;
+
+eval {$mb->dispatch('build')};
+ok ! $@;
 
 {
   # Try again in a subprocess 
-  eval {$m->dispatch('clean')};
-  ok $@, '';
+  eval {$mb->dispatch('clean')};
+  ok ! $@;
 
-  $m->create_build_script;
+  $mb->create_build_script;
   ok -e 'Build';
-  
-  eval {$m->run_perl_script('Build')};
-  ok $@, '';
+
+  eval {$mb->run_perl_script('Build')};
+  ok ! $@;
 }
 
 # We can't be verbose in the sub-test, because Test::Harness will
 # think that the output is for the top-level test.
-eval {$m->dispatch('test')};
-ok $@, '';
+eval {$mb->dispatch('test')};
+ok ! $@;
 
 {
-  $m->dispatch('ppd', args => {codebase => '/path/to/codebase-xs'});
+  $mb->dispatch('ppd', args => {codebase => '/path/to/codebase-xs'});
 
-  my $ppd = slurp('XSTest.ppd');
+  (my $dist_filename = $dist->name) =~ s/::/-/g;
+  my $ppd = slurp($dist_filename . '.ppd');
 
-  my $perl_version = Module::Build::PPMMaker->_ppd_version($m->perl_version);
-  my $varchname = Module::Build::PPMMaker->_varchname($m->config);
+  my $perl_version = Module::Build::PPMMaker->_ppd_version($mb->perl_version);
+  my $varchname = Module::Build::PPMMaker->_varchname($mb->config);
 
   # This test is quite a hack since with XML you don't really want to
   # do a strict string comparison, but absent an XML parser it's the
   # best we can do.
-  ok $ppd, <<"EOF";
-<SOFTPKG NAME="XSTest" VERSION="0,01,0,0">
-    <TITLE>XSTest</TITLE>
+  is $ppd, <<"EOF";
+<SOFTPKG NAME="$dist_filename" VERSION="0,01,0,0">
+    <TITLE>@{[$dist->name]}</TITLE>
     <ABSTRACT>Perl extension for blah blah blah</ABSTRACT>
     <AUTHOR>A. U. Thor, a.u.thor\@a.galaxy.far.far.away</AUTHOR>
     <IMPLEMENTATION>
@@ -76,20 +95,28 @@ ok $@, '';
 EOF
 }
 
-if ($m->os_type eq 'Unix') {
-  eval {$m->dispatch('clean')};
-  ok $@, '';
-  
-  local $m->{config}{ld} = "FOO=BAR $m->{config}{ld}";
-  eval {$m->dispatch('build')};
-  ok $@, '';
-} else {
-  skip_subtest("skipping a couple Unixish-only tests") for 1..2;
+SKIP: {
+  skip( "skipping a couple Unixish-only tests", 2 )
+      unless $mb->os_type eq 'Unix';
+
+  eval {$mb->dispatch('clean')};
+  ok ! $@;
+
+  local $mb->{config}{ld} = "FOO=BAR $mb->{config}{ld}";
+  eval {$mb->dispatch('build')};
+  ok ! $@;
 }
 
-eval {$m->dispatch('realclean')};
-ok $@, '';
+eval {$mb->dispatch('realclean')};
+ok ! $@;
 
 # Make sure blib/ is gone after 'realclean'
-ok not -e 'blib';
+ok ! -e 'blib';
 
+
+# cleanup
+chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
+$dist->remove;
+
+use File::Path;
+rmtree( $tmp );

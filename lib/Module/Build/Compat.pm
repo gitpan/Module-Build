@@ -17,9 +17,10 @@ my %makefile_to_build =
    INC     => sub { map {('--extra_compiler_flags', "-I$_")} Module::Build->split_like_shell(shift) },
    POLLUTE => sub { ('--extra_compiler_flags', '-DPERL_POLLUTE') },
    INSTALLDIRS => sub {local $_ = shift; 'installdirs=' . (/^perl$/ ? 'core' : $_) },
-   PREFIX => sub {die "Sorry, PREFIX is not supported.  See the Module::Build\n".
-		      "documentation for 'destdir' or 'install_base' instead.\n"},
    LIB => sub { ('--install_path', 'lib='.shift()) },
+
+   # Some names they have in common
+   map {$_, lc($_)} qw(DESTDIR PREFIX INSTALL_BASE),
   );
 
 
@@ -140,12 +141,12 @@ sub makefile_to_build_args {
 
     if (exists $makefile_to_build{$key}) {
       my $trans = $makefile_to_build{$key};
-      push @out, ref($trans) ? $trans->($val) : "$trans=$val";
+      push @out, ref($trans) ? $trans->($val) : ("--$trans", $val);
     } elsif (exists $Config{lc($key)}) {
-      push @out, 'config=' . lc($key) . "=$val";
+      push @out, '--config', lc($key) . "=$val";
     } else {
       # Assume M::B can handle it in lowercase form
-      push @out, "\L$key\E=$val";
+      push @out, "--\L$key", $val;
     }
   }
   return @out;
@@ -403,6 +404,13 @@ versions of tools like CPAN and CPANPLUS.
 =head1 AUTHOR
 
 Ken Williams, ken@mathforum.org
+
+=head1 COPYRIGHT
+
+Copyright (c) 2001-2005 Ken Williams.  All rights reserved.
+
+This library is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
 
 =head1 SEE ALSO
 

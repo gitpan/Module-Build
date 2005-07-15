@@ -1,40 +1,70 @@
+#!/usr/bin/perl -w
 
+use lib 't/lib';
 use strict;
-use Test;
-plan tests => 9;
+
+use Test::More tests => 8;
+
+
+use Cwd ();
+my $cwd = Cwd::cwd;
+my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
+
+use DistGen;
+my $dist = DistGen->new( dir => $tmp );
+$dist->regen;
+
+chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+
 
 use Module::Build;
-ok(1);
 
 ###################################
-my $m = Module::Build->current;
+$dist->change_file( 'Build.PL', <<"---" );
+use Module::Build;
+my \$build = Module::Build->new(
+  module_name => @{[$dist->name]},
+  license     => 'perl'
+);
+\$build->create_build_script;
+\$build->notes(foo => 'bar');
+---
 
-# This was set in Build.PL
-ok $m->notes('foo'), 'bar';
+$dist->regen;
+
+my $mb = Module::Build->new_from_context;
+
+is $mb->notes('foo'), 'bar';
 
 # Try setting & checking a new value
-$m->notes(argh => 'new');
-ok $m->notes('argh'), 'new';
+$mb->notes(argh => 'new');
+is $mb->notes('argh'), 'new';
 
 # Change existing value
-$m->notes(foo => 'foo');
-ok $m->notes('foo'), 'foo';
+$mb->notes(foo => 'foo');
+is $mb->notes('foo'), 'foo';
 
 # Change back so we can run this test again successfully
-$m->notes(foo => 'bar');
-ok $m->notes('foo'), 'bar';
+$mb->notes(foo => 'bar');
+is $mb->notes('foo'), 'bar';
 
 ###################################
 # Make sure notes set before create_build_script() get preserved
-my $testdir = Module::Build->localize_file_path('t/Sample');
-chdir $testdir or die "Can't chdir($testdir): $!";
-$m = Module::Build->new(module_name => 'Sample');
-ok $m;
-$m->notes(foo => 'bar');
-ok $m->notes('foo'), 'bar';
+$mb = Module::Build->new(module_name => $dist->name);
+ok $mb;
+$mb->notes(foo => 'bar');
+is $mb->notes('foo'), 'bar';
 
-$m->create_build_script;
+$mb->create_build_script;
 
-$m = Module::Build->resume;
-ok $m;
-ok $m->notes('foo'), 'bar';
+$mb = Module::Build->resume;
+ok $mb;
+is $mb->notes('foo'), 'bar';
+
+
+# cleanup
+chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
+$dist->remove;
+
+use File::Path;
+rmtree( $tmp );
