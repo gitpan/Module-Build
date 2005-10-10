@@ -36,7 +36,6 @@ my $build = new Module::Build
    recommends => {
 		  'Archive::Tar' => '1.08',
 		  'ExtUtils::Install' => 0.30,
-		  'ExtUtils::ParseXS' => 2.02,
 		  'Pod::Readme' => 0.04,
 		  'Module::Signature' => 0.21,
 		 },
@@ -55,7 +54,8 @@ my $build = new Module::Build
 		     C_support =>
 		     {
 		      description => "Can compile/link C & XS code",
-		      requires => { 'ExtUtils::CBuilder' => 0.02 },
+		      requires => { 'ExtUtils::CBuilder' => 0.15,
+				    'ExtUtils::ParseXS'  => 2.02, },
 		     },
 		     manpage_support =>
 		     {
@@ -71,6 +71,14 @@ my $build = new Module::Build
 
    add_to_cleanup => ['t/Sample/pod2htm*'],
    script_files => ['scripts/config_data'],
+   meta_merge => {
+		  resources =>
+		  {
+		   homepage => 'http://sourceforge.net/projects/module-build',
+		   bugtracker => 'http://rt.cpan.org/NoAuth/Bugs.html?Dist=Module-Build',
+		   MailingList => 'http://lists.sourceforge.net/lists/listinfo/module-build-general',
+		  }
+		 },
   );
 
 $build->create_build_script;

@@ -11,14 +11,34 @@ use IO::File;
 
 
 my $PKG_REGEXP  = qr/^[\s\{;]*package\s+([\w:]+)/;
-my $VERS_REGEXP = qr/([\$*])(([\w\:\']*)\bVERSION)\b.*\=/;
+
+my $VARNAME_REGEXP = qr/ # match fully-qualified VERSION name
+  ([\$*])         # sigil - $ or *
+  (
+    (             # optional leading package name
+      (?:::|\')?  # possibly starting like just :: (ala $::VERSION)
+      (?:\w+(?:::|\'))*  # Foo::Bar:: ...
+    )?
+    VERSION
+  )\b
+/x;
+
+my $VERS_REGEXP = qr/ # match a VERSION definition
+  (?:
+    \(\s*$VARNAME_REGEXP\s*\) # with parens
+  |
+    $VARNAME_REGEXP           # without parens
+  )
+  \s*
+  =[^=]  # = but not ==
+/x;
 
 
 sub new_from_file {
   my $package  = shift;
   my $filename = File::Spec->rel2abs( shift );
   return undef unless defined( $filename ) && -f $filename;
-  return __PACKAGE__->_init( undef, $filename, @_ );
+  return $package->_init( undef, $filename, @_ );
 }
 
 sub new_from_module {
@@ -26,9 +46,9 @@ sub new_from_module {
   my $module  = shift;
   my %props   = @_;
   $props{inc} ||= \@INC;
-  my $filename = __PACKAGE__->find_module_by_name( $module, $props{inc} );
+  my $filename = $package->find_module_by_name( $module, $props{inc} );
   return undef unless defined( $filename ) && -f $filename;
-  return __PACKAGE__->_init( $module, $filename, %props );
+  return $package->_init( $module, $filename, %props );
 }
 
 sub _init {
@@ -81,7 +101,7 @@ sub _init {
 }
 
 # class method
-sub find_module_by_name {
+sub _do_find_module {
   my $package = shift;
   my $module  = shift || die 'find_module_by_name() requires a package name';
   my $dirs    = shift || \@INC;
@@ -89,14 +109,44 @@ sub find_module_by_name {
   my $file = File::Spec->catfile(split( /::/, $module));
   foreach my $dir ( @$dirs ) {
     my $testfile = File::Spec->catfile($dir, $file);
-    return File::Spec->rel2abs( $testfile )
+    return [ File::Spec->rel2abs( $testfile ), $dir ]
 	if -e $testfile and !-d _;  # For stuff like ExtUtils::xsubpp
-    return File::Spec->rel2abs( "$testfile.pm" )
+    return [ File::Spec->rel2abs( "$testfile.pm" ), $dir ]
 	if -e "$testfile.pm";
   }
   return;
 }
 
+# class method
+sub find_module_by_name {
+  my $found = shift()->_do_find_module(@_) or return;
+  return $found->[0];
+}
+
+# class method
+sub find_module_dir_by_name {
+  my $found = shift()->_do_find_module(@_) or return;
+  return $found->[1];
+}
+
+
+# given a line of perl code, attempt to parse it if it looks like a
+# $VERSION assignment, returning sigil, full name, & package name
+sub _parse_version_expression {
+  my $self = shift;
+  my $line = shift;
+
+  my( $sig, $var, $pkg );
+  if ( $line =~ $VERS_REGEXP ) {
+    ( $sig, $var, $pkg ) = $2 ? ( $1, $2, $3 ) : ( $4, $5, $6 );
+    if ( $pkg ) {
+      $pkg = ($pkg eq '::') ? 'main' : $pkg;
+      $pkg =~ s/::$//;
+    }
+  }
+
+  return ( $sig, $var, $pkg );
+}
 
 sub _parse_file {
   my $self = shift;
@@ -105,7 +155,7 @@ sub _parse_file {
   my $fh = IO::File->new( $filename )
     or die( "Can't open '$filename': $!" );
 
-  my( $in_pod, $seen_end, $need_vers ) = ( 0, 0,0 );
+  my( $in_pod, $seen_end, $need_vers ) = ( 0, 0, 0 );
   my( @pkgs, %vers, %pod, @pod );
   my $pkg = 'main';
   my $pod_sect = '';
@@ -139,36 +189,60 @@ sub _parse_file {
       $pod_sect = '';
       $pod_data = '';
 
+      # parse $line to see if it's a $VERSION declaration
+      my( $vers_sig, $vers_fullname, $vers_pkg ) =
+	  $self->_parse_version_expression( $line );
+
       if ( $line =~ $PKG_REGEXP ) {
-        $pkg = $1;
-        push( @pkgs, $pkg ) unless grep( $pkg eq $_, @pkgs );
-        $vers{$pkg} = undef unless exists( $vers{$pkg} );
+	$pkg = $1;
+	push( @pkgs, $pkg ) unless grep( $pkg eq $_, @pkgs );
+	$vers{$pkg} = undef unless exists( $vers{$pkg} );
 	$need_vers = 1;
 
+      # VERSION defined with full package spec, i.e. $Module::VERSION
+      } elsif ( $vers_fullname && $vers_pkg ) {
+	push( @pkgs, $vers_pkg ) unless grep( $vers_pkg eq $_, @pkgs );
+	$need_vers = 0 if $vers_pkg eq $pkg;
+
+	my $v =
+	  $self->_evaluate_version_line( $vers_sig, $vers_fullname, $line );
+	unless ( defined $vers{$vers_pkg} && length $vers{$vers_pkg} ) {
+	  $vers{$vers_pkg} = $v;
+	} else {
+	  warn <<"EOM";
+Package '$vers_pkg' already declared with version '$vers{$vers_pkg}'
+ignoring new version '$v'.
+EOM
+	}
+
       # first non-comment line in undeclared package main is VERSION
-      } elsif ( !exists($vers{main}) && $pkg eq 'main' &&
-		$line =~ $VERS_REGEXP ) {
-	  $need_vers = 0;
-          my $v = $self->_evaluate_version_line( $line );
-	  $vers{$pkg} = $v;
-	  push( @pkgs, 'main' );
+      } elsif ( !exists($vers{main}) && $pkg eq 'main' && $vers_fullname ) {
+	$need_vers = 0;
+	my $v =
+	  $self->_evaluate_version_line( $vers_sig, $vers_fullname, $line );
+	$vers{$pkg} = $v;
+	push( @pkgs, 'main' );
 
       # first non-comement line in undeclared packge defines package main
-      } elsif ( !exists($vers{main}) && $pkg eq 'main' &&
-		$line =~ /\w+/ ) {
+      } elsif ( !exists($vers{main}) && $pkg eq 'main' && $line =~ /\w+/ ) {
 	$need_vers = 1;
 	$vers{main} = '';
 	push( @pkgs, 'main' );
 
-      } elsif ( $line =~ $VERS_REGEXP && $need_vers ) {
-        # only first keep if this is the first $VERSION seen
+      # only keep if this is the first $VERSION seen
+      } elsif ( $vers_fullname && $need_vers ) {
 	$need_vers = 0;
-        my $v = $self->_evaluate_version_line( $line );
+	my $v =
+	  $self->_evaluate_version_line( $vers_sig, $vers_fullname, $line );
+
+
 	unless ( defined $vers{$pkg} && length $vers{$pkg} ) {
 	  $vers{$pkg} = $v;
-        } else {
-	  warn "Package '$pkg' already declared with version '$vers{$pkg}'\n" .
-	       "  ignoring new version '$v'.\n";
+	} else {
+	  warn <<"EOM";
+Package '$pkg' already declared with version '$vers{$pkg}'
+ignoring new version '$v'.
+EOM
 	}
 
       }
@@ -189,12 +263,9 @@ sub _parse_file {
 
 sub _evaluate_version_line {
   my $self = shift;
-  my $line = shift;
+  my( $sigil, $var, $line ) = @_;
 
   # Some of this code came from the ExtUtils:: hierarchy.
-
-  my ($sigil, $var) = ($line =~ $VERS_REGEXP);
-
 
   my $eval = qq{q#  Hide from _packages_inside()
 		 #; package Module::Build::ModuleInfo::_version;
@@ -209,12 +280,15 @@ sub _evaluate_version_line {
 
   # version.pm will change the ->VERSION method, so we mitigate the
   # potential effects here.  Unfortunately local(*UNIVERSAL::VERSION)
-  # will crash perl < 5.8.1.
+  # will crash perl < 5.8.1.  We also use * Foo::VERSION instead of
+  # *Foo::VERSION so that old versions of CPAN.pm, etc. with a
+  # too-permissive regex don't think we're actually declaring a
+  # version.
 
   my $old_version = \&UNIVERSAL::VERSION;
   eval {require version};
   my $result = eval $eval;
-  *UNIVERSAL::VERSION = $old_version;
+  * UNIVERSAL::VERSION = $old_version;
   warn "Error evaling version line '$eval' in $self->{filename}: $@\n" if $@;
 
   # Unbless it if it's a version.pm object
@@ -322,6 +396,14 @@ Returns the path to a module given the module or package name. A list
 of directories can be passed in as an optional paramater, otherwise
 @INC is searched.
 
-Can be called as both an object and a class method.
+Can be called as either an object or a class method.
+
+=head2 find_module_dir_by_name( $module [ , \@dirs ] )
+
+Returns the entry in C<@dirs> (or C<@INC> by default) that contains
+the module C<$module>. A list of directories can be passed in as an
+optional paramater, otherwise @INC is searched.
+
+Can be called as either an object or a class method.
 
 =cut

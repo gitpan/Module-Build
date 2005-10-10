@@ -3,7 +3,7 @@
 use lib 't/lib';
 use strict;
 
-use Test::More tests => 68;
+use Test::More 'no_plan';   # tests => 68;
 
 
 use File::Spec ();
@@ -26,11 +26,6 @@ use Config;
 use File::Spec::Functions qw( catdir splitdir );
 
 #########################
-
-TODO: {
-  local $TODO = 'Test PREFIX pass-thru to compat Makefile.PL';
-  ok 0, 'PREFIX';
-}
 
 use Module::Build;
 my $mb = Module::Build->new_from_context;
@@ -58,7 +53,11 @@ $mb->prefix(undef);
         script  => $Config{installsitescript} || $Config{installsitebin} ||
                    $Config{installscript},
         bindoc  => $Config{installsiteman1dir} || $Config{installman1dir},
-        libdoc  => $Config{installsiteman3dir} || $Config{installman3dir}
+        libdoc  => $Config{installsiteman3dir} || $Config{installman3dir},
+        binhtml => $Config{installsitehtml1dir} ||
+		   $Config{installhtml1dir} || $Config{installhtmldir},
+        libhtml => $Config{installsitehtml3dir} ||
+		   $Config{installhtml3dir} || $Config{installhtmldir},
     });
 }
 
@@ -75,6 +74,8 @@ $mb->prefix(undef);
         script  => $Config{installscript} || $Config{installbin},
         bindoc  => $Config{installman1dir},
         libdoc  => $Config{installman3dir},
+        binhtml => $Config{installhtml1dir} || $Config{installhtmldir},
+        libhtml => $Config{installhtml3dir} || $Config{installhtmldir},
     });
 
     $mb->installdirs('site');
@@ -98,6 +99,8 @@ $mb->prefix(undef);
         script  => catdir( $install_base, 'bin' ),
         bindoc  => catdir( $install_base, 'man', 'man1'),
         libdoc  => catdir( $install_base, 'man', 'man3' ),
+        binhtml => catdir( $install_base, 'html' ),
+        libhtml => catdir( $install_base, 'html' ),
     });
 }
 
@@ -150,12 +153,9 @@ $mb->prefix(undef);
     }
 
     # Poke at the innards of MB to change the default install locations.
-    while( my($key, $path) = each %test_config ) {
-        $mb->{properties}{install_sets}{site}{$key} = $path;
-    }
-
-    $mb->{config}{siteprefixexp} = catdir(File::Spec->rootdir, 
-                                         'wierd', 'prefix');
+    local $mb->install_sets->{site} = \%test_config;
+    $mb->config(siteprefixexp => catdir(File::Spec->rootdir, 
+					'wierd', 'prefix'));
 
     my $prefix = catdir('another', 'prefix');
     $mb->prefix($prefix);
@@ -175,33 +175,39 @@ $mb->prefix(undef);
         script  => catdir( $install_base, 'bin' ),
         bindoc  => catdir( $install_base, 'man', 'man1'),
         libdoc  => catdir( $install_base, 'man', 'man3' ),
+        binhtml => catdir( $install_base, 'html' ),
+        libhtml => catdir( $install_base, 'html' ),
     });
 }
 
 
-TODO: {
-  local $TODO = "install paths not defined.";
-  ok 0, '(bin|lib)doc install destination';
-}
-
 sub test_prefix {
     my ($prefix, $test_config) = @_;
-  
+
     local $Test::Builder::Level = $Test::Builder::Level + 1;
 
-    foreach my $type (qw(lib arch bin script bindoc libdoc)) {
+    foreach my $type (qw(lib arch bin script bindoc libdoc binhtml libhtml)) {
         my $dest = $mb->install_destination( $type );
-        like( $dest, "/^\Q$prefix\E/", "$type prefixed");
+	ok $mb->dir_contains($prefix, $dest), "$type prefixed";
 
-        if( $test_config ) {
-            my @test_dirs = splitdir( $test_config->{$type} );
-            my @dest_dirs = splitdir( $dest );
-
-            is( $dest_dirs[-1], $test_dirs[-1], '  suffix correctish' );
+        if( $test_config && $test_config->{$type} ) {
+	    have_same_ending($dest, $test_config->{$type},
+			     "  suffix correctish ($test_config->{$type} + $prefix = $dest)" );
         }
     }
 }
 
+sub have_same_ending {
+  my ($dir1, $dir2, $message) = @_;
+
+  $dir1 =~ s{/$}{} if $^O eq 'cygwin'; # remove any trailing slash
+  my @dir1 = splitdir $dir1;
+
+  $dir2 =~ s{/$}{} if $^O eq 'cygwin'; # remove any trailing slash
+  my @dir2 = splitdir $dir2;
+
+  is $dir1[-1], $dir2[-1], $message;
+}
 
 sub test_install_destinations {
     my($build, $expect) = @_;

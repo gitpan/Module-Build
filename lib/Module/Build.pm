@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.27_02';
+$VERSION = '0.27_03';
 $VERSION = eval $VERSION;
 
 # Okay, this is the brute-force method of finding out what kind of
@@ -320,10 +320,13 @@ that directory.
 
 =item docs
 
-This will generate documentation (ie: Unix man pages) for any binary and
-library files under B<blib/> that contain POD.  If there are no C<bindoc> or
-C<libdoc> installation targets defined (as will be the case on systems that
-don't support Unix manpages) this action does nothing.
+This will generate documentation (ie: Unix man pages and html
+documents) for any binary and library files under B<blib/> that
+contain POD.  If there are no C<bindoc> or C<libdoc> installation
+targets defined (as will be the case on systems that don't support
+Unix manpages) no action is taken for manpages. If there are no
+C<binhtml> or C<libhtml> installation targets defined no action is
+taken for html documents.
 
 =item fakeinstall
 
@@ -575,17 +578,25 @@ possible.
 something.  Pretty rare to see this in a perl distribution, but it
 happens.
 
+=item bindoc
+
+Documentation for the stuff in C<script> and C<bin>.  Usually
+generated from the POD in those files.  Under Unix, these are manual
+pages belonging to the 'man1' category.
+
 =item libdoc
 
 Documentation for the stuff in C<lib> and C<arch>.  This is usually
 generated from the POD in F<.pm> files.  Under Unix, these are manual
 pages belonging to the 'man3' category.
 
-=item bindoc
+=item binhtml
 
-Documentation for the stuff in C<script> and C<bin>.  Usually
-generated from the POD in those files.  Under Unix, these are manual
-pages belonging to the 'man1' category.
+This is the same as C<bindoc> above, but applies to html documents.
+
+=item libhtml
+
+This is the same as C<bindoc> above, but applies to html documents.
 
 =back
 
@@ -610,8 +621,13 @@ parameter as follows:
  arch    => installarchlib  installsitearch     installvendorarch
  script  => installscript   installsitebin      installvendorbin
  bin     => installbin      installsitebin      installvendorbin
- libdoc  => installman3dir  installsiteman3dir  installvendorman3dir
  bindoc  => installman1dir  installsiteman1dir  installvendorman1dir
+ libdoc  => installman3dir  installsiteman3dir  installvendorman3dir
+ binhtml => installhtml1dir installsitehtml1dir installvendorhtml1dir [*]
+ libhtml => installhtml3dir installsitehtml3dir installvendorhtml3dir [*]
+
+ * Under some OS (eg. MSWin32) the destination for html documents is
+   determined by the C<Config.pm> entry C<installhtmldir>.
 
 The default value of C<installdirs> is "site".  If you're creating
 vendor distributions of module packages, you may want to do something
@@ -660,12 +676,14 @@ C<install_base> parameter to point to a directory on your system.  For
 instance, if you set C<install_base> to "/home/ken" on a Linux
 system, you'll install as follows:
 
- lib     => /home/ken/lib
- arch    => /home/ken/lib/i386-linux
- script  => /home/ken/scripts
+ lib     => /home/ken/lib/perl5
+ arch    => /home/ken/lib/perl5/i386-linux
+ script  => /home/ken/bin
  bin     => /home/ken/bin
  bindoc  => /home/ken/man/man1
  libdoc  => /home/ken/man/man3
+ binhtml => /home/ken/html
+ libhtml => /home/ken/html
 
 Note that this is I<different> from how MakeMaker's C<PREFIX>
 parameter works.  Module::Build doesn't support MakeMaker's C<PREFIX>

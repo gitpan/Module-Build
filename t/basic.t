@@ -3,7 +3,7 @@
 use lib 't/lib';
 use strict;
 
-use Test::More tests => 52;
+use Test::More tests => 55;
 
 
 use File::Spec ();
@@ -100,7 +100,7 @@ like $INC{'Module/Build.pm'}, qr/\bblib\b/, "Make sure Module::Build was loaded 
   # Make sure the correct warning message is generated when an
   # optional prereq isn't installed
   my $flagged = 0;
-  local $SIG{__WARN__} = sub { $flagged = 1 if $_[0] =~ /ModuleBuildNonExistent isn't installed/};
+  local $SIG{__WARN__} = sub { $flagged = 1 if $_[0] =~ /ModuleBuildNonExistent is not installed/};
 
   my $mb = Module::Build->new(
     module_name => $dist->name,
@@ -147,7 +147,7 @@ my \$build = Module::Build->new(
 
   $dist->regen;
   eval {Module::Build->run_perl_script('Build.PL', [], ['skip_rcfile=1', '--config', "foocakes=barcakes", '--foo', '--bar', '--bar', '-bat=hello', 'gee=whiz', '--any', 'hey', '--destdir', 'yo', '--verbose', '1'])};
-  ok ! $@;
+  is $@, '';
 
   my $mb = Module::Build->resume;
   is $mb->config->{cc}, $Config{cc};
@@ -196,6 +196,19 @@ my \$build = Module::Build->new(
   ok ref($mb->dist_author), 'dist_author converted to array if simple string';
   is $mb->dist_author->[0], 'Foo Meister <foo@example.com>';
   is $mb->build_class, 'My::Big::Fat::Builder';
+}
+
+# Test conversion of shell strings
+{
+  my $mb = Module::Build->new(
+    module_name => $dist->name,
+    dist_author => 'Foo Meister <foo@example.com>',
+    extra_compiler_flags => '-I/foo -I/bar',
+    extra_linker_flags => '-L/foo -L/bar',
+  );
+  ok $mb;
+  is_deeply $mb->extra_compiler_flags, ['-I/foo', '-I/bar'], "Should split shell string into list";
+  is_deeply $mb->extra_linker_flags,   ['-L/foo', '-L/bar'], "Should split shell string into list";
 }
 
 
