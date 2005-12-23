@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.27_03';
+$VERSION = '0.27_04';
 $VERSION = eval $VERSION;
 
 # Okay, this is the brute-force method of finding out what kind of
@@ -94,6 +94,7 @@ if (grep {-e File::Spec->catfile($_, qw(Module Build Platform), $^O) . '.pm'} @I
 sub os_type { $OSTYPES{$^O} }
 
 1;
+
 __END__
 
 
@@ -106,18 +107,18 @@ Module::Build - Build and install Perl modules
 
 Standard process for building & installing modules:
 
-   perl Build.PL
-   ./Build
-   ./Build test
-   ./Build install
+  perl Build.PL
+  ./Build
+  ./Build test
+  ./Build install
 
 Or, if you're on a platform (like DOS or Windows) that doesn't like
 the "./" notation, you can do this:
 
-   perl Build.PL
-   perl Build
-   perl Build test
-   perl Build install
+  perl Build.PL
+  perl Build
+  perl Build test
+  perl Build install
 
 
 =head1 DESCRIPTION
@@ -148,23 +149,57 @@ This illustrates initial configuration and the running of three
 'actions'.  In this case the actions run are 'build' (the default
 action), 'test', and 'install'.  Other actions defined so far include:
 
-  build                          help        
-  clean                          html        
-  code                           install     
-  config_data                    manifest    
+  build                          html        
+  clean                          install     
+  code                           manifest    
+  config_data                    manpages    
   diff                           ppd         
   dist                           ppmdist     
-  distcheck                      pure_install
-  distclean                      realclean   
-  distdir                        skipcheck   
-  distmeta                       test        
-  distsign                       testcover   
-  disttest                       testdb      
-  docs                           testpod     
-  fakeinstall                    versioninstall
+  distcheck                      prereq_report
+  distclean                      pure_install
+  distdir                        realclean   
+  distmeta                       skipcheck   
+  distsign                       test        
+  disttest                       testcover   
+  docs                           testdb      
+  fakeinstall                    testpod     
+  help                           versioninstall
 
 
 You can run the 'help' action for a complete list of actions.
+
+
+=head1 GUIDE TO DOCUMENTATION
+
+The documentation for C<Module::Build> is broken up into three sections:
+
+=over
+
+=item General Usage (L<Module::Build>)
+
+This is the document you are currently reading. It describes basic
+usage and background information.  Its main purpose is to assist the
+user who wants to learn how to invoke and control C<Module::Build>
+scripts at the command line.
+
+=item Authoring Reference (L<Module::Build::Authoring>)
+
+This document describes the C<Module::Build> API for authors who are
+writing F<Build.PL> scripts for a distribution or controlling
+C<Module::Build> processes programmatically.  It describes the
+methods available as well as providing general information on
+subclassing C<Module::Build> to alter and extend its behavior.  Also,
+there is a section on controlling the Build process from other
+scripts, including how to construct an object and how to invoke
+actions through it from an external script.
+
+=item Cookbook (L<Module::Build::Cookbook>)
+
+This document demonstrates how to accomplish many common tasks.  It
+covers general command line usage and authoring of F<Build.PL>
+scripts.  Includes working examples.
+
+=back
 
 
 =head1 ACTIONS
@@ -172,15 +207,15 @@ You can run the 'help' action for a complete list of actions.
 There are some general principles at work here.  First, each task when
 building a module is called an "action".  These actions are listed
 above; they correspond to the building, testing, installing,
-packaging, etc. tasks.
+packaging, etc., tasks.
 
 Second, arguments are processed in a very systematic way.  Arguments
 are always key=value pairs.  They may be specified at C<perl Build.PL>
-time (i.e.  C<perl Build.PL destdir=/my/secret/place>), in which case
+time (i.e. C<perl Build.PL destdir=/my/secret/place>), in which case
 their values last for the lifetime of the C<Build> script.  They may
 also be specified when executing a particular action (i.e.
 C<Build test verbose=1>), in which case their values last only for the
-lifetime of that command.  Per-action command-line parameters take
+lifetime of that command.  Per-action command line parameters take
 precedence over parameters specified at C<perl Build.PL> time.
 
 The build process also relies heavily on the C<Config.pm> module, and
@@ -219,31 +254,12 @@ them in C<blib/>.  Of course, you need a working C compiler (probably
 the same one that built perl itself) for the compilation to work
 properly.
 
-The C<build> action also runs any C<.PL> files in your F<lib/>
+The C<code> action also runs any C<.PL> files in your F<lib/>
 directory.  Typically these create other files, named the same but
 without the C<.PL> ending.  For example, a file F<lib/Foo/Bar.pm.PL>
 could create the file F<lib/Foo/Bar.pm>.  The C<.PL> files are
 processed first, so any C<.pm> files (or other kinds that we deal
 with) will get copied correctly.
-
-If your C<.PL> scripts don't create any files, or if they create files
-with unexpected names, or even if they create multiple files, you
-should tell us that so that we can clean up properly after these
-created files.  Use the C<PL_files> parameter to C<new()>:
-
- PL_files => { 'lib/Foo/Bar_pm.PL' => 'lib/Foo/Bar.pm',
-               'lib/something.PL'  => ['/lib/something', '/lib/else'],
-               'lib/funny.PL'      => [] }
-
-Note that in contrast to MakeMaker, the C<build> action only
-(currently) handles C<.pm>, C<.pod>, C<.PL>, and C<.xs> files.  They
-must all be in the C<lib/> directory, in the directory structure that
-they should have when installed.  We also handle C<.c> files that can
-be in the place of your choosing - see the C<c_source> argument to
-C<new()>.
-
-The C<.xs> support is currently in alpha.  Please let me know whether
-it works for you.
 
 =item config_data
 
@@ -261,7 +277,7 @@ A C<flags> parameter may be passed to the action, which will be passed
 to the 'diff' program.  Consult your 'diff' documentation for the
 parameters it will accept - a good one is C<-u>:
 
- ./Build diff flags=-u
+  ./Build diff flags=-u
 
 =item dist
 
@@ -275,12 +291,12 @@ executables on Unix-like platforms, and the C<Archive::Tar> module
 elsewhere.  However, you can force it to use whatever executable you
 want by supplying an explicit C<tar> (and optional C<gzip>) parameter:
 
- perl Build dist --tar C:\path\to\tar.exe --gzip C:\path\to\zip.exe
+  ./Build dist --tar C:\path\to\tar.exe --gzip C:\path\to\zip.exe
 
 =item distcheck
 
 Reports which files are in the build directory but not in the
-F<MANIFEST> file, and vice versa. (See L<manifest> for details)
+F<MANIFEST> file, and vice versa.  (See L<manifest> for details.)
 
 =item distclean
 
@@ -288,23 +304,25 @@ Performs the 'realclean' action and then the 'distcheck' action.
 
 =item distdir
 
-Creates a directory called C<$(DISTNAME)-$(VERSION)> (if that
-directory already exists, it will be removed first).  Then copies all
-the files listed in the F<MANIFEST> file to that directory.  This
-directory is what people will see when they download your distribution
-and unpack it.
-
-While performing the 'distdir' action, a file containing various bits
-of "metadata" will be created.  The metadata includes the module's
-name, version, dependencies, license, and the C<dynamic_config>
-flag.  This file is created as F<META.yml> in YAML format, so you
-must have the C<YAML> module installed in order to create it.  You
-should also ensure that the F<META.yml> file is listed in your
-F<MANIFEST> - if it's not, a warning will be issued.
+Creates a "distribution directory" named C<$dist_name-$dist_version>
+(if that directory already exists, it will be removed first), then
+copies all the files listed in the F<MANIFEST> file to that directory.
+This directory is what the distribution tarball is created from.
 
 =item distmeta
 
-Creates the F<META.yml> file for your distribution.
+Creates the F<META.yml> file that describes the distribution.
+
+F<META.yml> is a file containing various bits of "metadata" about the
+distribution.  The metadata includes the distribution name, version,
+abstract, prerequisites, license, and various other data about the
+distribution.  This file is created as F<META.yml> in YAML format, so
+the C<YAML> module must be installed in order to create it.  The
+F<META.yml> file must also be listed in F<MANIFEST> - if it's not, a
+warning will be issued.
+
+The current version of the F<META.yml> specification can be found at
+L<http://module-build.sourceforge.net/META-spec-v1.2.html>
 
 =item distsign
 
@@ -320,11 +338,11 @@ that directory.
 
 =item docs
 
-This will generate documentation (ie: Unix man pages and html
-documents) for any binary and library files under B<blib/> that
+This will generate documentation (e.g. Unix man pages and html
+documents) for any installable items under B<blib/> that
 contain POD.  If there are no C<bindoc> or C<libdoc> installation
 targets defined (as will be the case on systems that don't support
-Unix manpages) no action is taken for manpages. If there are no
+Unix manpages) no action is taken for manpages.  If there are no
 C<binhtml> or C<libhtml> installation targets defined no action is
 taken for html documents.
 
@@ -344,19 +362,28 @@ With an optional argument specifying an action name (e.g. C<Build help
 test>), the 'help' action will show you any POD documentation it can
 find for that action.
 
+=item html
+
+This will generate HTML documentation for any binary or library files
+under B<blib/> that contain POD.  The HTML documentation will only be
+installed if the install paths can be determined from values in
+C<Config.pm>.  You can also supply or override install paths on the
+command line by specifying C<install_path> values for the C<binhtml>
+and/or C<libhtml> installation targets.
+
 =item install
 
 This action will use C<ExtUtils::Install> to install the files from
-C<blib/> into the system.  See L<How Installation Paths are Determined> for details
-about how Module::Build determines where to install things, and how to
-influence this process.
+C<blib/> into the system.  See L<INSTALL PATHS>
+for details about how Module::Build determines where to install
+things, and how to influence this process.
 
 If you want the installation process to look around in C<@INC> for
 other versions of the stuff you're installing and try to delete it,
 you can use the C<uninst> parameter, which tells C<ExtUtils::Install> to
 do so:
 
- Build install uninst=1
+  ./Build install uninst=1
 
 This can be a good idea, as it helps prevent multiple versions of a
 module from being present on your system, which can be a confusing
@@ -376,16 +403,25 @@ in the F<MANIFEST>.
 The following is a reasonable F<MANIFEST.SKIP> starting point, you can
 add your own stuff to it:
 
-   ^_build
-   ^Build$
-   ^blib
-   ~$
-   \.bak$
-   ^MANIFEST\.SKIP$
-   CVS
+  ^_build
+  ^Build$
+  ^blib
+  ~$
+  \.bak$
+  ^MANIFEST\.SKIP$
+  CVS
 
 See the L<distcheck> and L<skipcheck> actions if you want to find out
 what the C<manifest> action would do, without actually doing anything.
+
+=item manpages
+
+This will generate man pages for any binary or library files under
+B<blib/> that contain POD.  The man pages will only be installed if the
+install paths can be determined from values in C<Config.pm>.  You can
+also supply or override install paths by specifying there values on
+the command line with the C<bindoc> and C<libdoc> installation
+targets.
 
 =item ppd
 
@@ -393,12 +429,12 @@ Build a PPD file for your distribution.
 
 This action takes an optional argument C<codebase> which is used in
 the generated ppd file to specify the (usually relative) URL of the
-distribution. By default, this value is the distribution name without
+distribution.  By default, this value is the distribution name without
 any path information.
 
 Example:
 
- perl Build ppd codebase="MSWin32-x86-multi-thread/Module-Build-0.21.tar.gz"
+  ./Build ppd --codebase "MSWin32-x86-multi-thread/Module-Build-0.21.tar.gz"
 
 =item ppmdist
 
@@ -409,6 +445,13 @@ C<codebase> argument described under that action.
 This uses the same mechanism as the C<dist> action to tar & zip its
 output, so you can supply C<tar> and/or C<gzip> parameters to affect
 the result.
+
+=item prereq_report
+
+This action prints out a list of all prerequisites, the versions required, and
+the versions actually installed.  This can be useful for reviewing the
+configuration of your system prior to a build, or when compiling data to send
+for a bug report.
 
 =item pure_install
 
@@ -452,15 +495,15 @@ argument whose value is a whitespace-separated list of test scripts to
 run.  This is especially useful in development, when you only want to
 run a single test to see whether you've squashed a certain bug yet:
 
- ./Build test --test_files t/something_failing.t
+  ./Build test --test_files t/something_failing.t
 
 You may also pass several C<test_files> arguments separately:
 
- ./Build test --test_files t/one.t --test_files t/two.t
+  ./Build test --test_files t/one.t --test_files t/two.t
 
 or use a C<glob()>-style pattern:
 
- ./Build test --test_files 't/01-*.t'
+  ./Build test --test_files 't/01-*.t'
 
 =item testcover
 
@@ -481,7 +524,7 @@ argument.
 =item testpod
 
 This checks all the files described in the C<docs> action and 
-produces C<Test::Harness>-style output. If you are a module author,
+produces C<Test::Harness>-style output.  If you are a module author,
 this is useful to run before creating a new release.
 
 =item versioninstall
@@ -492,20 +535,20 @@ experimental. **
 
 If you have the C<only.pm> module installed on your system, you can
 use this action to install a module into the version-specific library
-trees. This means that you can have several versions of the same
+trees.  This means that you can have several versions of the same
 module installed and C<use> a specific one like this:
 
- use only MyModule => 0.55;
+  use only MyModule => 0.55;
 
 To override the default installation libraries in C<only::config>,
 specify the C<versionlib> parameter when you run the C<Build.PL> script:
 
- perl Build.PL versionlib=/my/version/place/
+  perl Build.PL --versionlib /my/version/place/
 
 To override which version the module is installed as, specify the
 C<versionlib> parameter when you run the C<Build.PL> script:
 
- perl Build.PL version=0.50
+  perl Build.PL --version 0.50
 
 See the C<only.pm> documentation for more information on
 version-specific installs.
@@ -513,20 +556,54 @@ version-specific installs.
 =back
 
 
-=head2 Default Commandline Options (F<.modulebuildrc>)
+=head1 OPTIONS
+
+=head2 Command Line Options
+
+The following options can be used during any invocation of C<Build.PL>
+or the Build script, during any action.  For information on other
+options specific to an action, see the documentation for the
+respective action.
+
+NOTE: There is some preliminary support for options to use the more
+familiar long option style.  Most options can be preceded with the
+C<--> long option prefix, and the underscores changed to dashes
+(e.g. --use-rcfile).  Additionally, the argument to boolean options is
+optional, and boolean options can be negated by prefixing them with
+'no' or 'no-' (e.g. --noverbose or --no-verbose).
+
+=over 4
+
+=item quiet
+
+Suppress informative messages on output.
+
+=item use_rcfile
+
+Load the F<~/.modulebuildrc> option file.  This option can be set to
+false to prevent the custom resource file from being loaded.
+
+=item verbose
+
+Display extra information about the Build on output.
+
+=back
+
+
+=head2 Default Options File (F<.modulebuildrc>)
 
 When Module::Build starts up, it will look for a file,
-F<$ENV{HOME}/.modulebuildrc>. If the file exists, the options
+F<$ENV{HOME}/.modulebuildrc>.  If the file exists, the options
 specified there will be used as defaults, as if they were typed on the
-command line. The defaults can be overridden by specifying new values
+command line.  The defaults can be overridden by specifying new values
 on the command line.
 
 The action name must come at the beginning of the line, followed by any
-amount of whitespace and then the options. Options are given the same
-as they would be on the commandline. They can be separated by any
+amount of whitespace and then the options.  Options are given the same
+as they would be on the command line.  They can be separated by any
 amount of whitespace, including newlines, as long there is whitespace at
-the beginning of each continued line. Anything following a hash mark (C<#>)
-is considered a comment, and is stripped before parsing. If more than
+the beginning of each continued line.  Anything following a hash mark (C<#>)
+is considered a comment, and is stripped before parsing.  If more than
 one line begins with the same action name, those lines are merged into
 one set of options.
 
@@ -535,13 +612,17 @@ key C<*> (asterisk) denotes any global options that should be applied
 to all actions, and the key 'Build_PL' specifies options to be applied
 when you invoke C<perl Build.PL>.
 
- *        verbose=1   # global options
- diff     flags=-u
- install  install_base=/home/ken
-          --install_path html=/home/ken/docs/html
+  *        verbose=1   # global options
+  diff     flags=-u
+  install  --install_base /home/ken
+           --install_path html=/home/ken/docs/html
+
+If you wish to locate your resource file in a different location, you
+can set the environment variable 'MODULEBUILDRC' to the complete
+absolute path of the file containing your options.
 
 
-=head2 How Installation Paths are Determined
+=head1 INSTALL PATHS
 
 When you invoke Module::Build's C<build> action, it needs to figure
 out where to install things.  The nutshell version of how this works
@@ -614,30 +695,30 @@ parameter as follows:
 
                           'installdirs' set to:
                    core          site                vendor
- 
-              uses the following defaults from Config.pm:
- 
- lib     => installprivlib  installsitelib      installvendorlib
- arch    => installarchlib  installsitearch     installvendorarch
- script  => installscript   installsitebin      installvendorbin
- bin     => installbin      installsitebin      installvendorbin
- bindoc  => installman1dir  installsiteman1dir  installvendorman1dir
- libdoc  => installman3dir  installsiteman3dir  installvendorman3dir
- binhtml => installhtml1dir installsitehtml1dir installvendorhtml1dir [*]
- libhtml => installhtml3dir installsitehtml3dir installvendorhtml3dir [*]
 
- * Under some OS (eg. MSWin32) the destination for html documents is
-   determined by the C<Config.pm> entry C<installhtmldir>.
+              uses the following defaults from Config.pm:
+
+  lib     => installprivlib  installsitelib      installvendorlib
+  arch    => installarchlib  installsitearch     installvendorarch
+  script  => installscript   installsitebin      installvendorbin
+  bin     => installbin      installsitebin      installvendorbin
+  bindoc  => installman1dir  installsiteman1dir  installvendorman1dir
+  libdoc  => installman3dir  installsiteman3dir  installvendorman3dir
+  binhtml => installhtml1dir installsitehtml1dir installvendorhtml1dir [*]
+  libhtml => installhtml3dir installsitehtml3dir installvendorhtml3dir [*]
+
+  * Under some OS (eg. MSWin32) the destination for html documents is
+    determined by the C<Config.pm> entry C<installhtmldir>.
 
 The default value of C<installdirs> is "site".  If you're creating
 vendor distributions of module packages, you may want to do something
 like this:
 
- perl Build.PL installdirs=vendor
+  perl Build.PL --installdirs vendor
 
 or
 
- Build install installdirs=vendor
+  ./Build install --installdirs vendor
 
 If you're installing an updated version of a module that was included
 with perl itself (i.e. a "core module"), then you may set
@@ -653,21 +734,15 @@ appropriate entries, we'll start using those.)
 
 =item install_path
 
-Once the defaults have been set, you can override them.  You can set
-individual entries by using the C<install_path> parameter:
-
- my $m = Module::Build->new
-  (...other options...,
-   install_path => {lib  => '/foo/lib',
-                    arch => '/foo/lib/arch'});
+Once the defaults have been set, you can override them.
 
 On the command line, that would look like this:
 
- perl Build.PL --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
+  perl Build.PL --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
 
 or this:
 
- Build install --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
+  ./Build install --install_path lib=/foo/lib --install_path arch=/foo/lib/arch
 
 =item install_base
 
@@ -676,21 +751,20 @@ C<install_base> parameter to point to a directory on your system.  For
 instance, if you set C<install_base> to "/home/ken" on a Linux
 system, you'll install as follows:
 
- lib     => /home/ken/lib/perl5
- arch    => /home/ken/lib/perl5/i386-linux
- script  => /home/ken/bin
- bin     => /home/ken/bin
- bindoc  => /home/ken/man/man1
- libdoc  => /home/ken/man/man3
- binhtml => /home/ken/html
- libhtml => /home/ken/html
+  lib     => /home/ken/lib/perl5
+  arch    => /home/ken/lib/perl5/i386-linux
+  script  => /home/ken/bin
+  bin     => /home/ken/bin
+  bindoc  => /home/ken/man/man1
+  libdoc  => /home/ken/man/man3
+  binhtml => /home/ken/html
+  libhtml => /home/ken/html
 
 Note that this is I<different> from how MakeMaker's C<PREFIX>
-parameter works.  Module::Build doesn't support MakeMaker's C<PREFIX>
-option.  See L</"Why PREFIX is not supported"> for more details.
-C<install_base> just gives you a default layout under the directory
-you specify, which may have little to do with the C<installdirs=site>
-layout.
+parameter works.  See L</"Why PREFIX is not recommended"> for more
+details.  C<install_base> just gives you a default layout under the
+directory you specify, which may have little to do with the
+C<installdirs=site> layout.
 
 The exact layout under the directory you specify may vary by system -
 we try to do the "sensible" thing on each platform.
@@ -702,11 +776,11 @@ If you want to install everything into a temporary directory first
 manager like C<rpm> or C<dpkg> could create a package from), you can
 use the C<destdir> parameter:
 
- perl Build.PL destdir=/tmp/foo
+  perl Build.PL --destdir /tmp/foo
 
 or
 
- Build install destdir=/tmp/foo
+  ./Build install --destdir /tmp/foo
 
 This will effectively install to "/tmp/foo/$sitelib",
 "/tmp/foo/$sitearch", and the like, except that it will use
@@ -715,41 +789,7 @@ platform you're installing on.
 
 =back
 
-=head1 Alternatives to PREFIX
-
-Module::Build offers L</install_base> as a simple, predictable, and
-user-configurable alternative to ExtUtils::MakeMaker's C<PREFIX>.
-What's more, MakeMaker will soon accept C<INSTALL_BASE> -- we strongly
-urge you to make the switch.
-
-Here's a quick comparison of the two when installing modules to your
-home directory on a unix box:
-
-MakeMaker [*]:
-
-  % perl Makefile.PL PREFIX=/home/spurkis
-  PERL5LIB=/home/spurkis/lib/perl5/5.8.5:/home/spurkis/lib/perl5/site_perl/5.8.5
-  PATH=/home/spurkis/bin
-  MANPATH=/home/spurkis/man
-
-Module::Build:
-
-  % perl Build.PL install_base=/home/spurkis
-  PERL5LIB=/home/spurkis/lib/perl5
-  PATH=/home/spurkis/bin
-  MANPATH=/home/spurkis/man
-
-[*] Note that MakeMaker's behaviour cannot be guaranteed in even this
-common scenario, and differs among different versions of MakeMaker.
-
-In short, using C<install_base> is similar to the following MakeMaker usage:
-
-  perl Makefile.PL PREFIX=/home/spurkis LIB=/home/spurkis/lib/perl5
-
-See L</How Installation Paths are Determined> for details on other
-installation options available and how to configure them.
-
-=head2 Why PREFIX is not supported
+=head2 About PREFIX Support
 
 First, it is necessary to understand the original idea behind
 C<PREFIX>.  If, for example, the default installation locations for
@@ -763,8 +803,12 @@ each path.
 
 However, the real world is more complicated than that.  The C<PREFIX>
 idea is fundamentally broken when your machine doesn't jibe with
-C<PREFIX>'s worldview.  A design decision was made not to support it
-in Module::Build, here's a summary of the reasons why:
+C<PREFIX>'s worldview.
+
+
+=over 4
+
+=item Why PREFIX is not recommended
 
 =over 4
 
@@ -773,9 +817,10 @@ in Module::Build, here's a summary of the reasons why:
 Many systems have Perl configs that make little sense with PREFIX.
 For example, OS X, where core modules go in
 F</System/Library/Perl/...>, user-installed modules go in
-F</Library/Perl/...>, and man pages go in F</usr/share/man/...>.  The PREFIX is thus set to F</>.
-Install L<Foo::Bar> on OS X with C<PREFIX=/home/spurkis> and you get
-things like F</home/spurkis/Library/Perl/5.8.1/Foo/Bar.pm> and
+F</Library/Perl/...>, and man pages go in F</usr/share/man/...>.  The
+PREFIX is thus set to F</>.  Install L<Foo::Bar> on OS X with
+C<PREFIX=/home/spurkis> and you get things like
+F</home/spurkis/Library/Perl/5.8.1/Foo/Bar.pm> and
 F</home/spurkis/usr/share/man/man3/Foo::Bar.3pm>.  Not too pretty.
 
 The problem is not limited to Unix-like platforms, either - on Windows
@@ -812,11 +857,43 @@ have been you or it could have been some guy at Redhat.
 
 =back
 
-=head2 PREFIX will be supported
 
-The current maintainer of MakeMaker has offered to implement C<PREFIX>
-pass-through support in Module::Build B<for backwards compatability
-only>.  You are still strongly recommended to use C<install_base>.
+=item Alternatives to PREFIX
+
+Module::Build offers L</install_base> as a simple, predictable, and
+user-configurable alternative to ExtUtils::MakeMaker's C<PREFIX>.
+What's more, MakeMaker will soon accept C<INSTALL_BASE> -- we strongly
+urge you to make the switch.
+
+Here's a quick comparison of the two when installing modules to your
+home directory on a unix box:
+
+MakeMaker [*]:
+
+  % perl Makefile.PL PREFIX=/home/spurkis
+  PERL5LIB=/home/spurkis/lib/perl5/5.8.5:/home/spurkis/lib/perl5/site_perl/5.8.5
+  PATH=/home/spurkis/bin
+  MANPATH=/home/spurkis/man
+
+Module::Build:
+
+  % perl Build.PL install_base=/home/spurkis
+  PERL5LIB=/home/spurkis/lib/perl5
+  PATH=/home/spurkis/bin
+  MANPATH=/home/spurkis/man
+
+[*] Note that MakeMaker's behaviour cannot be guaranteed in even this
+common scenario, and differs among different versions of MakeMaker.
+
+In short, using C<install_base> is similar to the following MakeMaker usage:
+
+  perl Makefile.PL PREFIX=/home/spurkis LIB=/home/spurkis/lib/perl5
+
+See L</INSTALL PATHS> for details on other
+installation options available and how to configure them.
+
+=back
+
 
 =head1 MOTIVATIONS
 
@@ -895,23 +972,22 @@ requires tracing all dependencies backward, it runs into problems on
 NFS, and it's just generally flimsy.  It would be better to use an MD5
 signature or the like, if available.  See C<cons> for an example.
 
-- append to perllocal.pod
-- write .packlist in appropriate location (needed for un-install)
-- add a 'plugin' functionality
+ - append to perllocal.pod
+ - add a 'plugin' functionality
 
 
 =head1 AUTHOR
 
-Ken Williams, kwilliams@cpan.org
+Ken Williams <kwilliams@cpan.org>
 
 Development questions, bug reports, and patches should be sent to the
-Module-Build mailing list at module-build-general@lists.sourceforge.net .
+Module-Build mailing list at <module-build-general@lists.sourceforge.net>.
 
 Bug reports are also welcome at
-http://rt.cpan.org/NoAuth/Bugs.html?Dist=Module-Build .
+<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Module-Build>.
 
 An anonymous CVS repository containing the latest development version
-is available; see http://sourceforge.net/cvs/?group_id=45731 for the
+is available; see <http://sourceforge.net/cvs/?group_id=45731> for the
 details of how to access it.
 
 
@@ -922,11 +998,15 @@ Copyright (c) 2001-2005 Ken Williams.  All rights reserved.
 This library is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
+
 =head1 SEE ALSO
 
 perl(1), Module::Build::Cookbook(3), Module::Build::Authoring(3),
 ExtUtils::MakeMaker(3), YAML(3)
 
-http://www.dsmit.com/cons/
+F<META.yml> Specification:
+L<http://module-build.sourceforge.net/META-spec-v1.2.html>
+
+L<http://www.dsmit.com/cons/>
 
 =cut

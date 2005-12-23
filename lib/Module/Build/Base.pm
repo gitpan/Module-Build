@@ -7,7 +7,7 @@ use File::Copy ();
 use File::Find ();
 use File::Path ();
 use File::Basename ();
-use File::Spec ();
+use File::Spec 0.82 ();
 use File::Compare ();
 use Data::Dumper ();
 use IO::File ();
@@ -22,7 +22,7 @@ use Module::Build::Notes;
 sub new {
   my $self = shift()->_construct(@_);
 
-  $self->{action} = 'Build_PL';
+  $self->{invoked_action} = $self->{action} ||= 'Build_PL';
   $self->cull_args(@ARGV);
   
   die "Too early to specify a build action '$self->{action}'.  Do 'Build $self->{action}' instead.\n"
@@ -30,9 +30,11 @@ sub new {
 
   $self->dist_name;
   $self->dist_version;
+
   $self->check_manifest;
   $self->check_prereq;
   $self->check_autofeatures;
+
   $self->_set_install_paths;
   $self->_find_nested_builds;
 
@@ -71,7 +73,7 @@ sub resume {
     unless $mb_version eq $self->{properties}{mb_version};
   
   $self->cull_args(@ARGV);
-  $self->{action} ||= 'build';
+  $self->{invoked_action} = $self->{action} ||= 'build';
   
   return $self;
 }
@@ -156,7 +158,7 @@ sub _construct {
 
   $self->add_to_cleanup( @{delete $p->{add_to_cleanup}} )
     if $p->{add_to_cleanup};
-  
+
   return $self;
 }
 
@@ -175,9 +177,10 @@ sub log_warn {
   }
 }
 
+
 sub _set_install_paths {
   my $self = shift;
-  my $c = $self->{config};
+  my $c = $self->config;
   my $p = $self->{properties};
 
   my @libstyle = $c->{installstyle} ?
@@ -185,8 +188,11 @@ sub _set_install_paths {
   my $arch     = $c->{archname};
   my $version  = $c->{version};
 
-  my $html1dir = $c->{installhtml1dir} || $c->{installhtmldir};
-  my $html3dir = $c->{installhtml3dir} || $c->{installhtmldir};
+  my $bindoc  = $c->{installman1dir} || undef;
+  my $libdoc  = $c->{installman3dir} || undef;
+
+  my $binhtml = $c->{installhtml1dir} || $c->{installhtmldir} || undef;
+  my $libhtml = $c->{installhtml3dir} || $c->{installhtmldir} || undef;
 
   $p->{install_sets} =
     {
@@ -195,10 +201,10 @@ sub _set_install_paths {
 		arch    => $c->{installarchlib},
 		bin     => $c->{installbin},
 		script  => $c->{installscript},
-		bindoc  => $c->{installman1dir},
-		libdoc  => $c->{installman3dir},
-		binhtml => $html1dir,
-		libhtml => $html3dir,
+		bindoc  => $bindoc,
+		libdoc  => $libdoc,
+		binhtml => $binhtml,
+		libhtml => $libhtml,
 	       },
      site   => {
 		lib     => $c->{installsitelib},
@@ -206,10 +212,10 @@ sub _set_install_paths {
 		bin     => $c->{installsitebin} || $c->{installbin},
 		script  => $c->{installsitescript} ||
 		           $c->{installsitebin} || $c->{installscript},
-		bindoc  => $c->{installsiteman1dir} || $c->{installman1dir},
-		libdoc  => $c->{installsiteman3dir} || $c->{installman3dir},
-		binhtml => $c->{installsitehtml1dir} || $html1dir,
-		libhtml => $c->{installsitehtml3dir} || $html3dir,
+		bindoc  => $c->{installsiteman1dir} || $bindoc,
+		libdoc  => $c->{installsiteman3dir} || $libdoc,
+		binhtml => $c->{installsitehtml1dir} || $binhtml,
+		libhtml => $c->{installsitehtml3dir} || $libhtml,
 	       },
      vendor => {
 		lib     => $c->{installvendorlib},
@@ -217,10 +223,10 @@ sub _set_install_paths {
 		bin     => $c->{installvendorbin} || $c->{installbin},
 		script  => $c->{installvendorscript} ||
 		           $c->{installvendorbin} || $c->{installscript},
-		bindoc  => $c->{installvendorman1dir} || $c->{installman1dir},
-		libdoc  => $c->{installvendorman3dir} || $c->{installman3dir},
-		binhtml => $c->{installvendorhtml1dir} || $html1dir,
-		libhtml => $c->{installvendorhtml3dir} || $html3dir,
+		bindoc  => $c->{installvendorman1dir} || $bindoc,
+		libdoc  => $c->{installvendorman3dir} || $libdoc,
+		binhtml => $c->{installvendorhtml1dir} || $binhtml,
+		libhtml => $c->{installvendorhtml3dir} || $libhtml,
 	       },
     };
 
@@ -283,17 +289,6 @@ sub _set_install_paths {
 	     },
     };
 
-
-  my $installdirs = $p->{installdirs};
-
-  $p->{gen_manpages} ||= ( $p->{install_sets}{$installdirs}{bindoc} &&
-                           $p->{install_sets}{$installdirs}{libdoc} ) ? 1 : 0;
-  $p->{gen_html}     ||= ( $p->{install_sets}{$installdirs}{binhtml} &&
-			   $p->{install_sets}{$installdirs}{libhtml} ) ? 1 : 0;
-
-  $p->{install_manpages} ||= $p->{gen_manpages} ? 1 : 0;
-  $p->{install_html}     ||= $p->{gen_html}     ? 1 : 0;
-
 }
 
 sub _find_nested_builds {
@@ -328,7 +323,7 @@ sub _perl_is_same {
 sub find_perl_interpreter {
   return $^X if File::Spec->file_name_is_absolute($^X);
   my $proto = shift;
-  my $c = ref($proto) ? $proto->{config} : \%Config::Config;
+  my $c = ref($proto) ? $proto->config : \%Config::Config;
   my $exe = $c->{exe_ext};
 
   my $thisperl = $^X;
@@ -346,8 +341,6 @@ sub find_perl_interpreter {
   }
   return;
 }
-
-sub base_dir { shift()->{properties}{base_dir} }
 
 sub _is_interactive {
   return -t STDIN && (-t STDOUT || !(-f STDOUT || -c STDOUT)) ;   # Pipe?
@@ -398,6 +391,7 @@ sub y_n {
 }
 
 sub current_action { shift->{action} }
+sub invoked_action { shift->{invoked_action} }
 
 sub notes        { shift()->{phash}{notes}->access(@_) }
 sub config_data  { shift()->{phash}{config_data}->access(@_) }
@@ -410,19 +404,28 @@ sub features     {
 
   if (@_) {
     my $key = shift;
-    if ($ph->{features}->exists($key)) { return $ph->{features}->access($key, @_) }
+    if ($ph->{features}->exists($key)) {
+      return $ph->{features}->access($key, @_);
+    }
 
     if (my $info = $ph->{auto_features}->access($key)) {
-      return not $self->prereq_failures($info);
+      my $failures = $self->prereq_failures($info);
+      my $disabled = grep( /^(?:\w+_)?(?:requires|conflicts)$/,
+			   keys %$failures ) ? 1 : 0;
+      return !$disabled;
     }
+
     return $ph->{features}->access($key, @_);
   }
-  
+
   # No args - get the auto_features & overlay the regular features
   my %features;
   my %auto_features = $ph->{auto_features}->access();
   while (my ($name, $info) = each %auto_features) {
-    $features{$name} = not $self->prereq_failures($info);
+    my $failures = $self->prereq_failures($info);
+    my $disabled = grep( /^(?:\w+_)?(?:requires|conflicts)$/,
+			 keys %$failures ) ? 1 : 0;
+    $features{$name} = $disabled ? 0 : 1;
   }
   %features = (%features, $ph->{features}->access());
 
@@ -455,10 +458,13 @@ sub ACTION_config_data {
   
   my $module_name = $self->module_name
     or die "The config_data feature requires that 'module_name' be set";
-  my $notes_name = $module_name . '::ConfigData';
+  my $notes_name = $module_name . '::ConfigData'; # TODO: Customize name ???
   my $notes_pm = File::Spec->catfile($self->blib, 'lib', split /::/, "$notes_name.pm");
 
-  return if $self->up_to_date([$self->config_file('config_data'), $self->config_file('features')], $notes_pm);
+  return if $self->up_to_date(['Build.PL',
+			       $self->config_file('config_data'),
+			       $self->config_file('features')
+			      ], $notes_pm);
 
   $self->log_info("Writing config notes to $notes_pm\n");
   File::Path::mkpath(File::Basename::dirname($notes_pm));
@@ -520,17 +526,44 @@ sub ACTION_config_data {
 
       $valid_properties{$class}{$property} = $default;
 
-      if (my $type = ref $default) {
+      my $type = ref $default;
+      if ($type) {
 	push @{$additive_properties{$class}->{$type}}, $property;
       }
 
       unless ($class->can($property)) {
         no strict 'refs';
-        *{"$class\::$property"} = sub {
-	  my $self = shift;
-	  $self->{properties}{$property} = shift if @_;
-	  return $self->{properties}{$property};
-	};
+	if ( $type eq 'HASH' ) {
+          *{"$class\::$property"} = sub {
+	    my $self = shift;
+	    my $x = ( $property eq 'config' ) ? $self : $self->{properties};
+	    return $x->{$property} unless @_;
+
+	    if ( defined($_[0]) && !ref($_[0]) ) {
+	      if ( @_ == 1 ) {
+		return exists( $x->{$property}{$_[0]} ) ?
+		         $x->{$property}{$_[0]} : undef;
+              } elsif ( @_ % 2 == 0 ) {
+	        my %args = @_;
+	        while ( my($k, $v) = each %args ) {
+	          $x->{$property}{$k} = $v;
+	        }
+	      } else {
+		die "Unexpected arguments for property '$property'\n";
+	      }
+	    } else {
+	      $x->{$property} = $_[0];
+	    }
+	  };
+
+        } else {
+          *{"$class\::$property"} = sub {
+	    my $self = shift;
+	    $self->{properties}{$property} = shift if @_;
+	    return $self->{properties}{$property};
+	  }
+        }
+
       }
       return $class;
     }
@@ -540,6 +573,9 @@ sub ACTION_config_data {
 
       # Set the build class.
       $self->{properties}{build_class} ||= ref $self;
+
+      # If there was no orig_dir, set to the same as base_dir
+      $self->{properties}{orig_dir} ||= $self->{properties}{base_dir};
 
       my $defaults = $self->valid_properties_defaults;
       
@@ -563,88 +599,80 @@ sub ACTION_config_data {
 }
 
 # Add the default properties.
-__PACKAGE__->add_property(module_name => '');
+__PACKAGE__->add_property(blib => 'blib');
+__PACKAGE__->add_property(build_class => 'Module::Build');
+__PACKAGE__->add_property(build_elements => [qw(PL support pm xs pod script)]);
 __PACKAGE__->add_property(build_script => 'Build');
 __PACKAGE__->add_property(config_dir => '_build');
-__PACKAGE__->add_property(blib => 'blib');
-__PACKAGE__->add_property('mb_version');
-__PACKAGE__->add_property(build_elements => [qw(PL support pm xs pod script)]);
-__PACKAGE__->add_property(installdirs => 'site');
-__PACKAGE__->add_property(install_path => {});
 __PACKAGE__->add_property(include_dirs => []);
-__PACKAGE__->add_property(config => {});
-__PACKAGE__->add_property(recurse_into => []);
-__PACKAGE__->add_property(build_class => 'Module::Build');
-__PACKAGE__->add_property(html_css => ($^O =~ /Win32/) ? 'Active.css' : '');
-__PACKAGE__->add_property(meta_add => {});
-__PACKAGE__->add_property(meta_merge => {});
+__PACKAGE__->add_property(installdirs => 'site');
 __PACKAGE__->add_property(metafile => 'META.yml');
-__PACKAGE__->add_property($_ => 0) for qw(
-   gen_manpages
-   gen_html
-   install_manpages
-   install_html
-);
-__PACKAGE__->add_property($_) for qw(
-   base_dir
-   dist_name
-   dist_version
-   dist_version_from
-   dist_author
-   dist_abstract
-   license
-   pm_files
-   xs_files
-   pod_files
-   PL_files
-   scripts
-   script_files
-   test_files
-   recursive_test_files
-   perl
-   has_config_data
-   install_sets
-   install_base_relpaths
-   original_prefix
-   prefix_relpaths
-   install_base
-   destdir
-   debugger
-   verbose
-   c_source
-   autosplit
-   create_makefile_pl
-   create_readme
-   pollute
-   extra_compiler_flags
-   extra_linker_flags
-   bindoc_dirs
-   libdoc_dirs
-   get_options
-   quiet
-   ignore_prereq_conflicts
-   ignore_prereq_requires
-   ignore_prereqs
-   skip_rcfile
-   prefix
-);
+__PACKAGE__->add_property(recurse_into => []);
+__PACKAGE__->add_property(use_rcfile => 1);
 
 {
-  my @prereq_actions = ( 'Build_PL', __PACKAGE__->known_actions );
-  my @prereq_types   = qw( requires recommends conflicts );
-  __PACKAGE__->add_property(prereq_actions => \@prereq_actions);
-  __PACKAGE__->add_property(prereq_types   => \@prereq_types);
-  my @prereq_action_types;
-  foreach my $action ( @prereq_actions ) {
-    foreach my $type ( @prereq_types   ) {
-      my $req = $action eq 'Build_PL' ? '' : $action . '_';
-      $req .= $type;
-      __PACKAGE__->add_property( $req => {} );
-      push( @prereq_action_types, $req );
-    }
+  my $Is_ActivePerl = eval {require ActivePerl::DocTools};
+  __PACKAGE__->add_property(html_css => $Is_ActivePerl ? 'Active.css' : '');
+}
+
+{
+  my @prereq_action_types = qw(requires build_requires conflicts recommends);
+  foreach my $type (@prereq_action_types) {
+    __PACKAGE__->add_property($type => {});
   }
   __PACKAGE__->add_property(prereq_action_types => \@prereq_action_types);
 }
+
+__PACKAGE__->add_property($_ => {}) for qw(
+  config
+  get_options
+  install_base_relpaths
+  install_path
+  install_sets
+  meta_add
+  meta_merge
+  original_prefix
+  prefix_relpaths
+);
+
+__PACKAGE__->add_property($_) for qw(
+  PL_files
+  autosplit
+  base_dir
+  bindoc_dirs
+  c_source
+  create_makefile_pl
+  create_readme
+  debugger
+  destdir
+  dist_abstract
+  dist_author
+  dist_name
+  dist_version
+  dist_version_from
+  extra_compiler_flags
+  extra_linker_flags
+  has_config_data
+  install_base
+  libdoc_dirs
+  license
+  mb_version
+  module_name
+  orig_dir
+  perl
+  pm_files
+  pod_files
+  pollute
+  prefix
+  quiet
+  recursive_test_files
+  script_files
+  scripts
+  test_files
+  verbose
+  xs_files
+);
+
 
 sub mb_parents {
     # Code borrowed from Class::ISA.
@@ -741,7 +769,10 @@ sub _find_dist_version_from {
   my ($self) = @_;
   my $p = $self->{properties};
   if ($self->module_name) {
-    $p->{dist_version_from} ||= join( '/', 'lib', split '::', $self->module_name ) . '.pm';
+    return $p->{dist_version_from} ||=
+	join( '/', 'lib', split(/::/, $self->module_name) ) . '.pm';
+  } else {
+    return undef;
   }
 }
 
@@ -851,13 +882,6 @@ sub write_config {
   $self->{phash}{$_}->write() foreach qw(notes cleanup features auto_features config_data runtime_params);
 }
 
-sub config         { shift()->{config} }
-
-sub requires       { shift()->{properties}{requires} }
-sub recommends     { shift()->{properties}{recommends} }
-sub build_requires { shift()->{properties}{build_requires} }
-sub conflicts      { shift()->{properties}{conflicts} }
-
 sub check_autofeatures {
   my ($self) = @_;
   my $features = $self->auto_features;
@@ -875,11 +899,16 @@ sub check_autofeatures {
     $self->log_info("  $name" . '.' x ($max_name_len - length($name) + 4));
 
     if ( my $failures = $self->prereq_failures($info) ) {
-      $self->log_info("disabled\n");
+      my $disabled = grep( /^(?:\w+_)?(?:requires|conflicts)$/,
+			   keys %$failures ) ? 1 : 0;
+      $self->log_info( $disabled ? "disabled\n" : "enabled\n" );
+
       my $log_text;
-      foreach my $type ( grep $failures->{$_}, @{$self->prereq_action_types} ) {
-	while (my ($module, $status) = each %{$failures->{$type}}) {
-	  my $prefix = ($type =~ /recommends$/) ? '*' : '-';
+      while (my ($type, $prereqs) = each %$failures) {
+	while (my ($module, $status) = each %$prereqs) {
+	  my $required =
+	    ($type =~ /^(?:\w+_)?(?:requires|conflicts)$/) ? 1 : 0;
+	  my $prefix = ($required) ? '-' : '*';
 	  $log_text .= "    $prefix $status->{message}\n";
 	}
       }
@@ -894,8 +923,8 @@ sub check_autofeatures {
 
 sub prereq_failures {
   my ($self, $info) = @_;
-  my @types = @{ $self->prereq_action_types };
 
+  my @types = @{ $self->prereq_action_types };
   $info ||= {map {$_, $self->$_()} @types};
 
   my $out;
@@ -904,13 +933,13 @@ sub prereq_failures {
     my $prereqs = $info->{$type};
     while ( my ($modname, $spec) = each %$prereqs ) {
       my $status = $self->check_installed_status($modname, $spec);
-      
-      if ($type =~ /conflicts$/) {
+
+      if ($type =~ /^(?:\w+_)?conflicts$/) {
 	next if !$status->{ok};
 	$status->{conflicts} = delete $status->{need};
 	$status->{message} = "$modname ($status->{have}) conflicts with this distribution";
 
-      } elsif ($type =~ /recommends$/) {
+      } elsif ($type =~ /^(?:\w+_)?recommends$/) {
 	next if $status->{ok};
 	$status->{message} = ($status->{have} eq '<none>'
 			      ? "Optional prerequisite $modname is not installed"
@@ -926,6 +955,19 @@ sub prereq_failures {
   return $out;
 }
 
+# returns a hash of defined prerequisites; i.e. only prereq types with values
+sub _enum_prereqs {
+  my $self = shift;
+  my %prereqs;
+  foreach my $type ( @{ $self->prereq_action_types } ) {
+    if ( $self->can( $type ) ) {
+      my $prereq = $self->$type() || {};
+      $prereqs{$type} = $prereq if %$prereq;
+    }
+  }
+  return \%prereqs;
+}
+
 sub check_prereq {
   my $self = shift;
 
@@ -937,30 +979,28 @@ sub check_prereq {
   }
 
   # Check to see if there are any prereqs to check
-  my $has_prereqs = grep { keys %{$self->$_()} }
-                    @{ $self->prereq_action_types };
-  return 1 unless $has_prereqs;
+  my $info = $self->_enum_prereqs;
+  return 1 unless $info;
 
   $self->log_info("Checking prerequisites...\n");
 
-  my $failures = $self->prereq_failures;
+  my $failures = $self->prereq_failures($info);
 
   if ( $failures ) {
 
-    foreach my $type ( @{$self->prereq_action_types} ) {
-      next unless $failures->{$type};
-      while (my ($module, $status) = each %{$failures->{$type}}) {
-	my $prefix = ($type =~ /recommends$/) ? '*' : '- ERROR:';
+    while (my ($type, $prereqs) = each %$failures) {
+      while (my ($module, $status) = each %$prereqs) {
+	my $prefix = ($type =~ /^(?:\w+_)?recommends$/) ? '*' : '- ERROR:';
 	$self->log_warn(" $prefix $status->{message}\n");
       }
     }
 
-    $self->log_warn(<<'ERRSTR');
+    $self->log_warn(<<EOF);
 
 ERRORS/WARNINGS FOUND IN PREREQUISITES.  You may wish to install the versions
 of the modules indicated above before proceeding with this installation
 
-ERRSTR
+EOF
     return 0;
 
   } else {
@@ -1083,7 +1123,7 @@ sub make_executable {
   }
 }
 
-sub _startperl { shift()->{config}{startperl} }
+sub _startperl { shift()->config('startperl') }
 
 # Return any directories in @INC which are not in the default @INC for
 # this perl.  For example, stuff passed in with -I or loaded with "use lib".
@@ -1138,17 +1178,18 @@ $shebang
 
 use strict;
 use Cwd;
+use File::Basename;
 use File::Spec;
 
+my \$progname;
+my \$orig_dir;
 BEGIN {
   \$^W = 1;  # Use warnings
-  my \$curdir = File::Spec->canonpath( Cwd::cwd() );
-  \$curdir = uc \$curdir if $case_tolerant;
-  my \$is_same_dir = \$^O eq 'MSWin32' ? (Win32::GetShortPathName(\$curdir) eq '$q{base_dir}')
-                                       : (\$curdir eq '$q{base_dir}');
-  unless (\$is_same_dir) {
-    die ('This script must be run from $q{base_dir}, not '.\$curdir."\\n".
-	 "Please re-run the Build.PL script here.\\n");
+  \$progname = basename(\$0);
+  \$orig_dir = Cwd::cwd();
+  my \$base_dir = '$q{base_dir}';
+  unless (chdir(\$base_dir)) {
+    die ("Couldn't chdir(\$base_dir), aborting\\n");
   }
   unshift \@INC,
     (
@@ -1162,7 +1203,7 @@ use $build_package;
 \$^X = Module::Build->find_perl_interpreter
   unless File::Spec->file_name_is_absolute(\$^X);
 
-if (-e 'Build.PL' and not $build_package->up_to_date("Build.PL", \$0)) {
+if (-e 'Build.PL' and not $build_package->up_to_date('Build.PL', \$progname)) {
    warn "Warning: Build.PL has been altered.  You may need to run 'perl Build.PL' again.\\n";
 }
 
@@ -1170,6 +1211,7 @@ if (-e 'Build.PL' and not $build_package->up_to_date("Build.PL", \$0)) {
 my \$build = $build_package->resume (
   properties => {
     config_dir => '$q{config_dir}',
+    orig_dir => \$orig_dir,
   },
 );
 
@@ -1226,20 +1268,20 @@ sub dispatch {
   if (@_) {
     my ($action, %p) = @_;
     my $args = $p{args} ? delete($p{args}) : {};
-    
+
+    local $self->{invoked_action} = $action;
     local $self->{args} = {%{$self->{args}}, %$args};
     local $self->{properties} = {%{$self->{properties}}, %p};
     return $self->_call_action($action);
   }
 
   die "No build action specified" unless $self->{action};
+  local $self->{invoked_action} = $self->{action};
   $self->_call_action($self->{action});
 }
 
 sub _call_action {
   my ($self, $action) = @_;
-
-  $self->validate_action_prereqs( $action );
 
   return if $self->{_completed_actions}{$action}++;
 
@@ -1247,45 +1289,6 @@ sub _call_action {
   my $method = "ACTION_$action";
   die "No action '$action' defined, try running the 'help' action.\n" unless $self->can($method);
   return $self->$method();
-}
-
-sub validate_action_prereqs {
-  my $self = shift;
-  my $action = shift;
-
-  return if $self->ignore_prereqs;
-
-  my $failures = $self->prereq_failures;
-  my $fail_msg;
-  if ( !$self->ignore_prereq_requires && $failures->{"${action}_requires"} ) {
-    $fail_msg .= "Missing prerequisite module versions for action '$action':\n";
-    foreach my $module ( keys( %{$failures->{"${action}_requires"}} ) ) {
-      my $fail_info = $failures->{"${action}_requires"}{$module};
-      $fail_msg .= sprintf( "  Requested module '%s %s%s' but found %s\n",
-			    $module,
-			    $fail_info->{need} !~ /^\s*[!=<>]/ ? '> ' : '',
-			    $fail_info->{need},
-			    $fail_info->{have} );
-    }
-    if ( $action eq 'build' ) { # Backwards compatability
-      $self->log_warn( "$fail_msg\n" .
-		       "Ignoring for backwards compatability.\n" .
-		       "This will be a fatal error in future versions of Module::Build.\n\n" );
-      $fail_msg = undef;
-    }
-  }
-  if ( !$self->ignore_prereq_conflicts && $failures->{"${action}_conflicts"} ) {
-    $fail_msg .= "Found conflicting module requirements for action '$action':\n";
-    foreach my $module ( keys( %{$failures->{"${action}_conflicts"}} ) ) {
-      my $fail_info = $failures->{"${action}_conflicts"}{$module};
-      $fail_msg .= sprintf( "  Requested module '%s %s%s' conflicts with installed version %s\n",
-	       $module,
-	       $fail_info->{conflicts} !~ /^\s*[!=<>]/ ? '> ' : '',
-	       $fail_info->{conflicts},
-	       $fail_info->{have} );
-    }
-  }
-  die "Aborting '$action' action.\n$fail_msg" if $fail_msg;
 }
 
 sub cull_options {
@@ -1309,11 +1312,15 @@ sub cull_options {
         $args->{$k} = $v->{default} if exists $v->{default};
     }
 
+    local @ARGV = @_; # No other way to dupe Getopt::Long
+
     # Get the options values and return them.
     # XXX Add option to allow users to set options?
-    Getopt::Long::Configure('pass_through');
-    local @ARGV = @_; # No other way to dupe Getopt::Long
-    Getopt::Long::GetOptions($args, @specs);
+    if ( @specs ) {
+      Getopt::Long::Configure('pass_through');
+      Getopt::Long::GetOptions($args, @specs);
+    }
+
     return $args, @ARGV;
 }
 
@@ -1342,25 +1349,18 @@ sub _translate_option {
 
   (my $tr_opt = $opt) =~ tr/-/_/;
 
-  return $tr_opt if grep $_ eq $tr_opt, qw(
-    install_path
-    html_css
-    meta_add
-    meta_merge
-    gen_manpages
-    gen_html
-    install_manpages
-    install_html
-    test_files
-    install_base
+  return $tr_opt if grep $tr_opt =~ /^(?:no_?)?$_$/, qw(
     create_makefile_pl
     create_readme
     extra_compiler_flags
     extra_linker_flags
-    ignore_prereq_conflicts
-    ignore_prereq_requires
-    ignore_prereqs
-    skip_rcfile
+    html_css
+    install_base
+    install_path
+    meta_add
+    meta_merge
+    test_files
+    use_rcfile
   ); # normalize only selected option names
 
   return $opt;
@@ -1387,24 +1387,17 @@ sub _optional_arg {
   $opt = $self->_translate_option($opt);
 
   my @bool_opts = qw(
-    gen_manpages
-    gen_html
-    install_manpages
-    install_html
-    verbose
     create_readme
     pollute
     quiet
-    ignore_prereq_conflicts
-    ignore_prereq_requires
-    ignore_prereqs
-    skip_rcfile
     uninst
+    use_rcfile
+    verbose
   );
 
   # inverted boolean options; eg --noverbose or --no-verbose
   # converted to proper name & returned with false value (verbose, 0)
-  if ( grep $opt =~ /^no-?$_$/, @bool_opts ) {
+  if ( grep $opt =~ /^no[-_]?$_$/, @bool_opts ) {
     $opt =~ s/^no-?//;
     return ($opt, 0);
   }
@@ -1492,9 +1485,9 @@ sub read_args {
 sub _detildefy {
     my $arg = shift;
 
-    ($arg) = $arg =~ /^~/ ? glob($arg) : $arg;
+    my($new_arg) = glob($arg) if $arg =~ /^~/;
 
-    return $arg;
+    return defined($new_arg) ? $new_arg : $arg;
 }
 
 
@@ -1536,11 +1529,24 @@ sub _home_dir {
 sub read_modulebuildrc {
   my( $self, $action ) = @_;
 
-  my $home = $self->_home_dir;
-  return () unless defined $home;
+  return () unless $self->use_rcfile;
 
-  my $modulebuildrc = File::Spec->catfile( $home, '.modulebuildrc' );
-  return () unless -e $modulebuildrc;
+  my $modulebuildrc;
+  if ( exists($ENV{MODULEBUILDRC}) && $ENV{MODULEBUILDRC} eq 'NONE' ) {
+    return ();
+  } elsif ( exists($ENV{MODULEBUILDRC}) && -e $ENV{MODULEBUILDRC} ) {
+    $modulebuildrc = $ENV{MODULEBUILDRC};
+  } elsif ( exists($ENV{MODULEBUILDRC}) ) {
+    $self->log_warn("WARNING: Can't find resource file " .
+		    "'$ENV{MODULEBUILDRC}' defined in environment.\n" .
+		    "No options loaded\n");
+    return ();
+  } else {
+    my $home = $self->_home_dir;
+    return () unless defined $home;
+    $modulebuildrc = File::Spec->catfile( $home, '.modulebuildrc' );
+    return () unless -e $modulebuildrc;
+  }
 
   my $fh = IO::File->new( $modulebuildrc )
       or die "Can't open $modulebuildrc: $!";
@@ -1613,7 +1619,7 @@ sub cull_args {
   my $self = shift;
   my ($args, $action) = $self->read_args(@_);
   $self->merge_args($action, %$args);
-  $self->merge_modulebuildrc( $action, %$args ) unless $self->skip_rcfile;
+  $self->merge_modulebuildrc( $action, %$args );
 }
 
 sub super_classes {
@@ -1689,6 +1695,62 @@ sub get_action_docs {
   }
   
   return join '', @docs;
+}
+
+sub ACTION_prereq_report {
+  my $self = shift;
+  $self->log_info( $self->prereq_report );
+}
+
+sub prereq_report {
+  my $self = shift;
+  my @types = @{ $self->prereq_action_types };
+  my $info = { map { $_ => $self->$_() } @types };
+
+  my $output = '';
+  foreach my $type (@types) {
+    my $prereqs = $info->{$type};
+    next unless %$prereqs;
+    $output .= "\n$type:\n";
+    my $mod_len = 2;
+    my $ver_len = 4;
+    my %mods;
+    while ( my ($modname, $spec) = each %$prereqs ) {
+      my $len  = length $modname;
+      $mod_len = $len if $len > $mod_len;
+      $spec    ||= '0';
+      $len     = length $spec;
+      $ver_len = $len if $len > $ver_len;
+
+      my $mod = $self->check_installed_status($modname, $spec);
+      $mod->{name} = $modname;
+      $mod->{ok} ||= 0;
+      $mod->{ok} = ! $mod->{ok} if $type =~ /^(\w+_)?conflicts$/;
+
+      $mods{lc $modname} = $mod;
+    }
+
+    my $space  = q{ } x ($mod_len - 3);
+    my $vspace = q{ } x ($ver_len - 3);
+    my $sline  = q{-} x ($mod_len - 3);
+    my $vline  = q{-} x ($ver_len - 3);
+    my $disposition = ($type =~ /^(\w+_)?conflicts$/) ?
+                        'Clash' : 'Need';
+    $output .=
+      "    Module $space  $disposition $vspace  Have\n".
+      "    ------$sline+------$vline-+----------\n";
+
+
+    for my $k (sort keys %mods) {
+      my $mod = $mods{$k};
+      my $space  = q{ } x ($mod_len - length $k);
+      my $vspace = q{ } x ($ver_len - length $mod->{need});
+      my $f = $mod->{ok} ? ' ' : '!';
+      $output .=
+        "  $f $mod->{name} $space     $mod->{need}  $vspace   $mod->{have}\n";
+    }
+  }
+  return $output;
 }
 
 sub ACTION_help {
@@ -2014,7 +2076,7 @@ sub localize_dir_path {
 
 sub fix_shebang_line { # Adapted from fixin() in ExtUtils::MM_Unix 1.35
   my ($self, @files) = @_;
-  my $c = $self->{config};
+  my $c = $self->config;
   
   my ($does_shbang) = $c->{sharpbang} =~ /^\s*\#\!/;
   for my $file (@files) {
@@ -2083,31 +2145,64 @@ sub ACTION_docs {
   my $self = shift;
 
   $self->depends_on('code');
+  $self->depends_on('manpages', 'html');
+}
 
-  if ( $self->_mb_feature('manpage_support') &&
-       $self->gen_manpages )
-  {
-    $self->manify_bin_pods;
-    $self->manify_lib_pods;
+# Given a file type, will return true if the file type would normally
+# be installed when neither install-base nor prefix has been set.
+# I.e. it will be true only if the path is set from Config.pm or
+# set explicitly by the user via install-path.
+sub _is_default_installable {
+  my $self = shift;
+  my $type = shift;
+  return ( $self->install_destination($type) &&
+           ( $self->install_path($type) ||
+	     $self->install_sets($self->installdirs)->{$type} )
+	 ) ? 1 : 0;
+}
+
+sub ACTION_manpages {
+  my $self = shift;
+
+  return unless $self->_mb_feature('manpage_support');
+
+  $self->depends_on('code');
+
+  foreach my $type ( qw(bin lib) ) {
+    my $files = $self->_find_pods( $self->{properties}{"${type}doc_dirs"},
+                                   exclude => [ qr/\.bat$/ ] );
+    next unless %$files;
+
+    my $sub = $self->can("manify_${type}_pods");
+    next unless defined( $sub );
+
+    if ( $self->invoked_action eq 'manpages' ) {
+      $self->$sub();
+    } elsif ( $self->_is_default_installable("${type}doc") ) {
+      $self->$sub();
+    }
   }
 
-  $self->htmlify_pods if $self->gen_html;
 }
 
 sub manify_bin_pods {
   my $self    = shift;
-  require Pod::Man;
-  my $parser  = Pod::Man->new( section => 1 ); # binary manpages go in section 1
+
   my $files   = $self->_find_pods( $self->{properties}{bindoc_dirs},
                                    exclude => [ qr/\.bat$/ ] );
   return unless keys %$files;
-  
+
   my $mandir = File::Spec->catdir( $self->blib, 'bindoc' );
   File::Path::mkpath( $mandir, 0, 0777 );
 
+  require Pod::Man;
   foreach my $file (keys %$files) {
-    my $manpage = $self->man1page_name( $file ) . '.' . $self->{config}{man1ext};
-    my $outfile = File::Spec->catfile( $mandir, $manpage);
+    # Pod::Simple based parsers only support one document per instance.
+    # This is expected to change in a future version (Pod::Simple > 3.03).
+    my $parser  = Pod::Man->new( section => 1 ); # binaries go in section 1
+    my $manpage = $self->man1page_name( $file ) . '.' .
+	          $self->config( 'man1ext' );
+    my $outfile = File::Spec->catfile($mandir, $manpage);
     next if $self->up_to_date( $file, $outfile );
     $self->log_info("Manifying $file -> $outfile\n");
     $parser->parse_from_file( $file, $outfile );
@@ -2117,16 +2212,20 @@ sub manify_bin_pods {
 
 sub manify_lib_pods {
   my $self    = shift;
-  require Pod::Man;
-  my $parser  = Pod::Man->new( section => 3 ); # library manpages go in section 3
+
   my $files   = $self->_find_pods($self->{properties}{libdoc_dirs});
   return unless keys %$files;
-  
+
   my $mandir = File::Spec->catdir( $self->blib, 'libdoc' );
   File::Path::mkpath( $mandir, 0, 0777 );
 
+  require Pod::Man;
   while (my ($file, $relfile) = each %$files) {
-    my $manpage = $self->man3page_name( $relfile ) . '.' . $self->{config}{man3ext};
+    # Pod::Simple based parsers only support one document per instance.
+    # This is expected to change in a future version (Pod::Simple > 3.03).
+    my $parser  = Pod::Man->new( section => 3 ); # libraries go in section 3
+    my $manpage = $self->man3page_name( $relfile ) . '.' .
+	          $self->config( 'man3ext' );
     my $outfile = File::Spec->catfile( $mandir, $manpage);
     next if $self->up_to_date( $file, $outfile );
     $self->log_info("Manifying $file -> $outfile\n");
@@ -2165,88 +2264,104 @@ sub contains_pod {
 
 sub ACTION_html {
   my $self = shift;
+
+  return unless $self->_mb_feature('HTML_support');
+
   $self->depends_on('code');
-  $self->htmlify_pods;
+
+  foreach my $type ( qw(bin lib) ) {
+    my $files = $self->_find_pods( $self->{properties}{"${type}doc_dirs"},
+				   exclude => [ qr/\.(?:bat|com|html)$/ ] );
+    next unless %$files;
+
+    if ( $self->invoked_action eq 'html' ) {
+      $self->htmlify_pods( $type );
+    } elsif ( $self->_is_default_installable("${type}html") ) {
+      $self->htmlify_pods( $type );
+    }
+  }
+
 }
 
-# XXX This is wrong, wrong, wrong.
-# 1) It assumes installation into site directories
-# 2) If it's an ActiveState perl install, we need to run
+
+# 1) If it's an ActiveState perl install, we need to run
 #    ActivePerl::DocTools->UpdateTOC;
-# 3) Links to other modules are not being generated
+# 2) Links to other modules are not being generated
 sub htmlify_pods {
   my $self = shift;
+  my $type = shift;
+  my $htmldir = shift || File::Spec->catdir($self->blib, "${type}html");
 
   require Module::Build::PodParser;
   require Pod::Html;
 
   $self->add_to_cleanup('pod2htm*');
 
-  foreach my $type ( qw(bin lib) ) {
+  my $pods = $self->_find_pods( $self->{properties}{"${type}doc_dirs"},
+                                exclude => [ qr/\.(?:bat|com|html)$/ ] );
+  next unless %$pods;  # nothing to do
 
-    my $pods = $self->_find_pods( $self->{properties}{"${type}doc_dirs"},
-				  exclude => [ qr/\.(?:bat|com|html)$/ ] );
-    next unless %$pods;  # nothing to do
+  unless ( -d $htmldir ) {
+    File::Path::mkpath($htmldir, 0, 0755)
+      or die "Couldn't mkdir $htmldir: $!";
+  }
 
-    my $podpath = join ':',
-                  map  $_->[1],
-	          grep -e $_->[0],
-	          map  [File::Spec->catdir($self->blib, $_), $_],
-		  qw( script lib );
+  my @rootdirs = ($type eq 'bin') ? qw(bin) :
+      $self->installdirs eq 'core' ? qw(lib) : qw(site lib);
 
-    my $htmldir = File::Spec->catdir($self->blib, "${type}html");
-    unless ( -d $htmldir ) {
-      File::Path::mkpath($htmldir, 0, 0755)
-	or die "Couldn't mkdir $htmldir: $!";
+  my $podpath = join ':',
+                map  $_->[1],
+                grep -e $_->[0],
+                map  [File::Spec->catdir($self->blib, $_), $_],
+                qw( script lib );
+
+  foreach my $pod ( keys %$pods ) {
+
+    my ($name, $path) = File::Basename::fileparse($pods->{$pod},
+						  qr{\.(?:pm|plx?|pod)$});
+    my @dirs = File::Spec->splitdir( File::Spec->canonpath( $path ) );
+    pop( @dirs ) if $dirs[-1] eq File::Spec->curdir;
+
+    my $fulldir = File::Spec->catfile($htmldir, @rootdirs, @dirs);
+    my $outfile = File::Spec->catfile($fulldir, "${name}.html");
+    my $infile  = File::Spec->abs2rel($pod);
+
+    next if $self->up_to_date($infile, $outfile);
+
+    unless ( -d $fulldir ){
+      File::Path::mkpath($fulldir, 0, 0755)
+        or die "Couldn't mkdir $fulldir: $!";
     }
 
-    my @rootdirs = ($type eq 'bin') ? qw(bin) : qw(site lib);
+    my $path2root = join( '/', ('..') x (@rootdirs+@dirs) );
+    my $htmlroot = join( '/',
+			 ($path2root,
+			  $self->installdirs eq 'core' ? () : qw(site) ) );
 
-    foreach my $pod ( keys %$pods ) {
+    my $fh = IO::File->new($infile);
+    my $abstract = Module::Build::PodParser->new(fh => $fh)->get_abstract();
 
-      my ($name, $path) = File::Basename::fileparse($pods->{$pod}, qr{\..*});
-      my @dirs = File::Spec->splitdir( File::Spec->canonpath( $path ) );
-      pop( @dirs ) if $dirs[-1] eq File::Spec->curdir;
+    my $title = join( '::', (@dirs, $name) );
+    $title .= " - $abstract" if $abstract;
 
-      my $fulldir = File::Spec->catfile($htmldir, @rootdirs, @dirs);
-      my $outfile = File::Spec->catfile($fulldir, "${name}.html");
-      my $infile  = File::Spec->abs2rel($pod);
+    my @opts = (
+                '--flush',
+                "--title=$title",
+                "--podpath=$podpath",
+                "--infile=$infile",
+                "--outfile=$outfile",
+                '--podroot=' . $self->blib,
+                "--htmlroot=$htmlroot",
+               );
 
-      next if $self->up_to_date($infile, $outfile);
-
-      unless ( -d $fulldir ){
-        File::Path::mkpath($fulldir, 0, 0755)
-          or die "Couldn't mkdir $fulldir: $!";
-      }
-
-      my $path2root = join( '/', ('..') x (@rootdirs+@dirs) );
-      my $htmlroot = "$path2root/site";
-
-      my $fh = IO::File->new($infile);
-      my $abstract = Module::Build::PodParser->new(fh => $fh)->get_abstract();
-
-      my $title = join( '::', (@dirs, $name) );
-      $title .= " - $abstract" if $abstract;
-
-
-      my @opts = (
-                  '--flush',
-                  "--title=$title",
-                  "--podpath=$podpath",
-                  "--infile=$infile",
-                  "--outfile=$outfile",
-                  '--podroot=' . $self->blib,
-                  "--htmlroot=$htmlroot",
-                  eval {Pod::Html->VERSION(1.03); 1} ?
-		    ('--header', '--backlink=Back to Top') : (),
-                 );
-
-      push( @opts, "--css=$path2root/". $self->html_css ) if $self->html_css;
-
-      $self->log_info("HTMLifying $infile -> $outfile\n");
-      $self->log_verbose("pod2html @opts\n");
-      Pod::Html::pod2html(@opts);	# or warn "pod2html @opts failed: $!";
+    if ( eval{Pod::Html->VERSION(1.03)} ) {
+      push( @opts, ('--header', '--backlink=Back to Top') );
+      push( @opts, "--css=$path2root/" . $self->html_css) if $self->html_css;
     }
+
+    $self->log_info("HTMLifying $infile -> $outfile\n");
+    $self->log_verbose("pod2html @opts\n");
+    Pod::Html::pod2html(@opts);	# or warn "pod2html @opts failed: $!";
   }
 
 }
@@ -2377,10 +2492,60 @@ sub ACTION_ppd {
 
 sub ACTION_ppmdist {
   my ($self) = @_;
-  
-  $self->depends_on('build', 'ppd');
-  $self->add_to_cleanup($self->ppm_name);
-  $self->make_tarball($self->blib, $self->ppm_name);
+
+  $self->depends_on( 'build' );
+
+  my $ppm = $self->ppm_name;
+  $self->delete_filetree( $ppm );
+  $self->log_info( "Creating $ppm\n" );
+  $self->add_to_cleanup( $ppm, "$ppm.tar.gz" );
+
+  my %types = ( # translate types/dirs to those expected by ppm
+    lib     => 'lib',
+    arch    => 'arch',
+    bin     => 'bin',
+    script  => 'script',
+    bindoc  => 'man1',
+    libdoc  => 'man3',
+    binhtml => undef,
+    libhtml => undef,
+  );
+
+  foreach my $type ($self->install_types) {
+    next if exists( $types{$type} ) && !defined( $types{$type} );
+
+    my $dir = File::Spec->catdir( $self->blib, $type );
+    next unless -e $dir;
+
+    my $files = $self->rscan_dir( $dir );
+    foreach my $file ( @$files ) {
+      next unless -f $file;
+      my $rel_file =
+	File::Spec->abs2rel( File::Spec->rel2abs( $file ),
+			     File::Spec->rel2abs( $dir  ) );
+      my $to_file  =
+	File::Spec->catdir( $ppm, 'blib',
+			    exists( $types{$type} ) ? $types{$type} : $type,
+			    $rel_file );
+      $self->copy_if_modified( from => $file, to => $to_file );
+    }
+  }
+
+  foreach my $type ( qw(bin lib) ) {
+    local $self->{properties}{html_css} = 'Active.css';
+    $self->htmlify_pods( $type, File::Spec->catdir($ppm, 'blib', 'html') );
+  }
+
+  # create a tarball;
+  # the directory tar'ed must be blib so we need to do a chdir first
+  my $start_wd = $self->cwd;
+  chdir( $ppm ) or die "Can't chdir to $ppm";
+  $self->make_tarball( 'blib', File::Spec->catfile( $start_wd, $ppm ) );
+  chdir( $start_wd ) or die "Can't chdir to $start_wd";
+
+  $self->depends_on( 'ppd' );
+
+  $self->delete_filetree( $ppm );
 }
 
 sub ACTION_dist {
@@ -2409,6 +2574,8 @@ sub _add_to_manifest {
   $lines = [$lines] unless ref $lines;
 
   my $existing_files = $self->_read_manifest($manifest);
+  return unless defined( $existing_files );
+
   @$lines = grep {!exists $existing_files->{$_}} @$lines
     or return;
 
@@ -2416,7 +2583,8 @@ sub _add_to_manifest {
   chmod($mode | 0222, $manifest) or die "Can't make $manifest writable: $!";
   
   my $fh = IO::File->new("< $manifest") or die "Can't read $manifest: $!";
-  my $has_newline = (<$fh>)[-1] =~ /\n$/;
+  my $last_line = (<$fh>)[-1] || "\n";
+  my $has_newline = $last_line =~ /\n$/;
   $fh->close;
 
   $fh = IO::File->new(">> $manifest") or die "Can't write to $manifest: $!";
@@ -2491,20 +2659,54 @@ sub do_create_makefile_pl {
 sub do_create_readme {
   my $self = shift;
   $self->delete_filetree('README');
-  my $parser = eval {require Pod::Readme; 1} ? Pod::Readme->new :
-               eval {require Pod::Text;   1} ? Pod::Text->new :
-	       die "Can't load Pod::Readme or Pod::Text to create README";
-  $self->log_info("Creating README using " . ref($parser) . "\n");
-  $parser->parse_from_file($self->_main_docfile, 'README', @_);
+
+  my $docfile = $self->_main_docfile;
+  unless ( $docfile ) {
+    $self->log_warn(<<EOF);
+Cannot create README: can't determine which file contains documentation;
+Must supply either 'dist_version_from', or 'module_name' parameter.
+EOF
+    return;
+  }
+
+  if ( eval {require Pod::Readme; 1} ) {
+    $self->log_info("Creating README using Pod::Readme\n");
+
+    my $parser = Pod::Readme->new;
+    $parser->parse_from_file($docfile, 'README', @_);
+
+  } elsif ( eval {require Pod::Text; 1} ) {
+    $self->log_info("Creating README using Pod::Text\n");
+
+    my $fh = IO::File->new('> README');
+    if ( defined($fh) ) {
+      local $^W = 0;
+      Pod::Text::pod2text( $docfile, $fh );
+      $fh->close;
+    } else {
+      $self->log_warn(
+        "Cannot create 'README' file: Can't open file for writing\n" );
+      return;
+    }
+
+  } else {
+    $self->log_warn("Can't load Pod::Readme or Pod::Text to create README\n");
+    return;
+
+  }
+
   $self->_add_to_manifest('MANIFEST', 'README');
 }
 
 sub _main_docfile {
   my $self = shift;
   $self->_find_dist_version_from;
-  my $pm_file = $self->dist_version_from;
-  (my $pod_file = $pm_file) =~ s/.pm$/.pod/;
-  return (-e $pod_file ? $pod_file : $pm_file);
+  if ( my $pm_file = $self->dist_version_from ) {
+    (my $pod_file = $pm_file) =~ s/.pm$/.pod/;
+    return (-e $pod_file ? $pod_file : $pm_file);
+  } else {
+    return undef;
+  }
 }
 
 sub ACTION_distdir {
@@ -2544,10 +2746,13 @@ sub ACTION_disttest {
   my $dist_dir = $self->dist_dir;
   chdir $dist_dir or die "Cannot chdir to $dist_dir: $!";
   # XXX could be different names for scripts
-  
-  $self->run_perl_script('Build.PL') or die "Error executing 'Build.PL' in dist directory: $!";
-  $self->run_perl_script('Build') or die "Error executing 'Build' in dist directory: $!";
-  $self->run_perl_script('Build', [], ['test']) or die "Error executing 'Build test' in dist directory";
+
+  $self->run_perl_script('Build.PL') # XXX Should this be run w/ --nouse-rcfile
+      or die "Error executing 'Build.PL' in dist directory: $!";
+  $self->run_perl_script('Build')
+      or die "Error executing 'Build' in dist directory: $!";
+  $self->run_perl_script('Build', [], ['test'])
+      or die "Error executing 'Build test' in dist directory";
   chdir $start_dir;
 }
 
@@ -2566,7 +2771,7 @@ sub _write_default_maniskip {
 \bCVS\b
 ,v$
 \B\.svn\b
-\b\.cvsignore$
+\B\.cvsignore$
 
 # Avoid Makemaker generated and utility files.
 \bMakefile$
@@ -2589,18 +2794,18 @@ sub _write_default_maniskip {
 \.old$
 \.bak$
 \#$
-\b\.#
+\.#
 \.rej$
 
 # Avoid OS-specific files/dirs
 #   Mac OSX metadata
-\b\.DS_Store
+\B\.DS_Store
 #   Mac OSX SMB mount metadata files
-\b\._
+\B\._
 # Avoid archives of this distribution
 EOF
 
-  # Skip, for example, "Module-Build-0.27.tar.gz'
+  # Skip, for example, 'Module-Build-0.27.tar.gz'
   print $fh '\b'.$self->dist_name.'-[\d\.\_]+'."\n";
 
   $fh->close();
@@ -2689,24 +2894,6 @@ BEGIN { *scripts = \&script_files; }
   }
 }
 
-sub meta_add {
-  my ($self, %add) = @_;
-  my $m = $self->{properties}{meta_add};
-  while (my($k, $v) = each %add) {
-    $m->{$k} = $v;
-  }
-  return $m;
-}
-
-sub meta_merge {
-  my ($self, %merge) = @_;
-  my $m = $self->{properties}{meta_merge};
-  while (my($k, $v) = each %merge) {
-    $self->_hash_merge($m, $k, $v);
-  }
-  return $m;
-}
-
 sub _hash_merge {
   my ($self, $h, $k, $v) = @_;
   if (ref $h->{$k} eq 'ARRAY') {
@@ -2718,6 +2905,19 @@ sub _hash_merge {
   }
 }
 
+sub _yaml_quote_string {
+  # XXX doesn't handle embedded newlines
+
+  my ($self, $string) = @_;
+  if ($string !~ /\"/) {
+    $string =~ s{\\}{\\\\}g;
+    return qq{"$string"};
+  } else {
+    $string =~ s{([\\'])}{\\$1}g;
+    return qq{'$string'};
+  }
+}
+
 sub _write_minimal_metadata {
   my $self = shift;
   my $p = $self->{properties};
@@ -2726,18 +2926,21 @@ sub _write_minimal_metadata {
   my $fh = IO::File->new("> $file")
     or die "Can't open $file: $!";
 
+  my @author = map $self->_yaml_quote_string($_), @{$self->dist_author};
+  my $abstract = $self->_yaml_quote_string($self->dist_abstract);
+
   # XXX Add the meta_add & meta_merge stuff
 
-  print $fh <<"END_OF_META";
+  print $fh <<"EOF";
 --- #YAML:1.0
 name: $p->{dist_name}
 version: $p->{dist_version}
 author:
-@{[ join "\n", map "  - $_", @{$self->dist_author} ]}
-abstract: @{[ $self->dist_abstract ]}
+@{[ join "\n", map "  - $_", @author ]}
+abstract: $abstract
 license: $p->{license}
 generated_by: Module::Build version $Module::Build::VERSION, without YAML.pm
-END_OF_META
+EOF
 }
 
 sub ACTION_distmeta {
@@ -2793,10 +2996,12 @@ sub write_metafile {
     $self->{wrote_metadata} = $yaml_sub->($metafile, $node );
 
   } else {
-    $self->log_warn(<<EOM);
-\nCouldn't load YAML.pm, generating a minimal META.yml without it.
-Please check and edit the generated metadata, or consider installing YAML.pm.\n
-EOM
+    $self->log_warn(<<EOF);
+
+Couldn't load YAML.pm, generating a minimal META.yml without it.
+Please check and edit the generated metadata, or consider installing YAML.pm.
+
+EOF
 
     $self->_write_minimal_metadata;
   }
@@ -2811,7 +3016,10 @@ sub prepare_metadata {
   foreach (qw(dist_name dist_version dist_author dist_abstract license)) {
     (my $name = $_) =~ s/^dist_//;
     $node->{$name} = $self->$_();
+    die "ERROR: Missing required field '$name' for META.yml\n"
+      unless defined($node->{$name}) && length($node->{$name});
   }
+
   if (defined( $self->license ) &&
       defined( my $url = $self->valid_licenses->{ $self->license } )) {
     $node->{resources}{license} = $url;
@@ -2822,16 +3030,29 @@ sub prepare_metadata {
   }
 
   $node->{dynamic_config} = $p->{dynamic_config} if exists $p->{dynamic_config};
-  $node->{provides} = $self->find_dist_packages;
+  my $pkgs = eval { $self->find_dist_packages };
+  if ($@) {
+    $self->log_warn("WARNING: Possible missing or corrupt 'MANIFEST' file.\n" .
+		    "Nothing to enter for 'provides' field in META.yml\n");
+  } else {
+    $node->{provides} = $pkgs if %$pkgs;
+  }
+;
   $node->{no_index} = $p->{no_index} if exists $p->{no_index};
 
   $node->{generated_by} = "Module::Build version $Module::Build::VERSION";
 
-  while (my($k, $v) = each %{$p->{meta_add}}) {
+  $node->{'meta-spec'} = {
+    version => '1.2',
+    url     => 'http://module-build.sourceforge.net/META-spec-v1.2.html',
+  };
+
+
+  while (my($k, $v) = each %{$self->meta_add}) {
     $node->{$k} = $v;
   }
 
-  while (my($k, $v) = each %{$p->{meta_merge}}) {
+  while (my($k, $v) = each %{$self->meta_merge}) {
     $self->_hash_merge($node, $k, $v);
   }
 
@@ -3040,8 +3261,10 @@ sub prefix_relative {
   my ($self, $type) = @_;
   my $installdirs = $self->installdirs;
 
-  return $self->_prefixify($self->install_sets->{$installdirs}{$type},
-			   $self->original_prefix->{$installdirs}, 
+  my $relpath = $self->install_sets($installdirs)->{$type};
+
+  return $self->_prefixify($relpath,
+			   $self->original_prefix($installdirs),
 			   $type,
 			  );
 }
@@ -3104,29 +3327,25 @@ sub _prefixify_default {
 
 sub install_destination {
   my ($self, $type) = @_;
-  my $p = $self->{properties};
-  
-  return $p->{install_path}{$type} if exists $p->{install_path}{$type};
-  return File::Spec->catdir($p->{install_base}, $self->install_base_relpaths($type)) if $p->{install_base};
-  return File::Spec->catdir($p->{prefix}, $self->prefix_relative($type)) if $p->{prefix};
-  return $p->{install_sets}{ $p->{installdirs} }{$type};
+
+  return $self->install_path($type) if $self->install_path($type);
+
+  if ( $self->install_base ) {
+    my $relpath = $self->install_base_relpaths($type);
+    return $relpath ? File::Spec->catdir($self->install_base, $relpath) : undef;
+  }
+
+  if ( $self->prefix ) {
+    my $relpath = $self->prefix_relative($type);
+    return $relpath ? File::Spec->catdir($self->prefix, $relpath) : undef;
+  }
+
+  return $self->install_sets($self->installdirs)->{$type};
 }
 
 sub install_types {
   my $self = shift;
-  my $p = $self->{properties};
-  my %types = (%{$p->{install_path}}, %{ $p->{install_sets}{$p->{installdirs}} });
-
-  unless ( $self->gen_html && $self->install_html ) {
-    delete( $types{binhtml} );
-    delete( $types{libhtml} );
-  }
-
-  unless ( $self->gen_manpages && $self->install_manpages ) {
-    delete( $types{bindoc} );
-    delete( $types{libdoc} );
-  }
-
+  my %types = (%{$self->install_path}, %{ $self->install_sets($self->installdirs) });
   return sort keys %types;
 }
 
@@ -3134,26 +3353,30 @@ sub install_map {
   my ($self, $blib) = @_;
   $blib ||= $self->blib;
 
-  my %map;
+  my( %map, @skipping );
   foreach my $type ($self->install_types) {
     my $localdir = File::Spec->catdir( $blib, $type );
     next unless -e $localdir;
-    
+
     if (my $dest = $self->install_destination($type)) {
       $map{$localdir} = $dest;
     } else {
-      # Platforms like Win32, MacOS, etc. may not build man pages
-      die "Can't figure out where to install things of type '$type'"
-	unless $type =~ /^(lib|bin)doc$/;
+      push( @skipping, $type );
     }
   }
+
+  $self->log_warn(
+    "WARNING: Can't figure out install path for types: @skipping\n" .
+    "Files will not be installed.\n"
+  ) if @skipping;
   
   # Write the packlist into the same place as ExtUtils::MakeMaker.
   my $archdir = $self->install_destination('arch');
   my @ext = split /::/, $self->module_name;
   $map{write} = File::Spec->catdir($archdir, 'auto', @ext, '.packlist');
   
-  if (length(my $destdir = $self->{properties}{destdir} || '')) {
+  # Handle destdir
+  if (length(my $destdir = $self->destdir || '')) {
     foreach (keys %map) {
       # Need to remove volume from $map{$_} using splitpath, or else
       # we'll create something crazy like C:\Foo\Bar\E:\Baz\Quux
@@ -3218,7 +3441,7 @@ sub _cbuilder {
     unless $self->_mb_feature('C_support');
   
   require ExtUtils::CBuilder;
-  return $p->{_cbuilder} = ExtUtils::CBuilder->new(config => $self->{config});
+  return $p->{_cbuilder} = ExtUtils::CBuilder->new(config => $self->config);
 }
 
 sub have_c_compiler {
@@ -3253,25 +3476,28 @@ sub compile_c {
 
 sub link_c {
   my ($self, $to, $file_base) = @_;
-  my $b = $self->_cbuilder;
-  my ($cf, $p) = ($self->{config}, $self->{properties}); # For convenience
+  my $p = $self->{properties}; # For convenience
 
-  my $obj_file = "$file_base$cf->{obj_ext}";
+  my $spec = $self->_infer_xs_spec($file_base);
 
-  my $lib_file = $b->lib_file($obj_file);
-  $lib_file = File::Spec->catfile($to, File::Basename::basename($lib_file));
-  $self->add_to_cleanup($lib_file);
+  $self->add_to_cleanup($spec->{lib_file});
 
   my $objects = $p->{objects} || [];
 
-  return $lib_file if $self->up_to_date([$obj_file, @$objects], $lib_file);
+  return $spec->{lib_file}
+    if $self->up_to_date([$spec->{obj_file}, @$objects],
+			 $spec->{lib_file});
 
-  $b->link(module_name => $self->module_name,
-	   objects => [$obj_file, @$objects],
-	   lib_file => $lib_file,
-	   extra_linker_flags => $p->{extra_linker_flags});
-  
-  return $lib_file;
+  my $module_name = $self->module_name;
+  $module_name  ||= $spec->{module_name};
+
+  $self->_cbuilder->link(
+    module_name => $module_name,
+    objects     => [$spec->{obj_file}, @$objects],
+    lib_file    => $spec->{lib_file},
+    extra_linker_flags => $p->{extra_linker_flags} );
+
+  return $spec->{lib_file};
 }
 
 sub compile_xs {
@@ -3300,7 +3526,7 @@ sub compile_xs {
     }
     my $typemaps = join ' ', map qq{-typemap "$_"}, @typemaps;
 
-    my $cf = $self->{config};
+    my $cf = $self->config;
     my $perl = $self->{properties}{perl};
     
     my $command = (qq{$perl "-I$cf->{installarchlib}" "-I$cf->{installprivlib}" "$xsubpp" -noprototypes } .
@@ -3346,46 +3572,84 @@ sub run_perl_command {
   return $self->do_system($perl, @$args);
 }
 
+# Infer various data from the path of the input filename
+# that is needed to create output files.
+# The input filename is expected to be of the form:
+#   lib/Module/Name.ext or Module/Name.ext
+sub _infer_xs_spec {
+  my $self = shift;
+  my $file = shift;
+
+  my $cf = $self->{config};
+
+  my %spec;
+
+  my( $v, $d, $f ) = File::Spec->splitpath( $file );
+  my @d = File::Spec->splitdir( $d );
+  (my $file_base = $f) =~ s/\.[^.]+$//i;
+
+  $spec{base_name} = $file_base;
+
+  $spec{src_dir} = File::Spec->catpath( $v, $d, '' );
+
+  # the module name
+  shift( @d ) while @d && ($d[0] eq 'lib' || $d[0] eq '');
+  pop( @d ) while @d && $d[-1] eq '';
+  $spec{module_name} = join( '::', (@d, $file_base) );
+
+  $spec{archdir} = File::Spec->catdir($self->blib, 'arch', 'auto',
+				      @d, $file_base);
+
+  $spec{bs_file} = File::Spec->catfile($spec{archdir}, "${file_base}.bs");
+
+  $spec{lib_file} = File::Spec->catfile($spec{archdir},
+					"${file_base}.$cf->{dlext}");
+
+  $spec{c_file} = File::Spec->catfile( $spec{src_dir},
+				       "${file_base}.c" );
+
+  $spec{obj_file} = File::Spec->catfile( $spec{src_dir},
+					 "${file_base}$cf->{obj_ext}" );
+
+  return \%spec;
+}
+
 sub process_xs {
   my ($self, $file) = @_;
-  my $cf = $self->{config}; # For convenience
+  my $cf = $self->config; # For convenience
+
+  my $spec = $self->_infer_xs_spec($file);
 
   # File name, minus the suffix
   (my $file_base = $file) =~ s/\.[^.]+$//;
-  my $c_file = "$file_base.c";
 
   # .xs -> .c
-  $self->add_to_cleanup($c_file);
-  
-  unless ($self->up_to_date($file, $c_file)) {
-    $self->compile_xs($file, outfile => $c_file);
+  $self->add_to_cleanup($spec->{c_file});
+
+  unless ($self->up_to_date($file, $spec->{c_file})) {
+    $self->compile_xs($file, outfile => $spec->{c_file});
   }
-  
+
   # .c -> .o
   my $v = $self->dist_version;
-  $self->compile_c($c_file, defines => {VERSION => qq{"$v"}, XS_VERSION => qq{"$v"}});
+  $self->compile_c($spec->{c_file},
+		   defines => {VERSION => qq{"$v"}, XS_VERSION => qq{"$v"}});
 
-  # The .bs and .a files don't go in blib/lib/, they go in blib/arch/auto/.
-  # Unfortunately we have to pre-compute the whole path.
-  my $archdir;
-  {
-    my @dirs = File::Spec->splitdir($file_base);
-    $archdir = File::Spec->catdir($self->blib,'arch','auto', @dirs[1..$#dirs]);
-  }
-  
+  # archdir
+  File::Path::mkpath($spec->{archdir}, 0, 0777) unless -d $spec->{archdir};
+
   # .xs -> .bs
-  $self->add_to_cleanup("$file_base.bs");
-  unless ($self->up_to_date($file, "$file_base.bs")) {
+  $self->add_to_cleanup($spec->{bs_file});
+  unless ($self->up_to_date($file, $spec->{bs_file})) {
     require ExtUtils::Mkbootstrap;
-    $self->log_info("ExtUtils::Mkbootstrap::Mkbootstrap('$file_base')\n");
-    ExtUtils::Mkbootstrap::Mkbootstrap($file_base);  # Original had $BSLOADLIBS - what's that?
-    {my $fh = IO::File->new(">> $file_base.bs")}  # create
-    utime((time)x2, "$file_base.bs");  # touch
+    $self->log_info("ExtUtils::Mkbootstrap::Mkbootstrap('$spec->{bs_file}')\n");
+    ExtUtils::Mkbootstrap::Mkbootstrap($spec->{bs_file});  # Original had $BSLOADLIBS - what's that?
+    {my $fh = IO::File->new(">> $spec->{bs_file}")}  # create
+    utime((time)x2, $spec->{bs_file});  # touch
   }
-  $self->copy_if_modified("$file_base.bs", $archdir, 1);
-  
+
   # .o -> .(a|bundle)
-  $self->link_c($archdir, $file_base);
+  $self->link_c($spec->{archdir}, $file_base);
 }
 
 sub do_system {
@@ -3499,7 +3763,7 @@ Please see the C<Module::Build> documentation for more details.
 
 =head1 AUTHOR
 
-Ken Williams, ken@mathforum.org
+Ken Williams <ken@cpan.org>
 
 =head1 COPYRIGHT
 

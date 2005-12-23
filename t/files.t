@@ -5,6 +5,9 @@ use strict;
 
 use Test::More tests => 6;
 
+use File::Spec ();
+my $common_pl = File::Spec->catfile( 't', 'common.pl' );
+require $common_pl;
 
 use Cwd ();
 my $cwd = Cwd::cwd;
@@ -17,7 +20,6 @@ $dist->regen;
 chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
 
 
-use File::Spec;
 use IO::File;
 
 

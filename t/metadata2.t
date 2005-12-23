@@ -3,7 +3,7 @@
 use lib 't/lib';
 use strict;
 
-use Test::More 'no_plan'; # tests => 35;
+use Test::More tests => 18;
 
 
 use File::Spec ();
@@ -15,25 +15,44 @@ use Cwd ();
 my $cwd = Cwd::cwd;
 my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
 
+use Module::Build;
 use DistGen;
-my $dist = DistGen->new( dir => $tmp );
-$dist->change_file( 'Build.PL', <<"---" );
-use Module::Build;
-my \$builder = Module::Build->new(
-    module_name         => '@{[$dist->name]}',
-    dist_version        => '3.14159265',
-    license             => 'perl',
-    create_readme       => 1,
-);
 
-\$builder->create_build_script();
----
-$dist->regen;
 
-chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+############################## ACTION distmeta works without a MANIFEST file
 
-use Module::Build;
-my $mb = Module::Build->new_from_context;
+SKIP: {
+  skip( 'YAML_support feature is not enabled', 4 )
+      unless Module::Build->current->feature('YAML_support');
+
+  my $dist = DistGen->new( dir => $tmp, skip_manifest => 1 );
+  $dist->regen;
+
+  chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+
+  ok ! -e 'MANIFEST';
+
+  my $mb = Module::Build->new_from_context;
+
+  my $out;
+  $out = eval { stderr_of(sub{$mb->dispatch('distmeta')}) };
+  is $@, '';
+
+  like $out, qr/Nothing to enter for 'provides'/;
+
+  ok -e 'META.yml';
+
+  chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
+  $dist->remove;
+}
+
+
+############################## Check generation of README file
+
+# TODO: We need to test faking the absence of Pod::Readme when present
+#       so Pod::Text will be used. Also fake the absence of both to
+#       test that we fail gracefully.
+
 my $provides; # Used a bunch of times below
 
 my $pod_text = <<'---'; 
@@ -50,17 +69,25 @@ Simple Simon <simon@simple.sim>
 =cut
 ---
 
-sub _slurp {
-    my $filename = shift;
-    die "$filename doesn't exist. Aborting" if not -e $filename;
-    open my $fh, "<", $filename
-        or die "Couldn't open $filename: $!. Aborting.";
-    local $/;
-    return scalar <$fh>;
-}
+my $dist = DistGen->new( dir => $tmp );
 
-############################## Single Module
-# .pm File with pod 
+$dist->change_file( 'Build.PL', <<"---" );
+use Module::Build;
+my \$builder = Module::Build->new(
+    module_name         => '@{[$dist->name]}',
+    dist_version        => '3.14159265',
+    license             => 'perl',
+    create_readme       => 1,
+);
+
+\$builder->create_build_script();
+---
+$dist->regen;
+
+chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+
+
+# .pm File with pod
 #
 
 $dist->change_file( 'lib/Simple.pm', <<'---' . $pod_text);
@@ -69,9 +96,9 @@ $VERSION = '1.23';
 ---
 $dist->regen( clean => 1 );
 ok( -e "lib/Simple.pm", "Creating Simple.pm" );
-$mb = Module::Build->new_from_context;
-$mb->dispatch('distmeta');
-like( _slurp("README"), qr/NAME/, 
+my $mb = Module::Build->new_from_context;
+$mb->do_create_readme;
+like( slurp("README"), qr/NAME/, 
     "Generating README from .pm");
 is( $mb->dist_author->[0], 'Simple Simon <simon@simple.sim>', 
     "Extracting AUTHOR from .pm");
@@ -91,8 +118,8 @@ $dist->regen( clean => 1 );
 ok( -e "lib/Simple.pm", "Creating Simple.pm" );
 ok( -e "lib/Simple.pod", "Creating Simple.pod" );
 $mb = Module::Build->new_from_context;
-$mb->dispatch('distmeta');
-like( _slurp("README"), qr/NAME/, "Generating README from .pod");
+$mb->do_create_readme;
+like( slurp("README"), qr/NAME/, "Generating README from .pod");
 is( $mb->dist_author->[0], 'Simple Simon <simon@simple.sim>', 
     "Extracting AUTHOR from .pod");
 is( $mb->dist_abstract, "A simple module", 
@@ -116,11 +143,11 @@ $dist->regen( clean => 1 );
 ok( -e "lib/Simple.pm", "Creating Simple.pm" );
 ok( -e "lib/Simple.pod", "Creating Simple.pod" );
 $mb = Module::Build->new_from_context;
-$mb->dispatch('distmeta');
-like( _slurp("README"), qr/NAME/, "Generating README from .pod over .pm");
-is( $mb->dist_author->[0], 'Simple Simon <simon@simple.sim>', 
+$mb->do_create_readme;
+like( slurp("README"), qr/NAME/, "Generating README from .pod over .pm");
+is( $mb->dist_author->[0], 'Simple Simon <simon@simple.sim>',
     "Extracting AUTHOR from .pod over .pm");
-is( $mb->dist_abstract, "A simple module", 
+is( $mb->dist_abstract, "A simple module",
     "Extracting abstract from .pod over .pm");
 
 

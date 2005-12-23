@@ -1,12 +1,16 @@
 use strict;
 use Config;
 
-# In case the test wants to use Test::More or our other bundled
-# modules, make sure they can be loaded.  They'll still do "use
-# Test::More" in the test script.
 BEGIN {
+
+  # In case the test wants to use Test::More or our other bundled
+  # modules, make sure they can be loaded.  They'll still do "use
+  # Test::More" in the test script.
   my $t_lib = File::Spec->catdir('t', 'lib');
   push @INC, $t_lib; # Let user's installed version override
+
+  # Make sure none of our tests load the users ~/.modulebuildrc file
+  $ENV{MODULEBUILDRC} = 'NONE';
 }
 
 
@@ -55,6 +59,34 @@ sub find_in_path {
     }
   }
   return;
+}
+
+
+# A hash of all Config.pm settings related to installing
+# manpages with values set to an empty string.
+sub manpage_reset {
+  return (
+    installman1dir => '',
+    installman3dir => '',
+    installsiteman1dir => '',
+    installsiteman3dir => '',
+    installvendorman1dir => '',
+    installvendorman3dir => '',
+  );
+}
+
+# A hash of all Config.pm settings related to installing
+# html documents with values set to an empty string.
+sub html_reset {
+  return (
+    installhtmldir => '',
+    installhtml1dir => '',
+    installhtml3dir => '',
+    installsitehtml1dir => '',
+    installsitehtml3dir => '',
+    installvendorhtml1dir => '',
+    installvendorhtml3dir => '',
+  );
 }
 
 1;

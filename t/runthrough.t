@@ -113,7 +113,9 @@ print "^^^^^^^^^^^^^^^^^^^^^ Simple/test.pl output ^^^^^^^^^^^^^^^^^^^^^\n";
 SKIP: {
   skip( 'YAML_support feature is not enabled', 7 ) unless $have_yaml;
 
-  eval {$mb->dispatch('disttest')};
+  my $output = eval {
+    stdout_of( sub { $mb->dispatch('disttest') } )
+  };
   is $@, '';
   
   # After a test, the distdir should contain a blib/ directory

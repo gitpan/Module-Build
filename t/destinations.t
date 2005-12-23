@@ -3,7 +3,7 @@
 use lib 't/lib';
 use strict;
 
-use Test::More 'no_plan';   # tests => 68;
+use Test::More tests => 92;
 
 
 use File::Spec ();
@@ -27,15 +27,40 @@ use File::Spec::Functions qw( catdir splitdir );
 
 #########################
 
+# We need to create a well defined environment to test install paths.
+# We do this by setting up appropriate Config entries.
+
 use Module::Build;
-my $mb = Module::Build->new_from_context;
+my @installstyle = qw(lib perl5);
+my $mb = Module::Build->new_from_context(
+  installdirs => 'site',
+  config => {
+    installstyle    => catdir(@installstyle),
+
+    installprivlib  => catdir($tmp, @installstyle),
+    installarchlib  => catdir($tmp, @installstyle,
+			      @Config{qw(version archname)}),
+    installbin      => catdir($tmp, 'bin'),
+    installscript   => catdir($tmp, 'bin'),
+    installman1dir  => catdir($tmp, 'man', 'man1'),
+    installman3dir  => catdir($tmp, 'man', 'man3'),
+    installhtml1dir => catdir($tmp, 'html'),
+    installhtml3dir => catdir($tmp, 'html'),
+
+    installsitelib      => catdir($tmp, 'site', @installstyle, 'site_perl'),
+    installsitearch     => catdir($tmp, 'site', @installstyle, 'site_perl',
+				  @Config{qw(version archname)}),
+    installsitebin      => catdir($tmp, 'site', 'bin'),
+    installsitescript   => catdir($tmp, 'site', 'bin'),
+    installsiteman1dir  => catdir($tmp, 'site', 'man', 'man1'),
+    installsiteman3dir  => catdir($tmp, 'site', 'man', 'man3'),
+    installsitehtml1dir => catdir($tmp, 'site', 'html'),
+    installsitehtml3dir => catdir($tmp, 'site', 'html'),
+  }
+);
 isa_ok( $mb, 'Module::Build::Base' );
 
-my $install_sets = $mb->install_sets;
-
-
 # Get us into a known state.
-$mb->installdirs('site');
 $mb->install_base(undef);
 $mb->prefix(undef);
 
@@ -47,17 +72,15 @@ $mb->prefix(undef);
     is( $mb->prefix,       undef );
 
     test_install_destinations( $mb, {
-        lib     => $Config{installsitelib},
-        arch    => $Config{installsitearch},
-        bin     => $Config{installsitebin} || $Config{installbin},
-        script  => $Config{installsitescript} || $Config{installsitebin} ||
-                   $Config{installscript},
-        bindoc  => $Config{installsiteman1dir} || $Config{installman1dir},
-        libdoc  => $Config{installsiteman3dir} || $Config{installman3dir},
-        binhtml => $Config{installsitehtml1dir} ||
-		   $Config{installhtml1dir} || $Config{installhtmldir},
-        libhtml => $Config{installsitehtml3dir} ||
-		   $Config{installhtml3dir} || $Config{installhtmldir},
+      lib     => catdir($tmp, 'site', @installstyle, 'site_perl'),
+      arch    => catdir($tmp, 'site', @installstyle, 'site_perl',
+			@Config{qw(version archname)}),
+      bin     => catdir($tmp, 'site', 'bin'),
+      script  => catdir($tmp, 'site', 'bin'),
+      bindoc  => catdir($tmp, 'site', 'man', 'man1'),
+      libdoc  => catdir($tmp, 'site', 'man', 'man3'),
+      binhtml => catdir($tmp, 'site', 'html'),
+      libhtml => catdir($tmp, 'site', 'html'),
     });
 }
 
@@ -68,14 +91,14 @@ $mb->prefix(undef);
     is( $mb->installdirs, 'core' );
 
     test_install_destinations( $mb, {
-        lib     => $Config{installprivlib},
-        arch    => $Config{installarchlib},
-        bin     => $Config{installbin},
-        script  => $Config{installscript} || $Config{installbin},
-        bindoc  => $Config{installman1dir},
-        libdoc  => $Config{installman3dir},
-        binhtml => $Config{installhtml1dir} || $Config{installhtmldir},
-        libhtml => $Config{installhtml3dir} || $Config{installhtmldir},
+      lib     => catdir($tmp, @installstyle),
+      arch    => catdir($tmp, @installstyle, @Config{qw(version archname)}),
+      bin     => catdir($tmp, 'bin'),
+      script  => catdir($tmp, 'bin'),
+      bindoc  => catdir($tmp, 'man', 'man1'),
+      libdoc  => catdir($tmp, 'man', 'man3'),
+      binhtml => catdir($tmp, 'html'),
+      libhtml => catdir($tmp, 'html'),
     });
 
     $mb->installdirs('site');
@@ -114,7 +137,7 @@ $mb->prefix(undef);
     $mb->prefix( $prefix );
     is( $mb->{properties}{prefix}, $prefix );
 
-    test_prefix($prefix, $install_sets->{site});
+    test_prefix($prefix, $mb->install_sets('site'));
 }
 
 
@@ -190,9 +213,13 @@ sub test_prefix {
         my $dest = $mb->install_destination( $type );
 	ok $mb->dir_contains($prefix, $dest), "$type prefixed";
 
-        if( $test_config && $test_config->{$type} ) {
-	    have_same_ending($dest, $test_config->{$type},
-			     "  suffix correctish ($test_config->{$type} + $prefix = $dest)" );
+        SKIP: {
+	    skip( "'$type' not configured", 1 )
+	      unless $test_config && $test_config->{$type};
+
+	    have_same_ending( $dest, $test_config->{$type},
+			      "  suffix correctish " .
+			      "($test_config->{$type} + $prefix = $dest)" );
         }
     }
 }

@@ -2,7 +2,7 @@ use strict;
 
 # On some platforms (*ahem*, MacPerl 5.6.1) "use lib qw(lib);" doesn't
 # find the local "lib" directory, so we use File::Spec to do it properly.
-use File::Spec;
+use File::Spec 0.82;
 use lib File::Spec->catdir('lib');      # use our self to install
 use lib File::Spec->catdir('t', 'lib'); # use bundled Test::More
 
@@ -13,7 +13,7 @@ use Module::Build;
 
 my $build = new Module::Build
   (
-   module_name => 'Module::Build',   
+   module_name => 'Module::Build',
    license => 'perl',
    requires => {
 		'perl'           => '5.005_03',
@@ -23,7 +23,7 @@ my $build = new Module::Build
 		'File::Copy'     => 0,
 		'File::Find'     => 0,
 		'File::Path'     => 0,
-		'File::Spec'     => 0,
+		'File::Spec'     => '0.82', # rel2abs()
 		'ExtUtils::Install' => 0,
 		'ExtUtils::Manifest' => 0,
 		'ExtUtils::Mkbootstrap' => 0,
@@ -54,8 +54,8 @@ my $build = new Module::Build
 		     C_support =>
 		     {
 		      description => "Can compile/link C & XS code",
-		      requires => { 'ExtUtils::CBuilder' => 0.15,
-				    'ExtUtils::ParseXS'  => 2.02, },
+		      requires   => { 'ExtUtils::CBuilder' => 0.15, },
+		      recommends => { 'ExtUtils::ParseXS'  => 1.02, },
 		     },
 		     manpage_support =>
 		     {

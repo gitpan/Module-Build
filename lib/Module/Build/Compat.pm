@@ -21,7 +21,7 @@ my %makefile_to_build =
    LIB => sub { ('--install_path', 'lib='.shift()) },
 
    # Some names they have in common
-   map {$_, lc($_)} qw(DESTDIR PREFIX INSTALL_BASE),
+   map {$_, lc($_)} qw(DESTDIR PREFIX INSTALL_BASE UNINST),
   );
 
 
@@ -49,9 +49,13 @@ sub create_makefile_pl {
     
     if (File::Spec->file_name_is_absolute($subclass_dir)) {
       my $base_dir = $build->base_dir;
-      $build->log_warn("Warning: builder subclass " . ref($build) . 
-		       " doesn't seem to have been loaded from within $base_dir")
-	unless $build->dir_contains($base_dir, $subclass_dir);
+
+      if ($build->dir_contains($base_dir, $subclass_dir)) {
+	$subclass_dir = File::Spec->abs2rel($subclass_dir, $base_dir);
+      } else {
+	$build->log_warn("Warning: builder subclass " . ref($build) . 
+			 " doesn't seem to have been loaded from within $base_dir");
+      }
     }
     $subclass_load = "use lib '$subclass_dir';";
   }
@@ -85,7 +89,6 @@ EOF
       
       # Save this 'cause CPAN will chdir all over the place.
       my $cwd = Cwd::cwd();
-      my $makefile = File::Spec->rel2abs($0);
       
       CPAN::Shell->install('Module::Build::Compat')
 	or die " *** Cannot install without Module::Build.  Exiting ...\n";
@@ -270,15 +273,17 @@ __END__
 
 Module::Build::Compat - Compatibility with ExtUtils::MakeMaker
 
+
 =head1 SYNOPSIS
 
- # In a Build.PL :
- use Module::Build;
- my $build = Module::Build->new
-   ( module_name => 'Foo::Bar',
-     license => 'perl',
-     create_makefile_pl => 'passthrough' );
- ...
+  # In a Build.PL :
+  use Module::Build;
+  my $build = Module::Build->new
+    ( module_name => 'Foo::Bar',
+      license     => 'perl',
+      create_makefile_pl => 'passthrough' );
+  ...
+
 
 =head1 DESCRIPTION
 
@@ -292,11 +297,12 @@ Makefile.PL for you, in one of several different styles.
 Module::Build::Compat also provides some code that helps out the
 Makefile.PL at runtime.
 
+
 =head1 METHODS
 
 =over 4
 
-=item create_makefile_pl( $style, $build )
+=item create_makefile_pl($style, $build)
 
 Creates a Makefile.PL in the current directory in one of several
 styles, based on the supplied Module::Build object C<$build>.  This is
@@ -337,7 +343,7 @@ customization, because the vanilla Makefile.PL won't do any of that.
 
 =back
 
-=item run_build_pl( args => \@ARGV )
+=item run_build_pl(args => \@ARGV)
 
 This method runs the Build.PL script, passing it any arguments the
 user may have supplied to the C<perl Makefile.PL> command.  Because
@@ -360,7 +366,6 @@ This is the filename of the script to run - it defaults to C<Build.PL>.
 
 =back
 
-
 =item write_makefile()
 
 This method writes a 'dummy' Makefile that will pass all commands
@@ -378,6 +383,7 @@ The name of the file to write - defaults to the string C<Makefile>.
 
 =back
 
+
 =head1 SCENARIOS
 
 So, some common scenarios are:
@@ -390,7 +396,7 @@ Just include a Build.PL script (without a Makefile.PL
 script), and give installation directions in a README or INSTALL
 document explaining how to install the module.  In particular, explain
 that the user must install Module::Build before installing your
-module.  
+module.
 
 Note that if you do this, you may make things easier for yourself, but
 harder for people with older versions of CPAN or CPANPLUS on their
@@ -423,9 +429,11 @@ versions of tools like CPAN and CPANPLUS.
 
 =back
 
+
 =head1 AUTHOR
 
-Ken Williams, ken@mathforum.org
+Ken Williams <ken@cpan.org>
+
 
 =head1 COPYRIGHT
 
@@ -434,8 +442,10 @@ Copyright (c) 2001-2005 Ken Williams.  All rights reserved.
 This library is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
+
 =head1 SEE ALSO
 
 Module::Build(3), ExtUtils::MakeMaker(3)
+
 
 =cut
