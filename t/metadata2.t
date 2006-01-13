@@ -1,21 +1,15 @@
 #!/usr/bin/perl -w
 
-use lib 't/lib';
 use strict;
-
-use Test::More tests => 18;
-
-
-use File::Spec ();
-my $common_pl = File::Spec->catfile( 't', 'common.pl' );
-require $common_pl;
-
+use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
+use MBTest tests => 18;
 
 use Cwd ();
 my $cwd = Cwd::cwd;
 my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
 
 use Module::Build;
+use Module::Build::ConfigData;
 use DistGen;
 
 
@@ -23,7 +17,7 @@ use DistGen;
 
 SKIP: {
   skip( 'YAML_support feature is not enabled', 4 )
-      unless Module::Build->current->feature('YAML_support');
+      unless Module::Build::ConfigData->feature('YAML_support');
 
   my $dist = DistGen->new( dir => $tmp, skip_manifest => 1 );
   $dist->regen;

@@ -1,15 +1,8 @@
 #!/usr/bin/perl -w
 
-use lib 't/lib';
 use strict;
-
-use Test::More tests => 46;
-
-
-use File::Spec ();
-my $common_pl = File::Spec->catfile( 't', 'common.pl' );
-require $common_pl;
-
+use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
+use MBTest tests => 46;
 
 use Cwd ();
 my $cwd = Cwd::cwd;
@@ -17,13 +10,14 @@ my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
 
 
 use Module::Build;
-my $has_YAML = Module::Build->current->feature('YAML_support');
+use Module::Build::ConfigData;
+my $has_YAML = Module::Build::ConfigData->feature('YAML_support');
 
 
 use DistGen;
 my $dist = DistGen->new( dir => $tmp );
 $dist->change_file( 'Build.PL', <<"---" );
-use Module::Build;
+
 my \$builder = Module::Build->new(
     module_name   => '@{[$dist->name]}',
     dist_version  => '3.14159265',

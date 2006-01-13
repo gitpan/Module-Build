@@ -1,15 +1,8 @@
 #!/usr/bin/perl -w
 
-use lib 't/lib';
 use strict;
-
-use Test::More tests => 55;
-
-
-use File::Spec ();
-my $common_pl = File::Spec->catfile( 't', 'common.pl' );
-require $common_pl;
-
+use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
+use MBTest tests => 55;
 
 use Cwd ();
 my $cwd = Cwd::cwd;
@@ -26,7 +19,10 @@ chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
 
 use_ok 'Module::Build';
 
-like $INC{'Module/Build.pm'}, qr/\bblib\b/, "Make sure Module::Build was loaded from blib/";
+SKIP: {
+  skip "no blib in core", 1 if $ENV{PERL_CORE};
+  like $INC{'Module/Build.pm'}, qr/\bblib\b/, "Make sure Module::Build was loaded from blib/";
+}
 
 
 # Test object creation
@@ -92,8 +88,7 @@ like $INC{'Module/Build.pm'}, qr/\bblib\b/, "Make sure Module::Build was loaded 
   $Foo::Module::VERSION = '1.01_02';
 
   $info = Module::Build->check_installed_status('Foo::Module', '1.01_02');
-  ok $info->{ok};
-  print "# $info->{message}\n" if $info->{message};
+  ok $info->{ok} or diag($info->{message});
 }
 
 {

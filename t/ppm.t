@@ -1,32 +1,18 @@
 #!/usr/bin/perl -w
 
-use lib 't/lib';
 use strict;
-
-use Test::More;
-
-
-use File::Spec ();
-my $common_pl = File::Spec->catfile( 't', 'common.pl' );
-require $common_pl;
-
-
+use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
+use MBTest;
 use Module::Build;
+use Module::Build::ConfigData;
 
-my( $manpage_support, $HTML_support );
+my $manpage_support = Module::Build::ConfigData->feature('manpage_support');
+my $HTML_support = Module::Build::ConfigData->feature('HTML_support');
 
-{ local $SIG{__WARN__} = sub {};
 
-  my $mb = Module::Build->current;
-  $mb->verbose( 0 );
-
-  $manpage_support = $mb->feature('manpage_support');
-  $HTML_support    = $mb->feature('HTML_support');
-
-  my $have_c_compiler;
-  stderr_of( sub {$have_c_compiler = $mb->have_c_compiler} );
-
-  if ( ! $mb->feature('C_support') ) {
+{
+  my ($have_c_compiler, $C_support_feature) = check_compiler();
+  if (! $C_support_feature) {
     plan skip_all => 'C_support not enabled';
   } elsif ( ! $have_c_compiler ) {
     plan skip_all => 'C_support enabled, but no compiler found';
@@ -211,5 +197,32 @@ sub exists_ok {
   my $file  = shift;
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   ok exists( $files->{$file} ) && $files->{$file}, $file;
+}
+
+# A hash of all Config.pm settings related to installing
+# manpages with values set to an empty string.
+sub manpage_reset {
+  return (
+    installman1dir => '',
+    installman3dir => '',
+    installsiteman1dir => '',
+    installsiteman3dir => '',
+    installvendorman1dir => '',
+    installvendorman3dir => '',
+  );
+}
+
+# A hash of all Config.pm settings related to installing
+# html documents with values set to an empty string.
+sub html_reset {
+  return (
+    installhtmldir => '',
+    installhtml1dir => '',
+    installhtml3dir => '',
+    installsitehtml1dir => '',
+    installsitehtml3dir => '',
+    installvendorhtml1dir => '',
+    installvendorhtml3dir => '',
+  );
 }
 

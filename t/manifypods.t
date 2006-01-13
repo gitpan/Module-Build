@@ -1,19 +1,12 @@
 #!/usr/bin/perl -w
 
-use lib 't/lib';
 use strict;
-
-use File::Spec ();
-my $common_pl = File::Spec->catfile( 't', 'common.pl' );
-require $common_pl;
-
-
-#########################
-
-use Test::More;
+use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
+use MBTest;
 use Module::Build;
+use Module::Build::ConfigData;
 
-if ( Module::Build->current->feature('manpage_support') ) {
+if ( Module::Build::ConfigData->feature('manpage_support') ) {
   plan tests => 21;
 } else {
   plan skip_all => 'manpage_support feature is not enabled';

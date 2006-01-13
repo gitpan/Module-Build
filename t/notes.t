@@ -1,13 +1,8 @@
 #!/usr/bin/perl -w
 
-use lib 't/lib';
 use strict;
-
-use Test::More tests => 8;
-
-use File::Spec ();
-my $common_pl = File::Spec->catfile( 't', 'common.pl' );
-require $common_pl;
+use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
+use MBTest tests => 8;
 
 use Cwd ();
 my $cwd = Cwd::cwd;

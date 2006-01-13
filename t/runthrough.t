@@ -1,17 +1,12 @@
 #!/usr/bin/perl -w
 
-use lib 't/lib';
 use strict;
+use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
+use MBTest tests => 28;
+use Module::Build;
+use Module::Build::ConfigData;
 
-use Test::More tests => 28;
-
-my $have_yaml = Module::Build->current->feature('YAML_support');
-
-
-use File::Spec ();
-my $common_pl = File::Spec->catfile( 't', 'common.pl' );
-require $common_pl;
-
+my $have_yaml = Module::Build::ConfigData->feature('YAML_support');
 
 #########################
 
@@ -46,7 +41,9 @@ plan tests => 2;
 ok 1;
 
 require Module::Build;
-ok $INC{'Module/Build.pm'}, qr/blib/, 'Module::Build should be loaded from blib';
+skip $ENV{PERL_CORE} && "no blib in core",
+  $INC{'Module/Build.pm'}, qr/blib/, 'Module::Build should be loaded from blib';
+
 print "# Cwd: ", Module::Build->cwd, "\n";
 print "# \@INC: (@INC)\n";
 print "Done.\n";  # t/compat.t looks for this
@@ -68,7 +65,10 @@ chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
 use Module::Build;
 ok(1);
 
-like $INC{'Module/Build.pm'}, qr/\bblib\b/, "Make sure version from blib/ is loaded";
+SKIP: {
+  skip "no blib in core", 1 if $ENV{PERL_CORE};
+  like $INC{'Module/Build.pm'}, qr/\bblib\b/, "Make sure version from blib/ is loaded";
+}
 
 #########################
 
@@ -94,21 +94,25 @@ $mb->add_to_cleanup('save_out');
 ok grep {$_ eq 'before_script'} $mb->cleanup;
 ok grep {$_ eq 'save_out'     } $mb->cleanup;
 
-my $output = eval {
-  stdout_of( sub { $mb->dispatch('test', verbose => 1) } )
-};
-is $@, '';
-like $output, qr/all tests successful/i;
+{
+  # Make sure verbose=>1 works
+  my $all_ok = 1;
+  my $output = eval {
+    stdout_of( sub { $mb->dispatch('test', verbose => 1) } )
+  };
+  $all_ok &&= is($@, '');
+  $all_ok &&= like($output, qr/all tests successful/i);
+  
+  # This is the output of lib/Simple/Script.PL
+  $all_ok &&= ok(-e $mb->localize_file_path('lib/Simple/Script'));
 
-# This is the output of lib/Simple/Script.PL
-ok -e $mb->localize_file_path('lib/Simple/Script');
-
-
-# We prefix all lines with "| " so Test::Harness doesn't get confused.
-print "vvvvvvvvvvvvvvvvvvvvv Simple/test.pl output vvvvvvvvvvvvvvvvvvvvv\n";
-$output =~ s/^/| /mg;
-print $output;
-print "^^^^^^^^^^^^^^^^^^^^^ Simple/test.pl output ^^^^^^^^^^^^^^^^^^^^^\n";
+  unless ($all_ok) {
+    # We use diag() so Test::Harness doesn't get confused.
+    diag("vvvvvvvvvvvvvvvvvvvvv Simple/test.pl output vvvvvvvvvvvvvvvvvvvvv");
+    diag($output);
+    diag("^^^^^^^^^^^^^^^^^^^^^ Simple/test.pl output ^^^^^^^^^^^^^^^^^^^^^");
+  }
+}
 
 SKIP: {
   skip( 'YAML_support feature is not enabled', 7 ) unless $have_yaml;
@@ -160,9 +164,7 @@ SKIP: {
   
   my $fh = IO::File->new($blib_script);
   my $first_line = <$fh>;
-  print "# rewritten shebang?\n$first_line";
-  
-  isnt $first_line, "#!perl -w\n";
+  isnt $first_line, "#!perl -w\n", "should rewrite the shebang line";
 }
 
 {

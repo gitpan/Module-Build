@@ -2,16 +2,9 @@
 
 # Test ~ expansion from command line arguments.
 
-use lib 't/lib';
 use strict;
-
-use Test::More tests => 11;
-
-
-use File::Spec ();
-my $common_pl = File::Spec->catfile( 't', 'common.pl' );
-require $common_pl;
-
+use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
+use MBTest tests => 11;
 
 use Cwd ();
 my $cwd = Cwd::cwd;

@@ -1,15 +1,8 @@
 #!/usr/bin/perl -w
 
-use lib 't/lib';
 use strict;
-
-use Test::More tests => 34;
-
-
-use File::Spec ();
-my $common_pl = File::Spec->catfile( 't', 'common.pl' );
-require $common_pl;
-
+use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
+use MBTest tests => 34;
 
 use Cwd ();
 my $cwd = Cwd::cwd;
@@ -76,8 +69,7 @@ $mb->add_to_cleanup($destdir);
   
   my $libdir = strip_volume( $mb->install_destination('lib') );
   my $install_to = File::Spec->catfile($destdir, $libdir, $dist->name ) . '.pm';
-  print "Should have installed module as $install_to\n";
-  ok -e $install_to;
+  file_exists($install_to);
   
   local @INC = (@INC, File::Spec->catdir($destdir, $libdir));
   eval "require @{[$dist->name]}";
@@ -95,8 +87,7 @@ $mb->add_to_cleanup($destdir);
   is $@, '';
   my $libdir = strip_volume( $Config{installprivlib} );
   my $install_to = File::Spec->catfile($destdir, $libdir, $dist->name ) . '.pm';
-  print "Should have installed module as $install_to\n";
-  ok -e $install_to;
+  file_exists($install_to);
 }
 
 {
@@ -104,8 +95,7 @@ $mb->add_to_cleanup($destdir);
   eval {$mb->dispatch('install', install_path => {lib => $libdir}, destdir => $destdir)};
   is $@, '';
   my $install_to = File::Spec->catfile($destdir, $libdir, $dist->name ) . '.pm';
-  print "Should have installed module as $install_to\n";
-  ok -e $install_to;
+  file_exists($install_to);
 }
 
 {
@@ -113,8 +103,7 @@ $mb->add_to_cleanup($destdir);
   eval {$mb->dispatch('install', install_base => $libdir, destdir => $destdir)};
   is $@, '';
   my $install_to = File::Spec->catfile($destdir, $libdir, 'lib', 'perl5', $dist->name ) . '.pm';
-  print "Should have installed module as $install_to\n";
-  ok -e $install_to;
+  file_exists($install_to);
 }
 
 {
@@ -170,8 +159,7 @@ is $@, '';
   eval {$mb->run_perl_script('Build', [], ['install', '--destdir', $destdir])};
   is $@, '';
   my $install_to = File::Spec->catfile($destdir, $libdir, $dist->name ) . '.pm';
-  print "# Should have installed module as $install_to\n";
-  ok -e $install_to;
+  file_exists($install_to);
 
   my $basedir = File::Spec->catdir('', 'bar');
   eval {$mb->run_perl_script('Build', [], ['install', '--destdir', $destdir,
@@ -238,6 +226,11 @@ sub strip_volume {
   my $dir = shift;
   (undef, $dir) = File::Spec->splitpath( $dir, 1 );
   return $dir;
+}
+
+sub file_exists {
+  my $file = shift;
+  ok -e $file or diag("Expected $file to exist, but it doesn't");
 }
 
 
