@@ -14,16 +14,16 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 0b3a3c7f5b084da64c6ab9de24578c62758b9fbf Build.PL
-SHA1 c3762ebb7bcfc4958f90ec8ca3127146c3c6d16e Changes
+SHA1 6a788bb1ef9012ae8d155431e81db2e3ec8b7e2e Build.PL
+SHA1 3563a870b220dbee6a605f0df2014dbc626d8df0 Changes
 SHA1 7ffbdcf27feba9f2ea5e3800f378835b0c3154a2 INSTALL
 SHA1 56048a60f697f028a144169678ab49933038795b MANIFEST
-SHA1 fc68f86314d6451b793cc3ef4bd9b63a2cfcb190 META.yml
+SHA1 45a1dcc548e8fae34df45df43ea48e4e94dc9f2a META.yml
 SHA1 709de66c0beb8832da066b9f865d8693db5eb504 Makefile.PL
 SHA1 dc975fc8652f37ae7d6eac896c9dd5032ee0e4ae README
-SHA1 a8ed9f0a1b85f74a56a4614e75f646942a0c86cd lib/Module/Build.pm
-SHA1 cbd77227442925a27c3c5013062dae6188511642 lib/Module/Build/Authoring.pod
-SHA1 62b74eacab030e7b87c2f76c8fd572f473129663 lib/Module/Build/Base.pm
+SHA1 99de5e23d0eee3186697d3aa297d73c43e366ef1 lib/Module/Build.pm
+SHA1 29fb58963aae5ce46cf6baa5a3566a3037ceb197 lib/Module/Build/Authoring.pod
+SHA1 94a717b6813b897e35584770a09e446cb9254477 lib/Module/Build/Base.pm
 SHA1 3900062636d2db811b059ada22ad2aa0dc2b1268 lib/Module/Build/Compat.pm
 SHA1 90976758ca33e1bc9de6627149fb8230f0f37792 lib/Module/Build/Cookbook.pm
 SHA1 65fb4c4a6d693e8a7ac1b9dc41b238d2af0d9940 lib/Module/Build/ModuleInfo.pm
@@ -38,7 +38,7 @@ SHA1 30250cfce68b087340760aeb6a17e0fa64342ac8 lib/Module/Build/Platform/RiscOS.p
 SHA1 ccc7c488aaba06818543f66ba13382d5f2520892 lib/Module/Build/Platform/Unix.pm
 SHA1 3abc7514e10a07dfa4ea8246757856881b49df69 lib/Module/Build/Platform/VMS.pm
 SHA1 290e03c9204097e680998b0f751675adc91031b8 lib/Module/Build/Platform/VOS.pm
-SHA1 8c9af9cb12e10672dacad164e8050d9a7967d0b7 lib/Module/Build/Platform/Windows.pm
+SHA1 00a1d9fccca95cdc70e307e1bfa3207c42fe35b8 lib/Module/Build/Platform/Windows.pm
 SHA1 11985844a25a26a7fad1ede211f843b5b8986f1f lib/Module/Build/Platform/aix.pm
 SHA1 7fd92ad31a6f261b16df6a5650bd12a37e3461ef lib/Module/Build/Platform/cygwin.pm
 SHA1 8b058a6c539b5e34a7fff37be9f07309189da1ad lib/Module/Build/Platform/darwin.pm
@@ -58,7 +58,7 @@ SHA1 8870682cfe89ac1ed6c9af46e1ec9bdc2a138e0f t/install.t
 SHA1 77ff3133dfb8a83836714bfcbd7b09a7ddf24326 t/lib/DistGen.pm
 SHA1 5177fd576c297a11e34bac29bf199e9dbc2174d6 t/lib/MBTest.pm
 SHA1 4848d59cb5b15b21543d795d507cead4dfea208c t/manifypods.t
-SHA1 c2e1deb96875d86f6c8d60a4bc727dee44ac422c t/metadata.t
+SHA1 8f629be571eaed93f56176db17e83b155cdc736a t/metadata.t
 SHA1 f6ef176c5900f7ed42ad6856679afbd1bfc7b5d7 t/metadata2.t
 SHA1 d01410268b2083fe688e27dd8090bd0096c24890 t/moduleinfo.t
 SHA1 e23980dc0bdb2d82d7734d9f3972ae4c611296b8 t/notes.t
@@ -73,7 +73,7 @@ SHA1 2c02af53d4e6efe70a62adbe520731e0a66f38df t/xs.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.2.4 (Darwin)
 
-iD8DBQFDxuy3grvMBLfvlHYRAry8AJ9p6nCLaal1Uzq+Xq51rTZjQklO3wCg6BiY
-V1FBmgovDumm4V5oyOcPQBs=
-=CXVg
+iD8DBQFD1bEDgrvMBLfvlHYRAqWYAKCU6F4OwzCK3e1BMfRHdqoDpplljQCffZyj
+lRMDmUf9Vn7EJdq2oc1Cir4=
+=aKNs
 -----END PGP SIGNATURE-----
