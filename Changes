@@ -1,5 +1,23 @@
 Revision history for Perl extension Module::Build.
 
+0.27_07  Wed Feb  1 20:07:45 CST 2006
+
+ - The notes() method now returns the new value when called with two
+   arguments, just like when it's called with one argument. [Tyler
+   MacDonald]
+
+ - The notes() method now distinguishes among the values undef, 0, and
+   the empty string, where previously it didn't. [Tyler MacDonald]
+
+ - We now unshift(@INC) rather than push(@INC) for the directory where
+   a build subclass lives, so that we're sure to pick up the right
+   version and not some already-installed version. [perlmonkey]
+
+ - The SIGNATURE file for version 0.27_06 (and I'm sure for lots of
+   versions before that too!) was messed up, since we were modifying
+   some files after signing.  This has been band-aided for the time
+   being by signing twice. [Reported by Chris Dolan]
+
 0.27_06  Mon Jan 23 21:44:54 CST 2006
 
  - Fixed an undefined-variable warning when building the META.yml file
