@@ -6,6 +6,7 @@ use Module::Build::Base;
 use vars qw(@ISA);
 @ISA = qw(Module::Build::Base);
 
+sub need_prelink_c { 1 }
 
 
 =head1 NAME
@@ -61,6 +62,8 @@ sub cull_args {
 
 Use '__' instead of '::'.
 
+=back
+
 =cut
 
 sub manpage_separator {
@@ -68,62 +71,9 @@ sub manpage_separator {
 }
 
 
-=item prefixify
-
-Prefixify taking into account VMS' filepath syntax.
-
-=cut
-
-# Translated from ExtUtils::MM_VMS::prefixify()
-sub _prefixify {
-    my($self, $path, $sprefix, $type) = @_;
-    my $rprefix = $self->prefix;
-
-    $self->log_verbose("  prefixify $path from $sprefix to $rprefix\n");
-
-    # Translate $(PERLPREFIX) to a real path.
-    $rprefix = $self->eliminate_macros($rprefix);
-    $rprefix = VMS::Filespec::vmspath($rprefix) if $rprefix;
-    $sprefix = VMS::Filespec::vmspath($sprefix) if $sprefix;
-
-    $self->log_verbose("  rprefix translated to $rprefix\n".
-                       "  sprefix translated to $sprefix\n");
-
-    if( length $path == 0 ) {
-        $self->log_verbose("  no path to prefixify.\n")
-    }
-    elsif( !File::Spec->file_name_is_absolute($path) ) {
-        $self->log_verbose("    path is relative, not prefixifying.\n");
-    }
-    elsif( $sprefix eq $rprefix ) {
-        $self->log_verbose("  no new prefix.\n");
-    }
-    else {
-        my($path_vol, $path_dirs) = File::Spec->splitpath( $path );
-	my $vms_prefix = $self->config->{vms_prefix};
-        if( $path_vol eq $vms_prefix.':' ) {
-            $self->log_verbose("  $vms_prefix: seen\n");
-
-            $path_dirs =~ s{^\[}{\[.} unless $path_dirs =~ m{^\[\.};
-            $path = $self->_catprefix($rprefix, $path_dirs);
-        }
-        else {
-            $self->log_verbose("    cannot prefixify.\n");
-	    return $self->prefix_relpaths($self->installdirs, $type);
-        }
-    }
-
-    $self->log_verbose("    now $path\n");
-
-    return $path;
-}
-
-
-=back
-
 =head1 AUTHOR
 
-Michael G Schwern <schwern@pobox.com>, Ken Williams <ken@cpan.org>
+Michael G Schwern <schwern@pobox.com>, Ken Williams <ken@mathforum.org>
 
 =head1 SEE ALSO
 

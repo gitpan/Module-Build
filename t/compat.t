@@ -1,75 +1,61 @@
-#!/usr/bin/perl -w
-
 use strict;
-use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest;
+use Test;
+use Module::Build;
+use Module::Build::Compat;
 use File::Spec;
+use File::Path;
 use Config;
+
+my $common_pl = File::Spec->catfile('t', 'common.pl');
+require $common_pl;
+
+#use Carp;  $SIG{__WARN__} = \&Carp::cluck;
+
 
 # Don't let our own verbosity/test_file get mixed up with our subprocess's
 my @makefile_keys = qw(TEST_VERBOSE HARNESS_VERBOSE TEST_FILES MAKEFLAGS);
 local  @ENV{@makefile_keys};
 delete @ENV{@makefile_keys};
 
+skip_test("Don't know how to invoke 'make'")
+  unless $Config{make} and find_in_path($Config{make});
+
 my @makefile_types = qw(small passthrough traditional);
 my $tests_per_type = 10;
-if ( $Config{make} && find_in_path($Config{make}) ) {
-    plan tests => 30 + @makefile_types*$tests_per_type;
-} else {
-    plan skip_all => "Don't know how to invoke 'make'";
-}
+plan tests => 32 + @makefile_types*$tests_per_type;
 ok(1);  # Loaded
-
-
-#########################
-
-use Cwd ();
-my $cwd = Cwd::cwd;
-my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
-
-use DistGen;
-my $dist = DistGen->new( dir => $tmp );
-$dist->regen;
-
-chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
-
-
-#########################
-
-use Module::Build;
-use Module::Build::Compat;
-
-use Carp;  $SIG{__WARN__} = \&Carp::cluck;
 
 my @make = $Config{make} eq 'nmake' ? ('nmake', '-nologo') : ($Config{make});
 
-#########################
+my $startdir = Module::Build->cwd;
 
+my $goto = File::Spec->catdir( $startdir, 't', 'Sample' );
+chdir $goto or die "can't chdir to $goto: $!";
 
-my $mb = Module::Build->new_from_context;
-ok $mb;
+my $build = Module::Build->new_from_context;
+ok $build;
 
 foreach my $type (@makefile_types) {
-  Module::Build::Compat->create_makefile_pl($type, $mb);
-  test_makefile_creation($mb);
+  Module::Build::Compat->create_makefile_pl($type, $build);
+  test_makefile_creation($build); # 2 tests
   
-  ok $mb->do_system(@make);
+  ok $build->do_system(@make);
   
   # Can't let 'test' STDOUT go to our STDOUT, or it'll confuse Test::Harness.
   my $success;
   my $output = stdout_of( sub {
-			    $success = $mb->do_system(@make, 'test');
+			    $success = $build->do_system(@make, 'test');
 			  } );
   ok $success;
-  like uc $output, qr{DONE\.|SUCCESS};
+  ok uc $output, qr{DONE\.|SUCCESS}, "Make sure 'make test' ran";
   
-  ok $mb->do_system(@make, 'realclean');
+  ok $build->do_system(@make, 'realclean');
   
   # Try again with some Makefile.PL arguments
-  test_makefile_creation($mb, [], 'INSTALLDIRS=vendor', 1);
+  test_makefile_creation($build, [], 'INSTALLDIRS=vendor', 1); # 3 tests
   
   1 while unlink 'Makefile.PL';
-  ok ! -e 'Makefile.PL';
+  ok !-e 'Makefile.PL', 1;
 }
 
 {
@@ -78,16 +64,16 @@ foreach my $type (@makefile_types) {
   my $warning = '';
   local $SIG{__WARN__} = sub { $warning = shift; };
   my $maketext = eval { Module::Build::Compat->fake_makefile(makefile => 'Makefile') };
-  is $@, '';
-  like $maketext, qr/^realclean/m;
-  like $warning, qr/build_class/;
+  ok $@, '', "Make sure we can create a makefile";
+  ok $maketext, qr/^realclean/m;
+  ok $warning, qr/build_class/;
 }
 
 {
   # Make sure custom builder subclass is used in the created
   # Makefile.PL - make sure it fails in the right way here.
   local @Foo::Builder::ISA = qw(Module::Build);
-  my $foo_builder = Foo::Builder->new_from_context;
+  my $foo_builder = Foo::Builder->new_from_context();
   foreach my $style ('passthrough', 'small') {
     Module::Build::Compat->create_makefile_pl($style, $foo_builder);
     ok -e 'Makefile.PL';
@@ -95,10 +81,10 @@ foreach my $type (@makefile_types) {
     # Should fail with "can't find Foo/Builder.pm"
     my $warning = stderr_of
       (sub {
-	 my $result = $mb->run_perl_script('Makefile.PL');
-	 ok ! $result;
+	 my $result = $build->run_perl_script('Makefile.PL');
+	 ok !$result;
        });
-    like $warning, qr{Foo/Builder.pm};
+    ok $warning, qr{Foo/Builder.pm};
   }
   
   # Now make sure it can actually work.
@@ -106,54 +92,58 @@ foreach my $type (@makefile_types) {
   foreach my $style ('passthrough', 'small') {
     Module::Build::Compat->create_makefile_pl($style, $bar_builder);
     ok -e 'Makefile.PL';
-    ok $mb->run_perl_script('Makefile.PL');
+    ok $build->run_perl_script('Makefile.PL');
   }
 }
 
 {
   # Make sure various Makefile.PL arguments are supported
-  Module::Build::Compat->create_makefile_pl('passthrough', $mb);
+  Module::Build::Compat->create_makefile_pl('passthrough', $build);
 
-  my $libdir = File::Spec->catdir( $cwd, 't', 'libdir' );
-  my $result = $mb->run_perl_script('Makefile.PL', [],
-				     [
-				      "LIB=$libdir",
-				      'TEST_VERBOSE=1',
-				      'INSTALLDIRS=perl',
-				      'POLLUTE=1',
-				     ]
-				   );
+  my $libdir = File::Spec->catdir( $startdir, 't', 'libdir' );
+  my $result = $build->run_perl_script('Makefile.PL', [], 
+				       [
+					"LIB=$libdir",
+					'TEST_VERBOSE=1',
+					'INSTALLDIRS=perl',
+					'POLLUTE=1',
+				       ]
+				      );
   ok $result;
-  ok -e 'Build.PL';
+  ok -e 'Build.PL', 1;
 
   my $new_build = Module::Build->resume();
-  is $new_build->installdirs, 'core';
-  is $new_build->verbose, 1;
-  is $new_build->install_destination('lib'), $libdir;
-  is $new_build->extra_compiler_flags->[0], '-DPERL_POLLUTE';
+  ok $new_build->installdirs, 'core';
+  ok $new_build->verbose, 1;
+  ok $new_build->install_destination('lib'), $libdir;
+  ok $new_build->extra_compiler_flags->[0], '-DPERL_POLLUTE';
 
   # Make sure those switches actually had an effect
   my ($ran_ok, $output);
   $output = stdout_of( sub { $ran_ok = $new_build->do_system(@make, 'test') } );
   ok $ran_ok;
   $output =~ s/^/# /gm;  # Don't confuse our own test output
-  like $output, qr/(?:# ok \d+\s+)+/, 'Should be verbose';
+  ok $output, qr/# ok 1\s+# ok 2\s+/, 'Should be verbose';
 
   # Make sure various Makefile arguments are supported
-  $output = stdout_of( sub { $ran_ok = $mb->do_system(@make, 'test', 'TEST_VERBOSE=0') } );
+  $output = stdout_of( sub { $ran_ok = $build->do_system(@make, 'test', 'TEST_VERBOSE=0') } );
   ok $ran_ok;
   $output =~ s/^/# /gm;  # Don't confuse our own test output
-  like $output, qr/(?:# .+basic\.+ok\s+(?:[\d.]s\s*)?)+# All tests/,
-      'Should be non-verbose';
-
-  $mb->delete_filetree($libdir);
-  ok ! -e $libdir, "Sample installation directory should be cleaned up";
-
-  $mb->do_system(@make, 'realclean');
-  ok ! -e 'Makefile', "Makefile shouldn't exist";
+  ok $output, qr/# test\.+ok\s+# All/, 'Should be non-verbose';
+  
+  $output = stderr_of( sub { $ran_ok = $build->do_system(@make, 'install', "PREFIX=$libdir", "install_base=$libdir") } );
+  ok !$ran_ok;  # PREFIX should generate an error
+  ok $output, qr/PREFIX/, "Error should mention PREFIX";
+  
+  
+  $build->delete_filetree($libdir);
+  ok !-e $libdir, 1, "Sample installation directory should be cleaned up";
+  
+  $build->do_system(@make, 'realclean');
+  ok !-e 'Makefile', 1, "Makefile shouldn't exist";
 
   1 while unlink 'Makefile.PL';
-  ok ! -e 'Makefile.PL';
+  ok !-e 'Makefile.PL', 1;
 }
 
 { # Make sure tilde-expansion works
@@ -161,16 +151,17 @@ foreach my $type (@makefile_types) {
   # C<glob> on MSWin32 uses $ENV{HOME} if defined to do tilde-expansion
   local $ENV{HOME} = 'C:/' if $^O =~ /MSWin/ && !exists( $ENV{HOME} );
 
-  Module::Build::Compat->create_makefile_pl('passthrough', $mb);
+  Module::Build::Compat->create_makefile_pl('passthrough', $build);
 
-  $mb->run_perl_script('Makefile.PL', [], ['INSTALL_BASE=~/foo']);
+  $build->run_perl_script('Makefile.PL', [], ['INSTALL_BASE=~/foo']);
   my $b2 = Module::Build->current;
   ok $b2->install_base;
-  unlike $b2->install_base, qr/^~/, "Tildes should be expanded";
+  ok $b2->install_base !~ /^~/, 1, "Tildes should be expanded";
   
-  $mb->do_system(@make, 'realclean');
+  $build->do_system(@make, 'realclean');
   1 while unlink 'Makefile.PL';
 }
+
 #########################################################
 
 sub test_makefile_creation {
@@ -178,18 +169,10 @@ sub test_makefile_creation {
   
   my $result = $build->run_perl_script('Makefile.PL', $preargs, $postargs);
   ok $result;
-  ok -e 'Makefile', "Makefile should exist";
+  ok -e 'Makefile', 1, "Makefile should exist";
   
   if ($cleanup) {
     $build->do_system(@make, 'realclean');
-    ok ! -e 'Makefile', "Makefile shouldn't exist";
+    ok !-e 'Makefile', 1, "Makefile shouldn't exist";
   }
 }
-
-
-# cleanup
-chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
-$dist->remove;
-
-use File::Path;
-rmtree( $tmp );

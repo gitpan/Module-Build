@@ -1,165 +1,97 @@
 #!/usr/bin/perl -w
 
 use strict;
-use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest;
-use Module::Build;
-use Module::Build::ConfigData;
 
-if ( Module::Build::ConfigData->feature('manpage_support') ) {
-  plan tests => 21;
-} else {
-  plan skip_all => 'manpage_support feature is not enabled';
+use File::Spec;
+use Test;
+BEGIN {
+  my $common_pl = File::Spec->catfile('t', 'common.pl');
+  require $common_pl;
 }
 
-#########################
+use File::Path qw( rmtree );
 
+need_module('Pod::Man');
+plan tests => 21;
 
-use Cwd ();
-my $cwd = Cwd::cwd;
-my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
+use Module::Build;
 
-use DistGen;
-my $dist = DistGen->new( dir => $tmp );
-$dist->add_file( 'bin/nopod.pl', <<'---' );
-#!perl -w
-print "sample script without pod to test manifypods action\n";
----
-$dist->add_file( 'bin/haspod.pl', <<'---' );
-#!perl -w
-print "Hello, world";
+my $start = Module::Build->cwd;
+my $install = File::Spec->catdir( $start, 't', '_tmp' );
+chdir File::Spec->catdir( 't','Sample' ) or die "Can't chdir to t/Sample: $!";
 
-__END__
+my $m = new Module::Build
+  (
+   install_base => $install,
+   module_name  => 'Sample',
+   scripts      => [ 'script', File::Spec->catfile( 'bin', 'sample.pl' ) ],
+  );
 
-=head1 NAME
-
-haspod.pl - sample script with pod to test manifypods action
-
-=cut
----
-$dist->add_file( 'lib/Simple/NoPod.pm', <<'---' );
-package Simple::NoPod;
-1;
----
-$dist->add_file( 'lib/Simple/AllPod.pod', <<'---' );
-=head1 NAME
-
-Simple::AllPod - Pure POD
-
-=head1 AUTHOR
-
-Simple Man <simple@example.com>
-
-=cut
----
-$dist->regen;
-
-
-chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
-
-use File::Spec::Functions qw( catdir );
-my $destdir = catdir($cwd, 't', 'install_test');
-
-
-my $mb = Module::Build->new(
-  module_name      => $dist->name,
-  install_base     => $destdir,
-  scripts      => [ File::Spec->catfile( 'bin', 'nopod.pl'  ),
-                    File::Spec->catfile( 'bin', 'haspod.pl' )  ],
-
-  # need default install paths to ensure manpages & HTML get generated
-  installdirs => 'site',
-  config => {
-    installsiteman1dir  => catdir($tmp, 'site', 'man', 'man1'),
-    installsiteman3dir  => catdir($tmp, 'site', 'man', 'man3'),
-    installsitehtml1dir => catdir($tmp, 'site', 'html'),
-    installsitehtml3dir => catdir($tmp, 'site', 'html'),
-  }
-
-);
-
-$mb->add_to_cleanup($destdir);
-
-
-is( ref $mb->{properties}->{bindoc_dirs}, 'ARRAY', 'bindoc_dirs' );
-is( ref $mb->{properties}->{libdoc_dirs}, 'ARRAY', 'libdoc_dirs' );
+ok( ref $m->{properties}->{bindoc_dirs}, 'ARRAY', 'bindoc_dirs' );
+ok( ref $m->{properties}->{libdoc_dirs}, 'ARRAY', 'libdoc_dirs' );
 
 my %man = (
-	   sep  => $mb->manpage_separator,
+	   sep  => $m->manpage_separator,
 	   dir1 => 'man1',
 	   dir3 => 'man3',
-	   ext1 => $mb->config('man1ext'),
-	   ext3 => $mb->config('man3ext'),
+	   ext1 => $m->{config}{man1ext},
+	   ext3 => $m->{config}{man3ext},
 	  );
 
 my %distro = (
-	      'bin/nopod.pl'          => '',
-              'bin/haspod.pl'         => "haspod.pl.$man{ext1}",
-	      'lib/Simple.pm'         => "Simple.$man{ext3}",
-              'lib/Simple/NoPod.pm'   => '',
-              'lib/Simple/AllPod.pod' => "Simple$man{sep}AllPod.$man{ext3}",
+	      'bin/sample.pl' => "sample.pl.$man{ext1}",
+	      'lib/Sample/Docs.pod' => "Sample$man{sep}Docs.$man{ext3}",
+	      'lib/Sample.pm' => "Sample.$man{ext3}",
+	      'script' => '',
+	      'lib/Sample/NoPod.pm' => '',
 	     );
+# foreach(keys %foo) doesn't give proper lvalues on 5.005, so we use the ugly way
+%distro = map {$m->localize_file_path($_), $distro{$_}} keys %distro;
 
-%distro = map {$mb->localize_file_path($_), $distro{$_}} keys %distro;
+$m->dispatch('build');
 
-$mb->dispatch('build');
-
-eval {$mb->dispatch('docs')};
-is $@, '';
+eval {$m->dispatch('docs')};
+ok $@, '';
 
 while (my ($from, $v) = each %distro) {
   if (!$v) {
-    ok ! $mb->contains_pod($from), "$from should not contain POD";
+    ok $m->contains_pod($from), '', "$from should not contain POD";
     next;
   }
   
   my $to = File::Spec->catfile('blib', ($from =~ /^lib/ ? 'libdoc' : 'bindoc'), $v);
-  ok $mb->contains_pod($from), "$from should contain POD";
-  ok -e $to, "Created $to manpage";
+  ok $m->contains_pod($from), 1, "$from should contain POD";
+  ok -e $to, 1, "Created $to manpage";
 }
 
 
-$mb->dispatch('install');
+$m->add_to_cleanup($install);
+$m->dispatch('install');
 
 while (my ($from, $v) = each %distro) {
   next unless $v;
-  my $to = File::Spec->catfile($destdir, 'man', $man{($from =~ /^lib/ ? 'dir3' : 'dir1')}, $v);
-  ok -e $to, "Created $to manpage";
+  my $to = File::Spec->catfile($install, 'man', $man{($from =~ /^lib/ ? 'dir3' : 'dir1')}, $v);
+  ok -e $to, 1, "Created $to manpage";
 }
 
-$mb->dispatch('realclean');
+$m->dispatch('realclean');
 
 
-# revert to a pristine state
-chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
-$dist->remove;
-$dist = DistGen->new( dir => $tmp );
-$dist->regen;
-chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+my $m2 = new Module::Build
+  (
+   module_name     => 'Sample',
+   libdoc_dirs => [qw( foo bar baz )],
+  );
 
-
-my $mb2 = Module::Build->new(
-  module_name => $dist->name,
-  libdoc_dirs => [qw( foo bar baz )],
-);
-
-is( $mb2->{properties}->{libdoc_dirs}->[0], 'foo', 'override libdoc_dirs' );
+ok( $m2->{properties}->{libdoc_dirs}->[0], 'foo', 'override libdoc_dirs' );
 
 # Make sure we can find our own action documentation
-ok  $mb2->get_action_docs('build');
-ok !$mb2->get_action_docs('foo');
+ok  $m2->get_action_docs('build');
+ok !$m2->get_action_docs('foo');
 
 # Make sure those docs are the correct ones
-foreach ('testcover', 'disttest') {
-  my $docs = $mb2->get_action_docs($_);
-  like $docs, qr/=item $_/;
-  unlike $docs, qr/\n=/, $docs;
+foreach ('ppd', 'disttest') {
+  my $docs = $m2->get_action_docs($_);
+  ok $docs, "/=item $_/";
+  ok $docs !~ /\n=/, 1, $docs;
 }
-
-
-# cleanup
-chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
-$dist->remove;
-
-use File::Path;
-rmtree( $tmp );

@@ -39,7 +39,7 @@ sub _myparse_from_filehandle {
   
   my @author;
   while (<$fh>) {
-    next unless /^=head1\s+AUTHORS?/ ... /^=/;
+    next unless /^=head1\s+AUTHOR/ ... /^=/;
     next if /^=/;
     push @author, $_ if /\@/;
   }
@@ -66,7 +66,7 @@ sub get_author {
   
   $self->parse_from_filehandle($self->{fh});
 
-  return $self->{author} || [];
+  return $self->{author};  
 }
 
 ################## Pod::Parser overrides ###########
@@ -85,6 +85,7 @@ sub command {
   }
 }
 
+
 sub textblock {
   my ($self, $text) = @_;
   $text =~ s/^\s+//;
@@ -92,7 +93,7 @@ sub textblock {
   if ($self->{_head} eq 'NAME') {
     my ($name, $abstract) = split( /\s+-\s+/, $text, 2 );
     $self->{abstract} = $abstract;
-  } elsif ($self->{_head} =~ /^AUTHORS?$/) {
+  } elsif ($self->{_head} eq 'AUTHOR') {
     push @{$self->{author}}, $text if $text =~ /\@/;
   }
 }

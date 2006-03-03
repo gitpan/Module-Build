@@ -1,25 +1,15 @@
-#!/usr/bin/perl -w
 
 use strict;
-use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 6;
+use Test;
+plan tests => 6;
 
-use Cwd ();
-my $cwd = Cwd::cwd;
-my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
-
-use DistGen;
-my $dist = DistGen->new( dir => $tmp );
-$dist->regen;
-
-chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
-
-
+use File::Spec;
 use IO::File;
-
-
 use Module::Build;
-my $mb = Module::Build->new_from_context;
+ok(1);
+
+
+my $m = Module::Build->current;
 my @files;
 
 {
@@ -28,12 +18,12 @@ my @files;
   my @tmp;
   foreach (1..2) {
     my $tmp = File::Spec->catdir('t', "tmp$_");
-    $mb->add_to_cleanup($tmp);
+    $m->add_to_cleanup($tmp);
     push @files, $tmp;
     unless (-d $tmp) {
       mkdir($tmp, 0777) or die "Can't create $tmp: $!";
     }
-    ok -d $tmp;
+    ok -d $tmp, 1;
     $tmp[$_] = $tmp;
   }
   
@@ -43,25 +33,12 @@ my @files;
   my $fh = IO::File->new($file, '>') or die "Can't create $file: $!";
   print $fh "Foo\n";
   $fh->close;
-  ok -e $file;
+  ok -e $file, 1;
   
   
-  my $file2 = $mb->copy_if_modified(from => $file, to_dir => $tmp[2]);
+  my $file2 = $m->copy_if_modified(from => $file, to_dir => $tmp[2]);
   ok $file2;
-  ok -e $file2;
+  ok -e $file2, 1;
 }
 
-{
-  # Try some dir_contains() combinations
-  my $first  = File::Spec->catdir('', 'one', 'two');
-  my $second = File::Spec->catdir('', 'one', 'two', 'three');
-  
-  ok( Module::Build->dir_contains($first, $second) );
-}
-
-# cleanup
-chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
-$dist->remove;
-
-use File::Path;
-rmtree( $tmp );
+$m->delete_filetree(@files);

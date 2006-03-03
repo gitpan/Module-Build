@@ -8,6 +8,12 @@ use vars qw(@ISA);
 
 sub manpage_separator { '.' }
 
+sub need_prelink_c { 1 }
+
+# Apparently C compilation is pretty broken here, just disable it
+# until we figure it out
+sub have_c_compiler { 0 }
+
 1;
 __END__
 
@@ -25,7 +31,7 @@ Please see the L<Module::Build> for the general docs.
 
 =head1 AUTHOR
 
-Ken Williams <ken@cpan.org>
+Ken Williams, ken@mathforum.org
 
 =head1 SEE ALSO
 
