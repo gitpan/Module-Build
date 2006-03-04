@@ -89,8 +89,6 @@ sub ACTION_install {
   return $self->SUPER::ACTION_install(@_);
 }
 
-sub need_prelink_c { 1 }
-
 1;
 __END__
 
@@ -136,6 +134,7 @@ Need to unlock the Build program before deleting.
 =head1 AUTHOR
 
 Michael G Schwern <schwern@pobox.com>
+
 
 =head1 SEE ALSO
 

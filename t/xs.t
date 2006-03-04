@@ -1,95 +1,231 @@
-######################### We start with some black magic to print on failure.
+#!/usr/bin/perl -w
 
 use strict;
-use Test;
-use Config;
+use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
+use MBTest;
 use Module::Build;
-use File::Spec;
 
-my $common_pl = File::Spec->catfile('t', 'common.pl');
-require $common_pl;
+{
+  my ($have_c_compiler, $C_support_feature) = check_compiler();
 
-{ local $SIG{__WARN__} = sub {};
-
-  my $have_c_compiler;
-  stderr_of( sub {$have_c_compiler = Module::Build->current->have_c_compiler} );
-  print("1..0 # Skipped: no compiler found\n"), exit(0) unless $have_c_compiler;
+  if (! $C_support_feature) {
+    plan skip_all => 'C_support not enabled';
+  } elsif ( !$have_c_compiler ) {
+    plan skip_all => 'C_support enabled, but no compiler found';
+  } else {
+    plan tests => 22;
+  }
 }
 
-plan tests => 12;
+#########################
 
-######################### End of black magic.
 
-# Pretend we're in the t/XSTest/ subdirectory
-my $build_dir = File::Spec->catdir('t','XSTest');
-chdir $build_dir or die "Can't change to $build_dir : $!";
+use Cwd ();
+my $cwd = Cwd::cwd;
+my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
 
-my $m = Module::Build->new_from_context;
-ok(1);
+use DistGen;
+my $dist = DistGen->new( dir => $tmp, xs => 1 );
+$dist->regen;
 
-eval {$m->dispatch('clean')};
-ok $@, '';
+chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+my $mb = Module::Build->new_from_context;
 
-eval {$m->dispatch('build')};
-ok $@, '';
+
+eval {$mb->dispatch('clean')};
+is $@, '';
+
+eval {$mb->dispatch('build')};
+is $@, '';
+
+{
+  # Make sure it actually works: that we can call methods in the XS module
+
+  # Unfortunately, We must do this is a subprocess because some OS will not
+  # release the handle on a dynamic lib until the attaching process terminates
+
+  ok $mb->run_perl_command(['-Mblib', '-M'.$dist->name, '-e1']);
+
+  like stdout_of( sub {$mb->run_perl_command([
+       '-Mblib', '-M'.$dist->name,
+       '-we', "print @{[$dist->name]}::okay()"])}), qr/ok$/;
+
+  like stdout_of( sub {$mb->run_perl_command([
+       '-Mblib', '-M'.$dist->name,
+       '-we', "print @{[$dist->name]}::version()"])}), qr/0.01$/;
+
+  like stdout_of( sub {$mb->run_perl_command([
+       '-Mblib', '-M'.$dist->name,
+       '-we', "print @{[$dist->name]}::xs_version()"])}), qr/0.01$/;
+
+}
 
 {
   # Try again in a subprocess 
-  eval {$m->dispatch('clean')};
-  ok $@, '';
+  eval {$mb->dispatch('clean')};
+  is $@, '';
 
-  $m->create_build_script;
+  $mb->create_build_script;
   ok -e 'Build';
-  
-  eval {$m->run_perl_script('Build')};
-  ok $@, '';
+
+  eval {$mb->run_perl_script('Build')};
+  is $@, '';
 }
 
 # We can't be verbose in the sub-test, because Test::Harness will
 # think that the output is for the top-level test.
-eval {$m->dispatch('test')};
-ok $@, '';
+eval {$mb->dispatch('test')};
+is $@, '';
 
-{
-  $m->dispatch('ppd', args => {codebase => '/path/to/codebase-xs'});
+eval {$mb->dispatch('clean')};
+is $@, '';
 
-  my $ppd = slurp('XSTest.ppd');
 
-  my $perl_version = Module::Build::PPMMaker->_ppd_version($m->perl_version);
-  my $varchname = Module::Build::PPMMaker->_varchname($m->config);
+SKIP: {
+  skip( "skipping a Unixish-only tests", 1 )
+      unless $mb->os_type eq 'Unix';
 
-  # This test is quite a hack since with XML you don't really want to
-  # do a strict string comparison, but absent an XML parser it's the
-  # best we can do.
-  ok $ppd, <<"EOF";
-<SOFTPKG NAME="XSTest" VERSION="0,01,0,0">
-    <TITLE>XSTest</TITLE>
-    <ABSTRACT>Perl extension for blah blah blah</ABSTRACT>
-    <AUTHOR>A. U. Thor, a.u.thor\@a.galaxy.far.far.away</AUTHOR>
-    <IMPLEMENTATION>
-        <PERLCORE VERSION="$perl_version" />
-        <OS NAME="$^O" />
-        <ARCHITECTURE NAME="$varchname" />
-        <CODEBASE HREF="/path/to/codebase-xs" />
-    </IMPLEMENTATION>
-</SOFTPKG>
-EOF
+  local $mb->{config}{ld} = "FOO=BAR $mb->{config}{ld}";
+  eval {$mb->dispatch('build')};
+  is $@, '';
 }
 
-if ($m->os_type eq 'Unix') {
-  eval {$m->dispatch('clean')};
-  ok $@, '';
-  
-  local $m->{config}{ld} = "FOO=BAR $m->{config}{ld}";
-  eval {$m->dispatch('build')};
-  ok $@, '';
-} else {
-  skip_subtest("skipping a couple Unixish-only tests") for 1..2;
-}
-
-eval {$m->dispatch('realclean')};
-ok $@, '';
+eval {$mb->dispatch('realclean')};
+is $@, '';
 
 # Make sure blib/ is gone after 'realclean'
-ok not -e 'blib';
+ok ! -e 'blib';
 
+
+# cleanup
+chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
+$dist->remove;
+
+
+########################################
+
+# Try a XS distro with a deep namespace
+
+$dist = DistGen->new( name => 'Simple::With::Deep::Namespace',
+		      dir => $tmp, xs => 1 );
+$dist->regen;
+chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+
+$mb = Module::Build->new_from_context;
+is $@, '';
+
+$mb->dispatch('build');
+is $@, '';
+
+$mb->dispatch('test');
+is $@, '';
+
+$mb->dispatch('realclean');
+is $@, '';
+
+# cleanup
+chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
+$dist->remove;
+
+
+########################################
+
+# Try a XS distro using a flat directory structure
+# and a 'dist_name' instead of a 'module_name'
+
+$dist = DistGen->new( name => 'Dist-Name', dir => $tmp, xs => 1 );
+
+$dist->remove_file('lib/Dist-Name.pm');
+$dist->remove_file('lib/Dist-Name.xs');
+
+$dist->change_file('Build.PL', <<"---");
+use strict;
+use Module::Build;
+
+my \$builder = Module::Build->new(
+    dist_name         => 'Dist-Name',
+    dist_version_from => 'Simple.pm',
+    pm_files => { 'Simple.pm' => 'lib/Simple.pm' },
+    xs_files => { 'Simple.xs' => 'lib/Simple.xs' },
+);
+
+\$builder->create_build_script();
+---
+$dist->add_file('Simple.xs', <<"---");
+#include "EXTERN.h"
+#include "perl.h"
+#include "XSUB.h"
+
+MODULE = Simple         PACKAGE = Simple
+
+SV *
+okay()
+    CODE:
+        RETVAL = newSVpv( "ok", 0 );
+    OUTPUT:
+        RETVAL
+---
+
+$dist->add_file( 'Simple.pm', <<"---" );
+package Simple;
+
+\$VERSION = '0.01';
+
+require Exporter;
+require DynaLoader;
+
+\@ISA = qw( Exporter DynaLoader );
+\@EXPORT_OK = qw( okay );
+
+bootstrap Simple \$VERSION;
+
+1;
+
+__END__
+
+=head1 NAME
+
+Simple - Perl extension for blah blah blah
+
+=head1 DESCRIPTION
+
+Stub documentation for Simple.
+
+=head1 AUTHOR
+
+A. U. Thor, a.u.thor\@a.galaxy.far.far.away
+
+=cut
+---
+$dist->change_file('t/basic.t', <<"---");
+use Test::More tests => 2;
+use strict;
+
+use Simple;
+ok( 1 );
+
+ok( Simple::okay() eq 'ok' );
+---
+
+$dist->regen;
+chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+
+
+$mb = Module::Build->new_from_context;
+is $@, '';
+
+$mb->dispatch('build');
+is $@, '';
+
+$mb->dispatch('test');
+is $@, '';
+
+$mb->dispatch('realclean');
+is $@, '';
+
+# cleanup
+chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
+$dist->remove;
+
+use File::Path;
+rmtree( $tmp );

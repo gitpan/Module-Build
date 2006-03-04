@@ -1,10 +1,15 @@
+#!/usr/bin/perl -w
 
 use strict;
-use Test;
-plan tests => 4;
+use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
+use MBTest tests => 7;
 
-use Module::Build::PodParser;
-ok(1);
+use Cwd ();
+my $cwd = Cwd::cwd;
+
+#########################
+
+use_ok 'Module::Build::PodParser';
 
 {
   package IO::StringBased;
@@ -38,7 +43,28 @@ EOF
 
 
 my $pp = Module::Build::PodParser->new(fh => \*FH);
-ok $pp;
+ok $pp, 'object created';
 
-ok $pp->get_author->[0], 'C<Foo::Bar> was written by Engelbert Humperdinck I<E<lt>eh@example.comE<gt>> in 2004.';
-ok $pp->get_abstract, 'Perl extension for blah blah blah';
+is $pp->get_author->[0], 'C<Foo::Bar> was written by Engelbert Humperdinck I<E<lt>eh@example.comE<gt>> in 2004.', 'author';
+is $pp->get_abstract, 'Perl extension for blah blah blah', 'abstract';
+
+
+{
+  # Try again without a valid author spec
+  untie *FH;
+  tie *FH, 'IO::StringBased', <<'EOF';
+=head1 NAME
+
+Foo::Bar - Perl extension for blah blah blah
+
+=cut
+EOF
+
+  my $pp = Module::Build::PodParser->new(fh => \*FH);
+  ok $pp, 'object created';
+  
+  is_deeply $pp->get_author, [], 'author';
+  is $pp->get_abstract, 'Perl extension for blah blah blah', 'abstract';
+}
+
+
