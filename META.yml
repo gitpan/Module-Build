@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: Module-Build
-version: 0.27_08
+version: 0.27_09
 author:
   - Ken Williams <kwilliams@cpan.org>
   - |-
@@ -42,7 +42,7 @@ recommends:
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: 0.27_08
+    version: 0.27_09
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
   Module::Build::Compat:
@@ -88,7 +88,7 @@ provides:
     file: lib/Module/Build/PodParser.pm
   Module::Build::PodTester:
     file: lib/Module/Build/Base.pm
-generated_by: Module::Build version 0.2708
+generated_by: Module::Build version 0.2709
 meta-spec:
   url: |-
     http://module-build.sourceforge.net/META-spec-v1.2.html
