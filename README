@@ -98,22 +98,23 @@ ACTIONS
     The following build actions are provided by default.
 
     build
+        [version 0.01]
+
         If you run the `Build' script without any arguments, it runs the
         `build' action, which in turn runs the `code' and `docs' actions.
 
         This is analogous to the MakeMaker 'make all' target.
 
-    testpodcoverage
-        This checks the pod coverage of the distribution and produces
-        `Test::Harness'-style output. If you are a module author, this is
-        useful to run before creating a new release.
-
     clean
+        [version 0.01]
+
         This action will clean up any files that the build process may have
         created, including the `blib/' directory (but not including the
         `_build/' directory and the `Build' script itself).
 
     code
+        [version 0.20]
+
         This action builds your codebase.
 
         By default it just creates a `blib/' directory and copies any `.pm'
@@ -131,9 +132,13 @@ ACTIONS
         correctly.
 
     config_data
+        [version 0.26]
+
         ...
 
     diff
+        [version 0.14]
+
         This action will compare the files about to be installed with their
         installed counterparts. For .pm and .pod files, a diff will be shown
         (this currently requires a 'diff' program to be in your PATH). For
@@ -147,6 +152,8 @@ ACTIONS
           ./Build diff flags=-u
 
     dist
+        [version 0.02]
+
         This action is helpful for module authors who want to package up
         their module for source distribution through a medium like CPAN. It
         will create a tarball of the files listed in MANIFEST and compress
@@ -160,26 +167,38 @@ ACTIONS
           ./Build dist --tar C:\path\to\tar.exe --gzip C:\path\to\zip.exe
 
     distcheck
+        [version 0.05]
+
         Reports which files are in the build directory but not in the
         MANIFEST file, and vice versa. (See manifest for details.)
 
     distclean
+        [version 0.05]
+
         Performs the 'realclean' action and then the 'distcheck' action.
 
     distdir
+        [version 0.05]
+
         Creates a "distribution directory" named `$dist_name-$dist_version'
         (if that directory already exists, it will be removed first), then
         copies all the files listed in the MANIFEST file to that directory.
         This directory is what the distribution tarball is created from.
 
     distmeta
+        [version 0.21]
+
         Creates the META.yml file that describes the distribution.
 
         META.yml is a file containing various bits of "metadata" about the
         distribution. The metadata includes the distribution name, version,
         abstract, prerequisites, license, and various other data about the
-        distribution. This file is created as META.yml in YAML format, so
-        the `YAML' module must be installed in order to create it. The
+        distribution. This file is created as META.yml in YAML format. It is
+        recommended that the `YAML' module be installed to create it. If the
+        `YAML' module is not installed, an internal module supplied with
+        Module::Build will be used to write the META.yml file, and this will
+        most likely be fine.
+
         META.yml file must also be listed in MANIFEST - if it's not, a
         warning will be issued.
 
@@ -187,16 +206,22 @@ ACTIONS
         http://module-build.sourceforge.net/META-spec-v1.2.html
 
     distsign
+        [version 0.16]
+
         Uses `Module::Signature' to create a SIGNATURE file for your
         distribution, and adds the SIGNATURE file to the distribution's
         MANIFEST.
 
     disttest
+        [version 0.05]
+
         Performs the 'distdir' action, then switches into that directory and
         runs a `perl Build.PL', followed by the 'build' and 'test' actions
         in that directory.
 
     docs
+        [version 0.20]
+
         This will generate documentation (e.g. Unix man pages and html
         documents) for any installable items under blib/ that contain POD.
         If there are no `bindoc' or `libdoc' installation targets defined
@@ -205,11 +230,15 @@ ACTIONS
         installation targets defined no action is taken for html documents.
 
     fakeinstall
+        [version 0.02]
+
         This is just like the `install' action, but it won't actually do
         anything, it will just report what it *would* have done if you had
         actually run the `install' action.
 
     help
+        [version 0.03]
+
         This action will simply print out a message that is meant to help
         you use the build process. It will show you a list of available
         build actions too.
@@ -219,6 +248,8 @@ ACTIONS
         it can find for that action.
 
     html
+        [version 0.26]
+
         This will generate HTML documentation for any binary or library
         files under blib/ that contain POD. The HTML documentation will only
         be installed if the install paths can be determined from values in
@@ -227,6 +258,8 @@ ACTIONS
         and/or `libhtml' installation targets.
 
     install
+        [version 0.01]
+
         This action will use `ExtUtils::Install' to install the files from
         `blib/' into the system. See INSTALL PATHS for details about how
         Module::Build determines where to install things, and how to
@@ -244,6 +277,8 @@ ACTIONS
         situation indeed.
 
     manifest
+        [version 0.05]
+
         This is an action intended for use by module authors, not people
         installing modules. It will bring the MANIFEST up to date with the
         files currently present in the distribution. You may use a
@@ -268,6 +303,8 @@ ACTIONS
         the `manifest' action would do, without actually doing anything.
 
     manpages
+        [version 0.28]
+
         This will generate man pages for any binary or library files under
         blib/ that contain POD. The man pages will only be installed if the
         install paths can be determined from values in `Config.pm'. You can
@@ -275,7 +312,9 @@ ACTIONS
         the command line with the `bindoc' and `libdoc' installation
         targets.
 
-    ppd Build a PPD file for your distribution.
+    ppd [version 0.20]
+
+        Build a PPD file for your distribution.
 
         This action takes an optional argument `codebase' which is used in
         the generated ppd file to specify the (usually relative) URL of the
@@ -287,6 +326,8 @@ ACTIONS
           ./Build ppd --codebase "MSWin32-x86-multi-thread/Module-Build-0.21.tar.gz"
 
     ppmdist
+        [version 0.23]
+
         Generates a PPM binary distribution and a PPD description file. This
         action also invokes the 'ppd' action, so it can accept the same
         `codebase' argument described under that action.
@@ -296,28 +337,38 @@ ACTIONS
         the result.
 
     prereq_report
+        [version 0.28]
+
         This action prints out a list of all prerequisites, the versions
         required, and the versions actually installed. This can be useful
         for reviewing the configuration of your system prior to a build, or
         when compiling data to send for a bug report.
 
     pure_install
+        [version 0.28]
+
         This action is identical to the `install' action. In the future,
         though, if `install' starts writing to the file file
         $(INSTALLARCHLIB)/perllocal.pod, `pure_install' won't, and that will
         be the only difference between them.
 
     realclean
+        [version 0.01]
+
         This action is just like the `clean' action, but also removes the
         `_build' directory and the `Build' script. If you run the
         `realclean' action, you are essentially starting over, so you will
         have to re-create the `Build' script again.
 
     skipcheck
+        [version 0.05]
+
         Reports which files are skipped due to the entries in the
         MANIFEST.SKIP file (See manifest for details)
 
     test
+        [version 0.01]
+
         This will use `Test::Harness' to run any regression tests and report
         their results. Tests can be defined in the standard places: a file
         called `test.pl' in the top-level directory, or several files ending
@@ -353,6 +404,8 @@ ACTIONS
           ./Build test --test_files 't/01-*.t'
 
     testcover
+        [version 0.26]
+
         Runs the `test' action using `Devel::Cover', generating a
         code-coverage report showing which parts of the code were actually
         exercised during the tests.
@@ -363,15 +416,28 @@ ACTIONS
           DEVEL_COVER_OPTIONS=-ignore,Build ./Build testcover
 
     testdb
+        [version 0.05]
+
         This is a synonym for the 'test' action with the `debugger=1'
         argument.
 
     testpod
+        [version 0.25]
+
         This checks all the files described in the `docs' action and
         produces `Test::Harness'-style output. If you are a module author,
         this is useful to run before creating a new release.
 
+    testpodcoverage
+        [version 0.28]
+
+        This checks the pod coverage of the distribution and produces
+        `Test::Harness'-style output. If you are a module author, this is
+        useful to run before creating a new release.
+
     versioninstall
+        [version 0.16]
+
         ** Note: since `only.pm' is so new, and since we just recently added
         support for it here too, this feature is to be considered
         experimental. **
@@ -423,6 +489,8 @@ OPTIONS
 
   Default Options File (.modulebuildrc)
 
+    [version 0.28]
+
     When Module::Build starts up, it will look for a file,
     $ENV{HOME}/.modulebuildrc. If the file exists, the options specified
     there will be used as defaults, as if they were typed on the command
@@ -453,6 +521,8 @@ OPTIONS
     absolute path of the file containing your options.
 
 INSTALL PATHS
+    [version 0.19]
+
     When you invoke Module::Build's `build' action, it needs to figure out
     where to install things. The nutshell version of how this works is that
     default installation locations are determined from Config.pm, and they
@@ -597,6 +667,8 @@ INSTALL PATHS
         platform you're installing on.
 
   About PREFIX Support
+
+    [version 0.28]
 
     First, it is necessary to understand the original idea behind `PREFIX'.
     If, for example, the default installation locations for your machine are
