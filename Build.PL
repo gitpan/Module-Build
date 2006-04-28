@@ -11,7 +11,7 @@ use Module::Build;
 
 # 
 
-my $build = new Module::Build
+my $build = Module::Build->new
   (
    module_name => 'Module::Build',
    license => 'perl',
@@ -29,42 +29,42 @@ my $build = new Module::Build
 		'ExtUtils::Mkbootstrap' => 0,
 		'IO::File'       => 0,
 		'Cwd'            => 0,
+		'Text::Abbrev'   => 0,
 		'Text::ParseWords' => 0,
 		'Getopt::Long'   => 0,
 		'Test::Harness'  => 0,
 	       },
    recommends => {
 		  'Archive::Tar' => '1.08',
+		  'ExtUtils::CBuilder' => 0.15,
 		  'ExtUtils::Install' => 0.30,
+		  'ExtUtils::ParseXS' => 1.02,
 		  'Pod::Readme' => 0.04,
 		  'Module::Signature' => 0.21,
 		 },
-   build_requires => {
-		      'Test::More' => 0,
-		     },
    sign => 1,
    create_readme => 1,
 
    auto_features => {
 		     YAML_support =>
 		     {
-		      description => "Can write fully-functional META.yml files",
+		      description => "Use YAML.pm to write META.yml files",
 		      requires => { YAML => ' >= 0.35, != 0.49_01 ' },
 		     },
 		     C_support =>
 		     {
-		      description => "Can compile/link C & XS code",
+		      description => "Compile/link C & XS code",
 		      requires   => { 'ExtUtils::CBuilder' => 0.15, },
 		      recommends => { 'ExtUtils::ParseXS'  => 1.02, },
 		     },
 		     manpage_support =>
 		     {
-		      description => "Can create Unix man pages",
+		      description => "Create Unix man pages",
 		      requires => { 'Pod::Man' => 0 },
 		     },
 		     HTML_support =>
 		     {
-		      description => "Can create HTML documentation",
+		      description => "Create HTML documentation",
 		      requires => { 'Pod::Html' => 0 },
 		     },
 		    },
@@ -77,6 +77,7 @@ my $build = new Module::Build
 		   homepage => 'http://sourceforge.net/projects/module-build',
 		   bugtracker => 'http://rt.cpan.org/NoAuth/Bugs.html?Dist=Module-Build',
 		   MailingList => 'http://lists.sourceforge.net/lists/listinfo/module-build-general',
+		   repository => 'http://svn.perl.org/modules/Module-Build/'
 		  }
 		 },
   );

@@ -58,14 +58,13 @@ GUIDE TO DOCUMENTATION
         scripts at the command line.
 
     Authoring Reference (Module::Build::Authoring)
-        This document describes the `Module::Build' API for authors who are
+        This document describes the structure and organization of
+        `Module::Build', and the relevant concepts needed by authors who are
         writing Build.PL scripts for a distribution or controlling
-        `Module::Build' processes programmatically. It describes the methods
-        available as well as providing general information on subclassing
-        `Module::Build' to alter and extend its behavior. Also, there is a
-        section on controlling the Build process from other scripts,
-        including how to construct an object and how to invoke actions
-        through it from an external script.
+        `Module::Build' processes programmatically.
+
+    API Reference (Module::Build::API)
+        This is a reference to the `Module::Build' API.
 
     Cookbook (Module::Build::Cookbook)
         This document demonstrates how to accomplish many common tasks. It
@@ -261,7 +260,7 @@ ACTIONS
         [version 0.01]
 
         This action will use `ExtUtils::Install' to install the files from
-        `blib/' into the system. See INSTALL PATHS for details about how
+        `blib/' into the system. See "INSTALL PATHS" for details about how
         Module::Build determines where to install things, and how to
         influence this process.
 
@@ -491,11 +490,13 @@ OPTIONS
 
     [version 0.28]
 
-    When Module::Build starts up, it will look for a file,
-    $ENV{HOME}/.modulebuildrc. If the file exists, the options specified
-    there will be used as defaults, as if they were typed on the command
-    line. The defaults can be overridden by specifying new values on the
-    command line.
+    When Module::Build starts up, it will look first for a file,
+    $ENV{HOME}/.modulebuildrc. If it's not found there, it will look in the
+    the .modulebuildrc file in the directories referred to by the
+    environment variables `HOMEDRIVE' + `HOMEDIR', `USERPROFILE', `APPDATA',
+    `WINDIR', `SYS$LOGIN'. If the file exists, the options specified there
+    will be used as defaults, as if they were typed on the command line. The
+    defaults can be overridden by specifying new values on the command line.
 
     The action name must come at the beginning of the line, followed by any
     amount of whitespace and then the options. Options are given the same as
@@ -750,7 +751,7 @@ INSTALL PATHS
 
           perl Makefile.PL PREFIX=/home/spurkis LIB=/home/spurkis/lib/perl5
 
-        See INSTALL PATHS for details on other installation options
+        See "INSTALL PATHS" for details on other installation options
         available and how to configure them.
 
 MOTIVATIONS
@@ -821,9 +822,8 @@ AUTHOR
     Bug reports are also welcome at
     <http://rt.cpan.org/NoAuth/Bugs.html?Dist=Module-Build>.
 
-    An anonymous CVS repository containing the latest development version is
-    available; see <http://sourceforge.net/cvs/?group_id=45731> for the
-    details of how to access it.
+    The latest development version is available from the Subversion
+    repository at <https://svn.perl.org/modules/Module-Build/trunk/>
 
 COPYRIGHT
     Copyright (c) 2001-2005 Ken Williams. All rights reserved.
@@ -833,10 +833,12 @@ COPYRIGHT
 
 SEE ALSO
     perl(1), Module::Build::Cookbook(3), Module::Build::Authoring(3),
-    ExtUtils::MakeMaker(3), YAML(3)
+    Module::Build::API(3), ExtUtils::MakeMaker(3), YAML(3)
 
     META.yml Specification:
     http://module-build.sourceforge.net/META-spec-v1.2.html
 
     http://www.dsmit.com/cons/
+
+    http://search.cpan.org/dist/PerlBuildSystem/
 
