@@ -1,6 +1,11 @@
 ---
 name: Module-Build
-version: 0.2801
+version: !perl/Module::Build::Version
+  original: 0.2802
+  version:
+    - 0
+    - 280
+    - 200
 author:
   - 'Ken Williams <kwilliams@cpan.org>'
   - |-
@@ -32,6 +37,7 @@ requires:
   Text::Abbrev: 0
   Text::ParseWords: 0
   perl: 5.005_03
+  version: 0.64
 recommends:
   Archive::Tar: 1.08
   ExtUtils::CBuilder: 0.15
@@ -42,12 +48,21 @@ recommends:
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: 0.2801
+    version: !perl/Module::Build::Version
+      original: 0.2802
+      version:
+        - 0
+        - 280
+        - 200
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
   Module::Build::Compat:
     file: lib/Module/Build/Compat.pm
-    version: 0.03
+    version: !perl/Module::Build::Version
+      original: 0.03
+      version:
+        - 0
+        - 30
   Module::Build::Cookbook:
     file: lib/Module/Build/Cookbook.pm
   Module::Build::ModuleInfo:
@@ -88,10 +103,16 @@ provides:
     file: lib/Module/Build/PodParser.pm
   Module::Build::PodTester:
     file: lib/Module/Build/Base.pm
+  Module::Build::Version:
+    file: lib/Module/Build/Version.pm
   Module::Build::YAML:
     file: lib/Module/Build/YAML.pm
-    version: 0.50
-generated_by: Module::Build version 0.2801
+    version: !perl/Module::Build::Version
+      original: 0.50
+      version:
+        - 0
+        - 500
+generated_by: Module::Build version 0.2802
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html
   version: 1.2
