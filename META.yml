@@ -1,11 +1,11 @@
 ---
 name: Module-Build
 version: !perl/Module::Build::Version
-  original: 0.2802
+  original: 0.2803
   version:
     - 0
     - 280
-    - 200
+    - 300
 author:
   - 'Ken Williams <kwilliams@cpan.org>'
   - |-
@@ -48,21 +48,12 @@ recommends:
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: !perl/Module::Build::Version
-      original: 0.2802
-      version:
-        - 0
-        - 280
-        - 200
+    version: 0.2803
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
   Module::Build::Compat:
     file: lib/Module/Build/Compat.pm
-    version: !perl/Module::Build::Version
-      original: 0.03
-      version:
-        - 0
-        - 30
+    version: 0.03
   Module::Build::Cookbook:
     file: lib/Module/Build/Cookbook.pm
   Module::Build::ModuleInfo:
@@ -107,12 +98,8 @@ provides:
     file: lib/Module/Build/Version.pm
   Module::Build::YAML:
     file: lib/Module/Build/YAML.pm
-    version: !perl/Module::Build::Version
-      original: 0.50
-      version:
-        - 0
-        - 500
-generated_by: Module::Build version 0.2802
+    version: 0.50
+generated_by: Module::Build version 0.2803
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html
   version: 1.2

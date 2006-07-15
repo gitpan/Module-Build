@@ -15,16 +15,16 @@ not run its Makefile.PL or Build.PL.
 Hash: SHA1
 
 SHA1 938eecfad16c95dbb59e95b934fc4f2ea32a6d1e Build.PL
-SHA1 4a9626f27126e7c290dc8f14c75fb207e0357ebc Changes
+SHA1 b6d3f1bf39eaecc3f5d28615312f278d308ea1b6 Changes
 SHA1 53a1a50705853db54284e60cd6095c6c6fe1e19b INSTALL
 SHA1 730a3935e02cf0b29542daa62340da778d26dfea MANIFEST
-SHA1 a37c21d615225182fbeaa9fac122941d3727d2ce META.yml
+SHA1 80bc4e33cf30699d4f482b1d3a8cec1bc8180617 META.yml
 SHA1 709de66c0beb8832da066b9f865d8693db5eb504 Makefile.PL
 SHA1 54eecd369fac0f93ca9d66b958fe2e628b888b7d README
-SHA1 812d8298c050a9bfaa36f787ee12c196a1c9ac1f lib/Module/Build.pm
+SHA1 91466d74cf08ae4647bfe0d148a550e571867683 lib/Module/Build.pm
 SHA1 b34f7629f2fd74a3b4f7f90e2443a25eea06ebb4 lib/Module/Build/API.pod
 SHA1 37805147a358a4bd88fdd4d88bc4fc47d79d162b lib/Module/Build/Authoring.pod
-SHA1 8afa04cdb9468b5b3e57097b273772badef8c10d lib/Module/Build/Base.pm
+SHA1 7bf331f40fda7df99f8593e9b7b7eb7b9defcbab lib/Module/Build/Base.pm
 SHA1 7a0704ad8f195546c23f18b94adeabfb0a3d2c38 lib/Module/Build/Compat.pm
 SHA1 92b7e56f0deabedf456ceb4640574060f6adcc85 lib/Module/Build/Cookbook.pm
 SHA1 a22ea1500a6f96a7f7f299817a62c59dde53d8f0 lib/Module/Build/ModuleInfo.pm
@@ -78,7 +78,7 @@ SHA1 2c02af53d4e6efe70a62adbe520731e0a66f38df t/xs.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.2.4 (Darwin)
 
-iD8DBQFEuNsFgrvMBLfvlHYRApJmAJ97syM+iSIkY1enTi951GAxK0T4/gCgpe4u
-V7Z5b9UF59GO3nG4dXmyGxs=
-=zRZQ
+iD8DBQFEuVSygrvMBLfvlHYRAvltAKDE6jRlZoD3Ki1sk4zWyjSa2sn3hACg5h3N
+9ulBNA3iG7v9sbTDj/oU9fg=
+=eBzT
 -----END PGP SIGNATURE-----
