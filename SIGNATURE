@@ -14,27 +14,27 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 938eecfad16c95dbb59e95b934fc4f2ea32a6d1e Build.PL
-SHA1 f0ccbcdf3d95e8826635ccf5fa373d89d7fbaf54 Changes
+SHA1 465e32b666dd74d269b94e87ba6d96e2fe60eb19 Build.PL
+SHA1 38b64c161c0ed3c0ad192c7d8997052b554a3454 Changes
 SHA1 53a1a50705853db54284e60cd6095c6c6fe1e19b INSTALL
 SHA1 730a3935e02cf0b29542daa62340da778d26dfea MANIFEST
-SHA1 a5b06d50b2fa7386ee00c065fbcb67d809b60603 META.yml
+SHA1 6d7c81ed9ea387fd94b68bbc3e37975c3a20ca4f META.yml
 SHA1 709de66c0beb8832da066b9f865d8693db5eb504 Makefile.PL
-SHA1 54eecd369fac0f93ca9d66b958fe2e628b888b7d README
-SHA1 e2c2f1e0f719db4f2ab587a956d6f29aa1c6d089 lib/Module/Build.pm
-SHA1 b34f7629f2fd74a3b4f7f90e2443a25eea06ebb4 lib/Module/Build/API.pod
-SHA1 37805147a358a4bd88fdd4d88bc4fc47d79d162b lib/Module/Build/Authoring.pod
-SHA1 7bf331f40fda7df99f8593e9b7b7eb7b9defcbab lib/Module/Build/Base.pm
+SHA1 bb75abcd3fc5d4e697b816fbac7f596dcf2bc68e README
+SHA1 7c3bc8ba5bf02ea63a247a8864838bb66c6442c0 lib/Module/Build.pm
+SHA1 3a90a2c71aea2906ab7637bb54125906680e43e2 lib/Module/Build/API.pod
+SHA1 628c6a0e0b6e9c83fbef2a41957e8e2daa5acb0d lib/Module/Build/Authoring.pod
+SHA1 9e27cd8547849f6e100553bca6184f4e5088d600 lib/Module/Build/Base.pm
 SHA1 7a0704ad8f195546c23f18b94adeabfb0a3d2c38 lib/Module/Build/Compat.pm
 SHA1 92b7e56f0deabedf456ceb4640574060f6adcc85 lib/Module/Build/Cookbook.pm
-SHA1 a22ea1500a6f96a7f7f299817a62c59dde53d8f0 lib/Module/Build/ModuleInfo.pm
+SHA1 0e3468c6ef8df20d9c6ccf92220518581d75290a lib/Module/Build/ModuleInfo.pm
 SHA1 d104c2ba0e7fe1d1ab880984e2c4856c420be4a5 lib/Module/Build/Notes.pm
 SHA1 ce0db6ea1560f4f8bc60a334f939425ac6ae166c lib/Module/Build/PPMMaker.pm
 SHA1 cf3c08cbaf7175fc2ef2106c895dd0ecac4cde2e lib/Module/Build/Platform/Amiga.pm
 SHA1 ea5ae043b9fe2f2d023e1304e075ab5044fe5825 lib/Module/Build/Platform/Default.pm
 SHA1 d8af9e36f485f4d821633b4173d045c5eead34f8 lib/Module/Build/Platform/EBCDIC.pm
 SHA1 94b12487d9c1c935f1f2cfedb7f5b602b9d82aee lib/Module/Build/Platform/MPEiX.pm
-SHA1 fa6378052e0388dabaeff687a89164e2803921bd lib/Module/Build/Platform/MacOS.pm
+SHA1 37a157e524366540bbf395122a5843d1e5a6e9cb lib/Module/Build/Platform/MacOS.pm
 SHA1 30250cfce68b087340760aeb6a17e0fa64342ac8 lib/Module/Build/Platform/RiscOS.pm
 SHA1 952555063fcc2b7e611a4e906ed512f266a6a52c lib/Module/Build/Platform/Unix.pm
 SHA1 da27528a4633a30271eb4023da0f6942b0aa66ec lib/Module/Build/Platform/VMS.pm
@@ -45,7 +45,7 @@ SHA1 7fd92ad31a6f261b16df6a5650bd12a37e3461ef lib/Module/Build/Platform/cygwin.p
 SHA1 8b058a6c539b5e34a7fff37be9f07309189da1ad lib/Module/Build/Platform/darwin.pm
 SHA1 3185caf8caf2a77d616a3ac4951790542ac2fdad lib/Module/Build/Platform/os2.pm
 SHA1 cf42da19775f1e6f7c6d81bc883b6c1fb4a60230 lib/Module/Build/PodParser.pm
-SHA1 e8dfe1e33c8a6ada7aedc86db0302a320fbee338 lib/Module/Build/Version.pm
+SHA1 48922ce24628f4c1f754ba7d8ff8c27a7651960a lib/Module/Build/Version.pm
 SHA1 e89c4c2e611ef0f18aac9959967625d583a9ce3c lib/Module/Build/YAML.pm
 SHA1 f34987277f785499963061b7671d712adec63af9 scripts/config_data
 SHA1 b658448c1eb8823847725a2c899cbd2a80d5d1f4 t/basic.t
@@ -65,7 +65,7 @@ SHA1 4848d59cb5b15b21543d795d507cead4dfea208c t/manifypods.t
 SHA1 67c3f64403a0e9f4ec05292030df40906057eeed t/mbyaml.t
 SHA1 9fb14c872a907e8d21bf34c36ce70941917a4a31 t/metadata.t
 SHA1 f6ef176c5900f7ed42ad6856679afbd1bfc7b5d7 t/metadata2.t
-SHA1 ad905562b81c3f4720402e8b0ed8c698fd70e4d7 t/moduleinfo.t
+SHA1 071012854de7ea2352f62b829a5295631c90398b t/moduleinfo.t
 SHA1 ef90187a457aa7c0c80b4836e7f2dd943140ac8e t/notes.t
 SHA1 9669ed79d8862e8445e081d149cbb1742190a66f t/parents.t
 SHA1 371c25906e5a149104a88f2e42464c6c588652e3 t/pod_parser.t
@@ -78,7 +78,7 @@ SHA1 2c02af53d4e6efe70a62adbe520731e0a66f38df t/xs.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.2.4 (Darwin)
 
-iD8DBQFEurS+grvMBLfvlHYRAjmbAJ4gL5pQ+IyHtF5p06woeP1kdddW9QCgopuM
-Lca+e6CKjSQivwBwZ4dL+HM=
-=6dV/
+iD8DBQFEzCKGgrvMBLfvlHYRArV8AKCJBqoezds+mb26LG03aWWTjclODACfVSco
+cSz3NvNG33vK/6QQvwepNl8=
+=oB0K
 -----END PGP SIGNATURE-----

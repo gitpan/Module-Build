@@ -486,6 +486,12 @@ OPTIONS
     verbose
         Display extra information about the Build on output.
 
+    allow_mb_mismatch
+        Suppresses the check upon startup that the version of Module::Build
+        we're now running under is the same version that was initially
+        invoked when building the distribution (i.e. when the `Build.PL'
+        script was first run). Use with caution.
+
   Default Options File (.modulebuildrc)
 
     [version 0.28]
@@ -750,8 +756,7 @@ AUTHOR
     Ken Williams <kwilliams@cpan.org>
 
     Development questions, bug reports, and patches should be sent to the
-    Module-Build mailing list at
-    <module-build-general@lists.sourceforge.net>.
+    Module-Build mailing list at <module-build@perl.org>.
 
     Bug reports are also welcome at
     <http://rt.cpan.org/NoAuth/Bugs.html?Dist=Module-Build>.
