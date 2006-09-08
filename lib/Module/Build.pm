@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.2805';
+$VERSION = '0.2805_01';
 $VERSION = eval $VERSION;
 
 # Okay, this is the brute-force method of finding out what kind of
@@ -157,14 +157,14 @@ action), 'test', and 'install'.  Other actions defined so far include:
   dist                           prereq_report
   distcheck                      pure_install
   distclean                      realclean   
-  distdir                        skipcheck   
-  distmeta                       test        
-  distsign                       testcover   
-  disttest                       testdb      
-  docs                           testpod     
-  fakeinstall                    testpodcoverage
-  help                           versioninstall
-  html                                       
+  distdir                        retest      
+  distmeta                       skipcheck   
+  distsign                       test        
+  disttest                       testcover   
+  docs                           testdb      
+  fakeinstall                    testpod     
+  help                           testpodcoverage
+  html                           versioninstall
 
 
 You can run the 'help' action for a complete list of actions.
@@ -519,6 +519,17 @@ This action is just like the C<clean> action, but also removes the
 C<_build> directory and the C<Build> script.  If you run the
 C<realclean> action, you are essentially starting over, so you will
 have to re-create the C<Build> script again.
+
+=item retest
+
+[version 0.2806]
+
+This is just like the C<test> action, but doesn't actually build the
+distribution first, and doesn't add F<blib/> to the load path, and
+therefore will test against a I<previously> installed version of the
+distribution.  This can be used to verify that a certain installed
+distribution still works, or to see whether newer versions of a
+distribution still pass the old regression tests, and so on.
 
 =item skipcheck
 
