@@ -347,7 +347,7 @@ sub _backticks {
   my ($self, @cmd) = @_;
   if ($self->have_forkpipe) {
     local *FH;
-    my $pid = open FH, "-|";
+    my $pid = open *FH, "-|";
     if ($pid) {
       return wantarray ? <FH> : join '', <FH>;
     } else {
@@ -1141,7 +1141,8 @@ sub check_prereq {
   my $xs_files = $self->find_xs_files;
   if (keys %$xs_files && !$self->_mb_feature('C_support')) {
     $self->log_warn("Warning: this distribution contains XS files, ".
-		    "but Module::Build is not configured with C_support");
+		    "but Module::Build is not configured with C_support.  ".
+		    "Please install ExtUtils::CBuilder to enable C_support.\n");
   }
 
   # Check to see if there are any prereqs to check
@@ -1283,7 +1284,7 @@ sub make_executable {
   my $self = shift;
   foreach (@_) {
     my $current_mode = (stat $_)[2];
-    chmod $current_mode | 0111, $_;
+    chmod $current_mode | oct(111), $_;
   }
 }
 
@@ -1678,9 +1679,7 @@ sub read_args {
 sub _detildefy {
     my $arg = shift;
 
-    my($new_arg) = glob($arg) if $arg =~ /^~/;
-
-    return defined($new_arg) ? $new_arg : $arg;
+    return $arg =~ /^~/ ? (glob $arg)[0] : $arg;
 }
 
 
@@ -2112,7 +2111,8 @@ sub ACTION_testcover {
     my $cover_files = $self->rscan_dir('cover_db', sub {-f $_ and not /\.html$/});
     
     $self->do_system(qw(cover -delete))
-      unless $self->up_to_date($pm_files, $cover_files);
+      unless $self->up_to_date($pm_files,         $cover_files)
+	  && $self->up_to_date($self->test_files, $cover_files);
   }
 
   local $Test::Harness::switches    = 
@@ -2439,7 +2439,7 @@ sub manify_bin_pods {
   return unless keys %$files;
 
   my $mandir = File::Spec->catdir( $self->blib, 'bindoc' );
-  File::Path::mkpath( $mandir, 0, 0777 );
+  File::Path::mkpath( $mandir, 0, oct(777) );
 
   require Pod::Man;
   foreach my $file (keys %$files) {
@@ -2463,7 +2463,7 @@ sub manify_lib_pods {
   return unless keys %$files;
 
   my $mandir = File::Spec->catdir( $self->blib, 'libdoc' );
-  File::Path::mkpath( $mandir, 0, 0777 );
+  File::Path::mkpath( $mandir, 0, oct(777) );
 
   require Pod::Man;
   while (my ($file, $relfile) = each %$files) {
@@ -2549,7 +2549,7 @@ sub htmlify_pods {
   return unless %$pods;  # nothing to do
 
   unless ( -d $htmldir ) {
-    File::Path::mkpath($htmldir, 0, 0755)
+    File::Path::mkpath($htmldir, 0, oct(755))
       or die "Couldn't mkdir $htmldir: $!";
   }
 
@@ -2576,7 +2576,7 @@ sub htmlify_pods {
     next if $self->up_to_date($infile, $outfile);
 
     unless ( -d $fulldir ){
-      File::Path::mkpath($fulldir, 0, 0755)
+      File::Path::mkpath($fulldir, 0, oct(755))
         or die "Couldn't mkdir $fulldir: $!";
     }
 
@@ -2795,6 +2795,26 @@ sub ACTION_ppmdist {
   $self->delete_filetree( $ppm );
 }
 
+sub ACTION_pardist {
+  my ($self) = @_;
+
+  # Need PAR::Dist
+  if ( not eval { require PAR::Dist; PAR::Dist->VERSION(0.17) } ) {
+    $self->log_warn(
+      "In order to create .par distributions, you need to\n"
+      . "install PAR::Dist first."
+    );
+    return();
+  }
+  
+  $self->depends_on( 'build' );
+
+  return PAR::Dist::blib_to_par(
+    name => $self->dist_name,
+    version => $self->dist_version,
+  );
+}
+
 sub ACTION_dist {
   my ($self) = @_;
   
@@ -2834,7 +2854,7 @@ sub _add_to_manifest {
     or return;
 
   my $mode = (stat $manifest)[2];
-  chmod($mode | 0222, $manifest) or die "Can't make $manifest writable: $!";
+  chmod($mode | oct(222), $manifest) or die "Can't make $manifest writable: $!";
   
   my $fh = IO::File->new("< $manifest") or die "Can't read $manifest: $!";
   my $last_line = (<$fh>)[-1] || "\n";
@@ -3880,7 +3900,6 @@ sub run_perl_command {
   # this before documenting.
   my ($self, $args) = @_;
   $args = [ $self->split_like_shell($args) ] unless ref($args);
-  $args = [ split(/\s+/, $self->_quote_args($args)) ] if $self->os_type eq 'VMS';
   my $perl = ref($self) ? $self->perl : $self->find_perl_interpreter;
 
   # Make sure our local additions to @INC are propagated to the subprocess
@@ -3952,7 +3971,7 @@ sub process_xs {
 		   defines => {VERSION => qq{"$v"}, XS_VERSION => qq{"$v"}});
 
   # archdir
-  File::Path::mkpath($spec->{archdir}, 0, 0777) unless -d $spec->{archdir};
+  File::Path::mkpath($spec->{archdir}, 0, oct(777)) unless -d $spec->{archdir};
 
   # .xs -> .bs
   $self->add_to_cleanup($spec->{bs_file});
@@ -3972,12 +3991,14 @@ sub do_system {
   my ($self, @cmd) = @_;
   $self->log_info("@cmd\n");
 
-#  my %seen;
-#  my $sep = ref($self) ? $self->config('path_sep') : $Config{path_sep};
-#  local $ENV{PERL5LIB} = join $sep, grep {
-#    ! $seen{$_}++ and -d $_
-#  } split($sep, $ENV{PERL5LIB});
-
+  # Some systems proliferate huge PERL5LIBs, try to ameliorate:
+  my %seen;
+  my $sep = $self->config('path_sep');
+  local $ENV{PERL5LIB} = 
+    ( length($ENV{PERL5LIB}) < 500
+      ? $ENV{PERL5LIB}
+      : join $sep, grep { ! $seen{$_}++ and -d $_ } split($sep, $ENV{PERL5LIB})
+    );
 
   my $status = system(@cmd);
   if ($status and $! =~ /Argument list too long/i) {
@@ -4021,12 +4042,12 @@ sub copy_if_modified {
   }
 
   # Create parent directories
-  File::Path::mkpath(File::Basename::dirname($to_path), 0, 0777);
+  File::Path::mkpath(File::Basename::dirname($to_path), 0, oct(777));
   
   $self->log_info("Copying $file -> $to_path\n") if $args{verbose};
   File::Copy::copy($file, $to_path) or die "Can't copy('$file', '$to_path'): $!";
   # mode is read-only + (executable if source is executable)
-  my $mode = 0444 | ( $self->is_executable($file) ? 0111 : 0 );
+  my $mode = oct(444) | ( $self->is_executable($file) ? oct(111) : 0 );
   chmod( $mode, $to_path );
 
   return $to_path;
@@ -4102,11 +4123,11 @@ Please see the C<Module::Build> documentation for more details.
 
 =head1 AUTHOR
 
-Ken Williams <ken@cpan.org>
+Ken Williams <kwilliams@cpan.org>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2001-2005 Ken Williams.  All rights reserved.
+Copyright (c) 2001-2006 Ken Williams.  All rights reserved.
 
 This library is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.

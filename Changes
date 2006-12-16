@@ -1,5 +1,34 @@
 Revision history for Perl extension Module::Build.
 
+ - On some systems (haven't identified the actual problem yet)
+   $ENV{PERL5LIB} can grow to enormous enough sizes that we can't
+   launch any more subprocesses because the environment table is full.
+   This is the now-infamous "Couldn't run Build.PL: Argument list too
+   long" error.  Now we detect such situations and trim the directory
+   list to only include directories that actually exist, listed only
+   once each.  Not the ideal solution, but it should work.
+
+ - Silence a warning in M::B::ModuleInfo that happens when the author
+   is using the "$VERSION = eval $VERSION" idiom.
+
+ - When running the 'testcover' action, do "cover --delete" if any of
+   the test files have changed (we already did so if any of the code
+   under test has changed). [Suggested by Chris Dolan, RT #23584]
+
+ - Fixed a broken link in the documentation about PREFIX. [Spotted by
+   David Steinbrunner]
+
+ - Changes to do_system() & friends on VMS to get system calls working
+   much better there. [Craig Berry]
+
+ - Added the "pardist" target which creates a PAR binary distribution
+   akin to a PPM distribution. [Steffen Mueller]
+
+ - Added the Interix platform as a Unix variant. [Stephen Hartland]
+
+ - Improved the error message we emit when a distribution contains XS
+   files but the user has no C compiler. [Suggested by Andreas Koenig]
+
 0.2805_01  Thu Sep  7 21:57:29 CDT 2006
 
  - Because of a weird behavior of YAML::Node, any distribution that

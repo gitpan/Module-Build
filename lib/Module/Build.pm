@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.2805_01';
+$VERSION = '0.2806';
 $VERSION = eval $VERSION;
 
 # Okay, this is the brute-force method of finding out what kind of
@@ -46,6 +46,7 @@ my %OSTYPES = qw(
 		 sunos     Unix
 		 cygwin    Unix
 		 os2       Unix
+		 interix   Unix
 		 
 		 dos       Windows
 		 MSWin32   Windows
@@ -149,9 +150,9 @@ This illustrates initial configuration and the running of three
 'actions'.  In this case the actions run are 'build' (the default
 action), 'test', and 'install'.  Other actions defined so far include:
 
-  build                          install     
-  clean                          manifest    
-  code                           manpages    
+  build                          manifest    
+  clean                          manpages    
+  code                           pardist     
   config_data                    ppd         
   diff                           ppmdist     
   dist                           prereq_report
@@ -165,6 +166,7 @@ action), 'test', and 'install'.  Other actions defined so far include:
   fakeinstall                    testpod     
   help                           testpodcoverage
   html                           versioninstall
+  install                                    
 
 
 You can run the 'help' action for a complete list of actions.
@@ -347,7 +349,7 @@ F<META.yml> file must also be listed in F<MANIFEST> - if it's not, a
 warning will be issued.
 
 The current version of the F<META.yml> specification can be found at
-L<http://module-build.sourceforge.net/META-spec-v1.2.html>
+L<http://module-build.sourceforge.net/META-spec-current.html>
 
 =item distsign
 
@@ -465,6 +467,15 @@ install paths can be determined from values in C<Config.pm>.  You can
 also supply or override install paths by specifying there values on
 the command line with the C<bindoc> and C<libdoc> installation
 targets.
+
+=item pardist
+
+[version 0.2806]
+
+Generates a PAR binary distribution for use with L<PAR> or L<PAR::Dist>.
+
+It requires that the PAR::Dist module (version 0.17 and up) is
+installed on your system.
 
 =item ppd
 
@@ -859,8 +870,7 @@ system, you'll install as follows:
   libhtml => /home/ken/html
 
 Note that this is I<different> from how MakeMaker's C<PREFIX>
-parameter works.  See L</"Why PREFIX is not recommended"> for more
-details.  C<install_base> just gives you a default layout under the
+parameter works.  C<install_base> just gives you a default layout under the
 directory you specify, which may have little to do with the
 C<installdirs=site> layout.
 
@@ -1009,7 +1019,7 @@ repository at <https://svn.perl.org/modules/Module-Build/trunk/>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2001-2005 Ken Williams.  All rights reserved.
+Copyright (c) 2001-2006 Ken Williams.  All rights reserved.
 
 This library is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
@@ -1017,11 +1027,11 @@ modify it under the same terms as Perl itself.
 
 =head1 SEE ALSO
 
-perl(1), L<Module::Build::Cookbook>(3), L<Module::Build::Authoring>(3),
-L<Module::Build::API>(3), L<ExtUtils::MakeMaker>(3), L<YAML>(3)
+perl(1), L<Module::Build::Cookbook>, L<Module::Build::Authoring>,
+L<Module::Build::API>, L<ExtUtils::MakeMaker>, L<YAML>
 
 F<META.yml> Specification:
-L<http://module-build.sourceforge.net/META-spec-v1.2.html>
+L<http://module-build.sourceforge.net/META-spec-current.html>
 
 L<http://www.dsmit.com/cons/>
 
