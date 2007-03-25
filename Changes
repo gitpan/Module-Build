@@ -1,5 +1,54 @@
 Revision history for Perl extension Module::Build.
 
+ - Upgraded to version.pm 0.71. [John Peacock]
+
+ - Removed a couple small constructs in the tests ("use warnings;" and
+   "qw$foo bar$[1]") that caused test failures under perl 5.005.
+
+ - Added support for an explicit default value of undef in prompt().
+   [Eric Wilhelm]
+
+ - Improved our prompt() method, which could sometimes hang before the
+   user got a chance to see a prompt. [Andreas Koenig]
+
+ - Added a note about --allow_mb_mismatch to the error message that
+   happens right before someone might want to use that parameter.
+
+ - Added DragonflyBSD to the list of known Unix OSes.
+
+ - get_action_docs() dies on error rather than twiddling $@
+
+ - Made ModuleInfo's _evaluate_version_line() compatible with 'use
+   version ...$VERSION' lines.  [Eric Wilhelm]
+
+ - Added some verbiage in Module::Build::API that officially blesses
+   the _build/prereqs file for external consumption. [Suggested by Andreas Koenig]
+
+ - Added test profiles support via the test_types property and "testall"
+   target. [Eric Wilhelm, Jeff Lavallee]
+
+ - Use syscopy() on OS/2 in copy_if_modified() so we make sure to
+   overwrite any existing target file. [Ilya Zakharevich]
+
+ - Removed seemingly silly '~~' test in t/tilde.t.
+
+ - In our test-time utility library t/lib/MBTest.pm, we need to know
+   about a few .exe-like extensions on OS/2. [Ilya Zakharevich]
+
+ - In t/ppm.t, use DynaLoader::mod2fname() (if available) to determine
+   the correct translation of our test module's name into a DLL
+   name. [Ilya Zakharevich]
+
+ - Avoid an unlink() error on OS/2 when fixing shebang lines. [Ilya
+   Zakharevich]
+
+ - When we're protecting the world from the evils of long RedHat
+   $ENV{PERL5LIB} variables, don't assume $ENV{PERL5LIB} is already
+   defined.  This gets rid of a huge number of warnings for some
+   people. [Dave Rolsky]
+
+0.2806 - Fri Dec 15 22:20:14 2006
+
  - On some systems (haven't identified the actual problem yet)
    $ENV{PERL5LIB} can grow to enormous enough sizes that we can't
    launch any more subprocesses because the environment table is full.

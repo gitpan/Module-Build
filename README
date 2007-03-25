@@ -420,6 +420,33 @@ ACTIONS
 
           ./Build test --test_files 't/01-*.t'
 
+    testall
+        [verion 0.2807]
+
+        [Note: the 'testall' action and the code snippets below are
+        currently in alpha stage, see
+        "http://www.nntp.perl.org/group/perl.module.build/2007/03/msg584.htm
+        l" ]
+
+        Runs the `test' action plus each of the `test$type' actions defined
+        by the keys of the `test_types' parameter.
+
+        Currently, you need to define the ACTION_test$type method yourself
+        and enumerate them in the test_types parameter.
+
+          my $mb = Module::Build->subclass(
+            code => q(
+              sub ACTION_testspecial { shift->generic_test(type => 'special'); }
+              sub ACTION_testauthor  { shift->generic_test(type => 'author'); }
+            )
+          )->new(
+            ...
+            test_types  => {
+              special => '.st',
+              author  => '.at',
+            },
+            ...
+
     testcover
         [version 0.26]
 
