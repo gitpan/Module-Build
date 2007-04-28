@@ -1,6 +1,6 @@
 ---
 name: Module-Build
-version: 0.2807
+version: 0.2808
 author:
   - 'Ken Williams <kwilliams@cpan.org>'
   - |-
@@ -43,7 +43,7 @@ recommends:
 provides:
   Module::Build:
     file: lib/Module/Build.pm
-    version: 0.2807
+    version: 0.2808
   Module::Build::Base:
     file: lib/Module/Build/Base.pm
   Module::Build::Compat:
@@ -93,11 +93,11 @@ provides:
     file: lib/Module/Build/Base.pm
   Module::Build::Version:
     file: lib/Module/Build/Version.pm
-    version: 0.58
+    version: 0.7203
   Module::Build::YAML:
     file: lib/Module/Build/YAML.pm
     version: 0.50
-generated_by: Module::Build version 0.2807
+generated_by: Module::Build version 0.2808
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html
   version: 1.2
