@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.2808';
+$VERSION = '0.2808_01';
 $VERSION = eval $VERSION;
 
 # Okay, this is the brute-force method of finding out what kind of
@@ -34,6 +34,7 @@ my %OSTYPES = qw(
 		 irix      Unix
 		 darwin    Unix
 		 machten   Unix
+		 midnightbsd Unix
 		 next      Unix
 		 openbsd   Unix
 		 netbsd    Unix
@@ -226,10 +227,8 @@ C<Build test verbose=1>), in which case their values last only for the
 lifetime of that command.  Per-action command line parameters take
 precedence over parameters specified at C<perl Build.PL> time.
 
-The build process also relies heavily on the C<Config.pm> module, and
-all the key=value pairs in C<Config.pm> are available in
-
-C<< $self->{config} >>.  If the user wishes to override any of the
+The build process also relies heavily on the C<Config.pm> module.
+If the user wishes to override any of the
 values in C<Config.pm>, she may specify them like so:
 
   perl Build.PL --config cc=gcc --config ld=gcc
@@ -523,7 +522,7 @@ for a bug report.
 [version 0.28]
 
 This action is identical to the C<install> action.  In the future,
-though, if C<install> starts writing to the file file
+though, when C<install> starts writing to the file 
 F<$(INSTALLARCHLIB)/perllocal.pod>, C<pure_install> won't, and that
 will be the only difference between them.
 

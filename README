@@ -86,11 +86,9 @@ ACTIONS
     that command. Per-action command line parameters take precedence over
     parameters specified at `perl Build.PL' time.
 
-    The build process also relies heavily on the `Config.pm' module, and all
-    the key=value pairs in `Config.pm' are available in
-
-    `$self->{config}'. If the user wishes to override any of the values in
-    `Config.pm', she may specify them like so:
+    The build process also relies heavily on the `Config.pm' module. If the
+    user wishes to override any of the values in `Config.pm', she may
+    specify them like so:
 
       perl Build.PL --config cc=gcc --config ld=gcc
 
@@ -355,7 +353,7 @@ ACTIONS
         [version 0.28]
 
         This action is identical to the `install' action. In the future,
-        though, if `install' starts writing to the file file
+        though, when `install' starts writing to the file
         $(INSTALLARCHLIB)/perllocal.pod, `pure_install' won't, and that will
         be the only difference between them.
 

@@ -24,7 +24,7 @@ use Module::Build::ConfigData;
 
 use Cwd ();
 my $cwd = Cwd::cwd;
-my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
+my $tmp = MBTest->tmpdir;
 
 
 use DistGen;
@@ -46,17 +46,13 @@ Says "Hello"
 
 =cut
 ---
-$dist->change_file( 'Build.PL', <<"---" );
-
-my \$build = new Module::Build(
-  module_name => @{[$dist->name]},
+$dist->change_build_pl
+({
+  module_name => $dist->name,
   version => '0.01',
   license     => 'perl',
   scripts     => [ 'hello' ],
-);
-
-\$build->create_build_script;
----
+});
 $dist->regen;
 
 chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";

@@ -12,22 +12,19 @@ my $have_yaml = Module::Build::ConfigData->feature('YAML_support');
 
 use Cwd ();
 my $cwd = Cwd::cwd;
-my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
+my $tmp = MBTest->tmpdir;
 
 use DistGen;
 my $dist = DistGen->new( dir => $tmp );
 $dist->remove_file( 't/basic.t' );
-$dist->change_file( 'Build.PL', <<'---' );
-use Module::Build;
-
-my $build = new Module::Build(
+$dist->change_build_pl
+({
   module_name => 'Simple',
   scripts     => [ 'script' ],
   license     => 'perl',
   requires    => { 'File::Spec' => 0 },
-);
-$build->create_build_script;
----
+});
+
 $dist->add_file( 'script', <<'---' );
 #!perl -w
 print "Hello, World!\n";
@@ -83,7 +80,16 @@ eval {$mb->create_build_script};
 is $@, '';
 ok -e $mb->build_script;
 
-is $mb->dist_dir, 'Simple-0.01';
+my $dist_dir = 'Simple-0.01';
+
+# VMS may or may not need to modify the name, vmsify will do this if
+# the name looks like a UNIX directory.
+if ($^O eq 'VMS') {
+   my @dist_dirs = File::Spec->splitdir(VMS::Filespec::vmsify($dist_dir.'/'));
+   $dist_dir = $dist_dirs[0];
+}
+
+is $mb->dist_dir, $dist_dir;
 
 # The 'cleanup' file doesn't exist yet
 ok grep {$_ eq 'before_script'} $mb->cleanup;
@@ -159,12 +165,15 @@ SKIP: {
   ok $scripts->{script};
   
   # Check that a shebang line is rewritten
-  my $blib_script = File::Spec->catdir( qw( blib script script ) );
+  my $blib_script = File::Spec->catfile( qw( blib script script ) );
   ok -e $blib_script;
   
-  my $fh = IO::File->new($blib_script);
-  my $first_line = <$fh>;
-  isnt $first_line, "#!perl -w\n", "should rewrite the shebang line";
+ SKIP: {
+    skip("We do not rewrite shebang on VMS", 1) if $^O eq 'VMS';
+    my $fh = IO::File->new($blib_script);
+    my $first_line = <$fh>;
+    isnt $first_line, "#!perl -w\n", "should rewrite the shebang line";
+  }
 }
 
 {
@@ -209,15 +218,12 @@ echo Hello, World!
 ---
 
   $dist = DistGen->new( dir => $tmp );
-  $dist->change_file( 'Build.PL', <<'---' );
-use Module::Build;
-my $build = new Module::Build(
-  module_name => 'Simple',
-  scripts     => [ 'bin/script.bat' ],
-  license     => 'perl',
-);
-$build->create_build_script;
----
+  $dist->change_build_pl({
+			  module_name => 'Simple',
+			  scripts     => [ 'bin/script.bat' ],
+			  license     => 'perl',
+			 });
+
   $dist->add_file( 'bin/script.bat', $script_data );
 
   $dist->regen;

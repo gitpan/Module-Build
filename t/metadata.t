@@ -2,33 +2,48 @@
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 47;
+use MBTest tests => 49;
 
 use Cwd ();
 my $cwd = Cwd::cwd;
-my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
+my $tmp = MBTest->tmpdir;
 
 
 use Module::Build;
 use Module::Build::ConfigData;
-my $has_YAML = Module::Build::ConfigData->feature('YAML_support');
+
+my %metadata = 
+  (
+   module_name   => 'Simple',
+   dist_version  => '3.14159265',
+   dist_author   => [ 'Simple Simon <ss\@somewhere.priv>' ],
+   dist_abstract => 'Something interesting',
+   license       => 'perl',
+   meta_add => {
+		keywords  => [qw(super duper something)],
+		resources => {homepage => 'http://foo.example.com'},
+	       },
+  );
 
 
 use DistGen;
 my $dist = DistGen->new( dir => $tmp );
-$dist->change_file( 'Build.PL', <<"---" );
-
-my \$builder = Module::Build->new(
-    module_name   => '@{[$dist->name]}',
-    dist_version  => '3.14159265',
-    dist_author   => [ 'Simple Simon <ss\@somewhere.priv>' ],
-    dist_abstract => 'Something interesting',
-    license       => 'perl',
-);
-
-\$builder->create_build_script();
----
+$dist->change_build_pl( \%metadata );
 $dist->regen;
+
+my $simple_file = 'lib/Simple.pm';
+my $simple2_file = 'lib/Simple2.pm';
+
+   #TODO:
+   # Traditional VMS will return the file in in lower case, and is_deeply
+   # does exact case comparisons.
+   # When ODS-5 support is active for preserved case file names, this will
+   # need to be changed.
+   if ($^O eq 'VMS') {
+       $simple_file = lc($simple_file);
+       $simple2_file = lc($simple2_file);
+   }
+
 
 chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
 
@@ -39,28 +54,22 @@ my $mb = Module::Build->new_from_context;
 #
 # Test for valid META.yml
 
-SKIP: {
-  skip( 'YAML_support feature is not enabled', 8 ) unless $has_YAML;
-
-  require YAML;
-  require YAML::Node;
-  my $node = YAML::Node->new({});
-  $node = $mb->prepare_metadata( $node );
+{
+  my $node = $mb->prepare_metadata( {} );
 
   # exists() doesn't seem to work here
-  ok defined( $node->{name} ),     "'name' field present in META.yml";
-  ok defined( $node->{version} ),  "'version' field present in META.yml";
-  ok defined( $node->{abstract} ), "'abstract' field present in META.yml";
-  ok defined( $node->{author} ),   "'author' field present in META.yml";
-  ok defined( $node->{license} ),  "'license' field present in META.yml";
-  ok defined( $node->{generated_by} ),
-      "'generated_by' field present in META.yml";
+  is $node->{name}, $metadata{module_name};
+  is $node->{version}, $metadata{dist_version};
+  is $node->{abstract}, $metadata{dist_abstract};
+  is_deeply $node->{author}, $metadata{dist_author};
+  is $node->{license}, $metadata{license};
+  like $node->{generated_by}, qr{Module::Build};
   ok defined( $node->{'meta-spec'}{version} ),
       "'meta-spec' -> 'version' field present in META.yml";
   ok defined( $node->{'meta-spec'}{url} ),
       "'meta-spec' -> 'url' field present in META.yml";
-
-  # TODO : find a way to test for failure when above fields are not present
+  is_deeply $node->{keywords}, $metadata{meta_add}{keywords};
+  is_deeply $node->{resources}, $metadata{meta_add}{resources};
 }
 
 $dist->clean;
@@ -87,7 +96,7 @@ $VERSION = '1.23';
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Simple' => {file => 'lib/Simple.pm',
+	  {'Simple' => {file => $simple_file,
 			version => '1.23'}});
 
 $dist->change_file( 'lib/Simple.pm', <<'---' );
@@ -96,7 +105,7 @@ package Simple;
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Simple' => {file => 'lib/Simple.pm'}});
+	  {'Simple' => {file => $simple_file}});
 
 # File with no corresponding package (w/ or w/o version)
 # Simple.pm => Foo::Bar v1.23
@@ -108,7 +117,7 @@ $VERSION = '1.23';
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Foo::Bar' => { file => 'lib/Simple.pm',
+	  {'Foo::Bar' => { file => $simple_file,
 			   version => '1.23' }});
 
 $dist->change_file( 'lib/Simple.pm', <<'---' );
@@ -117,7 +126,7 @@ package Foo::Bar;
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Foo::Bar' => { file => 'lib/Simple.pm'}});
+	  {'Foo::Bar' => { file => $simple_file}});
 
 
 # Single file with multiple differing packages (w/ or w/o version)
@@ -133,9 +142,9 @@ $VERSION = '1.23';
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Simple'   => { file => 'lib/Simple.pm',
+	  {'Simple'   => { file => $simple_file,
 			   version => '1.23' },
-	   'Foo::Bar' => { file => 'lib/Simple.pm',
+	   'Foo::Bar' => { file => $simple_file,
 			   version => '1.23' }});
 
 {
@@ -167,9 +176,9 @@ $VERSION = '1.23';
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Foo'      => { file => 'lib/Simple.pm',
+	  {'Foo'      => { file => $simple_file,
 			   version => '1.23' },
-	   'Foo::Bar' => { file => 'lib/Simple.pm',
+	   'Foo::Bar' => { file => $simple_file,
 			   version => '1.23' }});
 
 
@@ -185,7 +194,7 @@ package Simple;
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Simple' => { file => 'lib/Simple.pm' }});
+	  {'Simple' => { file => $simple_file }});
 
 
 # Single file with same package appearing multiple times, single
@@ -201,7 +210,7 @@ package Simple;
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Simple' => { file => 'lib/Simple.pm',
+	  {'Simple' => { file => $simple_file,
 			 version => '1.23' }});
 
 
@@ -218,7 +227,7 @@ $VERSION = '1.23';
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Simple' => { file => 'lib/Simple.pm',
+	  {'Simple' => { file => $simple_file,
 			 version => '1.23' }});
 
 
@@ -237,7 +246,7 @@ my $err = '';
 $err = stderr_of( sub { $mb = new_build() } );
 $err = stderr_of( sub { $provides = $mb->find_dist_packages } );
 is_deeply($provides,
-	  {'Simple' => { file => 'lib/Simple.pm',
+	  {'Simple' => { file => $simple_file,
 			 version => '1.23' }}); # XXX should be 2.34?
 like( $err, qr/already declared/, '  with conflicting versions reported' );
 
@@ -256,7 +265,7 @@ $dist->regen( clean => 1 );
 $err = stderr_of( sub { $mb = new_build() } );
 $err = stderr_of( sub { $provides = $mb->find_dist_packages } );
 is_deeply($provides,
-	  {'Foo' => { file => 'lib/Simple.pm',
+	  {'Foo' => { file => $simple_file,
 		      version => '1.23' }}); # XXX should be 2.34?
 like( $err, qr/already declared/, '  with conflicting versions reported' );
 
@@ -277,7 +286,7 @@ package Simple;
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Simple' => { file => 'lib/Simple.pm' }});
+	  {'Simple' => { file => $simple_file }});
 $dist->remove_file( 'lib/Simple2.pm' );
 
 
@@ -295,7 +304,7 @@ package Simple;
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Simple' => { file => 'lib/Simple.pm',
+	  {'Simple' => { file => $simple_file,
 			 version => '1.23' }});
 $dist->remove_file( 'lib/Simple2.pm' );
 
@@ -315,7 +324,7 @@ $VERSION = '1.23';
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Simple' => { file => 'lib/Simple2.pm',
+	  {'Simple' => { file => $simple2_file,
 			 version => '1.23' }});
 $dist->remove_file( 'lib/Simple2.pm' );
 
@@ -336,7 +345,7 @@ $dist->regen( clean => 1 );
 $mb = new_build();
 $err = stderr_of( sub { $provides = $mb->find_dist_packages } );
 is_deeply($provides,
-	  {'Simple' => { file => 'lib/Simple.pm',
+	  {'Simple' => { file => $simple_file,
 			 version => '1.23' }});
 like( $err, qr/Found conflicting versions for package/,
       '  with conflicting versions reported' );
@@ -359,7 +368,7 @@ $dist->regen( clean => 1 );
 $mb = new_build();
 $err = stderr_of( sub { $provides = $mb->find_dist_packages } );
 is_deeply($provides,
-	  {'Simple' => { file => 'lib/Simple.pm',
+	  {'Simple' => { file => $simple_file,
 			 version => '1.23' }});
 $dist->remove_file( 'lib/Simple2.pm' );
 
@@ -400,7 +409,7 @@ package Foo;
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Foo' => { file => 'lib/Simple.pm',
+	  {'Foo' => { file => $simple_file,
 		      version => '1.23' }});
 $dist->remove_file( 'lib/Simple2.pm' );
 
@@ -419,7 +428,7 @@ $VERSION = '1.23';
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Foo' => { file => 'lib/Simple2.pm',
+	  {'Foo' => { file => $simple2_file,
 		      version => '1.23' }});
 $dist->remove_file( 'lib/Simple2.pm' );
 
@@ -489,7 +498,7 @@ $err = stderr_of( sub {
 } );
 $err = stderr_of( sub { $provides = $mb->find_dist_packages } );
 is_deeply($provides,
-	  {'Simple' => { file => 'lib/Simple.pm',
+	  {'Simple' => { file => $simple_file,
 			 version => '1.23' }});
 like( $err, qr/Found conflicting versions for package/,
       '  corresponding package conflicts with multiple alternatives' );
@@ -515,7 +524,7 @@ $err = stderr_of( sub {
 } );
 $err = stderr_of( sub { $provides = $mb->find_dist_packages } );
 is_deeply($provides,
-	  {'Simple' => { file => 'lib/Simple.pm',
+	  {'Simple' => { file => $simple_file,
 			 version => '1.23' }});
 like( $err, qr/Found conflicting versions for package/,
       '  only one alternative conflicts with corresponding package' );
@@ -539,7 +548,7 @@ $VERSION = '3.45';
 $dist->regen( clean => 1 );
 $mb = new_build();
 is_deeply($mb->find_dist_packages,
-	  {'Simple' => { file => 'lib/Simple.pm',
+	  {'Simple' => { file => $simple_file,
 			 version => '1.23' }});
 
 

@@ -18,20 +18,16 @@ if ( $ENV{TEST_SIGNATURE} ) {
 
 use Cwd ();
 my $cwd = Cwd::cwd;
-my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
+my $tmp = MBTest->tmpdir;
 
 use DistGen;
 my $dist = DistGen->new( dir => $tmp );
-$dist->change_file( 'Build.PL', <<"---" );
-use Module::Build;
-
-my \$build = new Module::Build(
-  module_name => @{[$dist->name]},
+$dist->change_build_pl
+({
+  module_name => $dist->name,
   license     => 'perl',
   sign        => 1,
-);
-\$build->create_build_script;
----
+});
 $dist->regen;
 
 chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";

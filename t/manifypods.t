@@ -17,7 +17,7 @@ if ( Module::Build::ConfigData->feature('manpage_support') ) {
 
 use Cwd ();
 my $cwd = Cwd::cwd;
-my $tmp = File::Spec->catdir( $cwd, 't', '_tmp' );
+my $tmp = MBTest->tmpdir;
 
 use DistGen;
 my $dist = DistGen->new( dir => $tmp );
@@ -58,7 +58,7 @@ $dist->regen;
 chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
 
 use File::Spec::Functions qw( catdir );
-my $destdir = catdir($cwd, 't', 'install_test');
+my $destdir = catdir($cwd, 't', 'install_test.' . $$);
 
 
 my $mb = Module::Build->new(
@@ -102,6 +102,11 @@ my %distro = (
 
 %distro = map {$mb->localize_file_path($_), $distro{$_}} keys %distro;
 
+my $lib_path = $mb->localize_dir_path('lib');
+
+# Remove trailing directory delimiter on VMS for compares
+$lib_path =~ s/\]// if $^O eq 'VMS';
+
 $mb->dispatch('build');
 
 eval {$mb->dispatch('docs')};
@@ -123,7 +128,8 @@ $mb->dispatch('install');
 
 while (my ($from, $v) = each %distro) {
   next unless $v;
-  my $to = File::Spec->catfile($destdir, 'man', $man{($from =~ /^lib/ ? 'dir3' : 'dir1')}, $v);
+  my $to = File::Spec->catfile
+     ($destdir, 'man', $man{($from =~ /^\Q$lib_path\E/ ? 'dir3' : 'dir1')}, $v);
   ok -e $to, "Created $to manpage";
 }
 
