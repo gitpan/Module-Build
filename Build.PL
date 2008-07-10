@@ -17,7 +17,7 @@ my $build = Module::Build->new(
   module_name => 'Module::Build',
   license     => 'perl',
   requires    => {
-    'perl'                  => '5.005_03',
+    'perl'                  => '5.005_04',
     'Data::Dumper'          => 0,
     'File::Basename'        => 0,
     'File::Compare'         => 0,
@@ -42,10 +42,13 @@ my $build = Module::Build->new(
     'ExtUtils::ParseXS'  => 1.02,
     'Pod::Readme'        => 0.04,
     'Module::Signature'  => 0.21,
-    'version'            => 0.661,
+    'version'            => 0.74,
   },
   sign          => 1,
   create_readme => 1,
+
+  # overwrite the M::B that shipped in core
+  installdirs   => ($] >= 5.009004 ? 'core' : 'site'),
 
   auto_features => {
     YAML_support => {

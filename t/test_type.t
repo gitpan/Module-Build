@@ -2,10 +2,11 @@
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 8;
+use MBTest tests => 9;
 
-use Cwd ();
-my $cwd = Cwd::cwd;
+use_ok 'Module::Build';
+ensure_blib('Module::Build');
+
 my $tmp = MBTest->tmpdir;
 
 use DistGen;
@@ -22,11 +23,9 @@ ok(1, 'second test in special_ext');
 
 $dist->regen;
 
-chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+$dist->chdir_in;
 
 #########################
-
-use_ok 'Module::Build';
 
 # Here we make sure we can define an action that will test a particular type
 $::x = 0;
@@ -66,7 +65,6 @@ like($output, qr/\.\.OK/);
 
 is($::x, 3, "called a third time");
 
-chdir( $cwd ) or die "Can't chdir to '$cwd': $!";
 $dist->remove;
 
 # vim:ts=4:sw=4:et:sta

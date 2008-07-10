@@ -13,22 +13,23 @@ use Module::Build;
   } elsif ( !$have_c_compiler ) {
     plan skip_all => 'C_support enabled, but no compiler found';
   } else {
-    plan tests => 22;
+    plan tests => 23;
   }
 }
+
+ensure_blib('Module::Build');
+
 
 #########################
 
 
-use Cwd ();
-my $cwd = Cwd::cwd;
 my $tmp = MBTest->tmpdir;
 
 use DistGen;
 my $dist = DistGen->new( dir => $tmp, xs => 1 );
 $dist->regen;
 
-chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+$dist->chdir_in;
 my $mb = Module::Build->new_from_context;
 
 
@@ -101,7 +102,6 @@ ok ! -e 'blib';
 
 
 # cleanup
-chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
 $dist->remove;
 
 
@@ -109,10 +109,10 @@ $dist->remove;
 
 # Try a XS distro with a deep namespace
 
-$dist = DistGen->new( name => 'Simple::With::Deep::Namespace',
+$dist = DistGen->new( name => 'Simple::With::Deep::Name',
 		      dir => $tmp, xs => 1 );
 $dist->regen;
-chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+$dist->chdir_in;
 
 $mb = Module::Build->new_from_context;
 is $@, '';
@@ -127,7 +127,6 @@ $mb->dispatch('realclean');
 is $@, '';
 
 # cleanup
-chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
 $dist->remove;
 
 
@@ -206,7 +205,7 @@ ok( Simple::okay() eq 'ok' );
 ---
 
 $dist->regen;
-chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+$dist->chdir_in;
 
 
 $mb = Module::Build->new_from_context;
@@ -222,8 +221,4 @@ $mb->dispatch('realclean');
 is $@, '';
 
 # cleanup
-chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
 $dist->remove;
-
-use File::Path;
-rmtree( $tmp );

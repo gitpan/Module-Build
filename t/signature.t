@@ -6,7 +6,7 @@ use MBTest;
 
 if ( $ENV{TEST_SIGNATURE} ) {
   if ( have_module( 'Module::Signature' ) ) {
-    plan tests => 7;
+    plan tests => 15;
   } else {
     plan skip_all => '$ENV{TEST_SIGNATURE} is set, but Module::Signature not found';
   }
@@ -14,10 +14,11 @@ if ( $ENV{TEST_SIGNATURE} ) {
   plan skip_all => '$ENV{TEST_SIGNATURE} is not set';
 }
 
+use_ok 'Module::Build';
+ensure_blib('Module::Build');
+
 #########################
 
-use Cwd ();
-my $cwd = Cwd::cwd;
 my $tmp = MBTest->tmpdir;
 
 use DistGen;
@@ -30,11 +31,9 @@ $dist->change_build_pl
 });
 $dist->regen;
 
-chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+$dist->chdir_in;
 
 #########################
-
-use Module::Build;
 
 my $mb = Module::Build->new_from_context;
 
@@ -47,7 +46,7 @@ my $mb = Module::Build->new_from_context;
   
   # Make sure the signature actually verifies
   ok Module::Signature::verify() == Module::Signature::SIGNATURE_OK();
-  chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+  $dist->chdir_in;
 }
 
 {
@@ -56,8 +55,10 @@ my $mb = Module::Build->new_from_context;
   my @run_order;
   {
     local $^W; # Skip 'redefined' warnings
-    local *Module::Signature::sign              = sub { push @run_order, 'sign' };
-    local *Module::Build::Base::ACTION_distmeta = sub { push @run_order, 'distmeta' };
+    local *Module::Signature::sign;
+    *Module::Signature::sign = sub { push @run_order, 'sign' };
+    local *Module::Build::Base::ACTION_distmeta;
+    *Module::Build::Base::ACTION_distmeta = sub { push @run_order, 'distmeta' };
     eval { $mb->dispatch('distdir') };
   }
   is $@, '';
@@ -69,9 +70,34 @@ eval { $mb->dispatch('realclean') };
 is $@, '';
 
 
-# cleanup
-chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
-$dist->remove;
+{
+  eval {$mb->dispatch('distdir', sign => 0 )};
+  is $@, '';
+  chdir( $mb->dist_dir ) or die "Can't chdir to '@{[$mb->dist_dir]}': $!";
+  ok !-e 'SIGNATURE', './Build distdir --sign 0 does not sign';
+}
 
-use File::Path;
-rmtree( $tmp );
+eval { $mb->dispatch('realclean') };
+is $@, '';
+
+$dist->chdir_in;
+
+{
+    local @ARGV = '--sign=1';
+    $dist->change_build_pl({
+        module_name => $dist->name,
+        license     => 'perl',
+    });
+    $dist->regen;
+    
+    my $mb = Module::Build->new_from_context;
+    is $mb->{properties}{sign}, 1;
+    
+    eval {$mb->dispatch('distdir')};
+    is $@, '';
+    chdir( $mb->dist_dir ) or die "Can't chdir to '@{[$mb->dist_dir]}': $!";
+    ok -e 'SIGNATURE', 'Build.PL --sign=1 signs';
+}
+
+# cleanup
+$dist->remove;

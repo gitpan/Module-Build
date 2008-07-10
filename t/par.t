@@ -17,13 +17,12 @@ use Module::Build::ConfigData;
   } elsif ( ! eval {require Archive::Zip} ) {
     plan skip_all => "Archive::Zip required.";
   } else {
-    plan tests => 3;
+    plan tests => 4;
   }
 }
+ensure_blib('Module::Build');
 
 
-use Cwd ();
-my $cwd = Cwd::cwd;
 my $tmp = MBTest->tmpdir;
 
 
@@ -55,7 +54,7 @@ $dist->change_build_pl
 });
 $dist->regen;
 
-chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+$dist->chdir_in;
 
 use File::Spec::Functions qw(catdir);
 
@@ -82,9 +81,4 @@ ok(
   'Distribution contains META.yml'
 );
 
-$dist->clean();
-
-chdir( $cwd );
-use File::Path;
-rmtree( $tmp );
-
+$dist->remove;

@@ -1,5 +1,107 @@
 Revision history for Perl extension Module::Build.
 
+0.2808_02 - Wed Jul  9 16:45:08 PDT 2008
+
+ - Experimental support for TAP::Harness with --use-tap-harness option
+   and the tap_harness_args property. [David Wheeler & Eric Wilhelm]
+
+ - Added test_file_exts property for main-run tests other than '*.t'.
+   [David Wheeler]
+
+ - Fixed getcwd()/rmtree() failure case on 5.10+mac where something is
+   unhappy about all of the tests deleting their distgen directory
+   before leaving it. [Eric Wilhelm & David Wheeler]
+
+ - Improved support for parsing qv() in modules' $VERSION
+   declarations, and made $VERSION-parsing errors more verbose. [Jos
+   Boumans]
+
+ - Integrated an omnibus patch for various VMS fixes. [Craig Berry &
+   John E. Malmberg]
+
+ - Some versions of Test::Harness (or something) seem to not be
+   stripping the ".t" suffix when outputting test reports, which was
+   causing one of our tests in t/compat.t to fail.  Fixed. [Spotted by
+   a smoke tester]
+
+ - Most Unix platforms seem to allow hyphens in usernames, so we honor
+   this in our de-tilde-fying methods now. [Spotted by s-murata]
+
+ - If there are multiple assignments to the $VERSION variable in
+   someone's module and this generates warnings, tell the user what
+   line number the problem is at.
+
+ - Added 'gnu' and 'gnukfreebsd' as Unix variants. [Niko Tyni]
+
+ - Fixed a couple bugs in how we quote arguments to external processes
+   when they have to pass through the shell.  Also much more
+   thoroughly tested our quoting now.
+
+ - Edited the Module::Build::API docs prose about the 'license' field
+   in response to some comments on the module-authors mailing list.
+
+ - Fixed a typo in some example code in the Cookbook. [Jeremy Leader]
+
+ - Custom typemaps were being looked for in places that don't quite
+   exist; fixed. [Michael G Schwern]
+
+ - QNX/Neutrino is now considered to be Unix. [rt.cpan.org 32214]
+
+ - Added 'gpl2' and 'gpl3' to the list of valid licenses. [Allen
+   Engelhardt]
+
+ - Fixed our Data::Dumper wrapper's sensitivity to users who might set
+   $Data::Dumper::Terse. [Spotted by Dominique Dumont]
+
+ - Documented the fix_shebang_line() method. [Elliot Shank]
+
+ - Applied the 'const' modifier to version() and xs_version() XS
+   functions we use during testing. [Robin Barker]
+
+ - Fixed processing of INC=, POLLUTE=, INSTALLDIRS=, and LIB= for
+   passthrough/small Makefile.PLs.
+
+ - perl Build.PL --sign=1 now signs. [Michael G Schwern]
+
+ - Fixed processing of INSTALLDIRS=whatever for compatibility
+   Makefiles. [Spotted by John Peacock]
+
+ - Zillions of special-cases have been added in Compat.pm for dealing
+   with the special Makefile system on VMS. [John E. Malmberg]
+
+ - Fixed some stuff in how VMS command-args get quoted. [John E. Malmberg]
+
+ - VMS now overrides localize_file_path() and localize_dir_path() so
+   we don't need to do special stuff in the general case. [John
+   E. Malmberg]
+
+ - Added a few more VMS-specific entries to the default MANIFEST.SKIP
+   file that (sometimes) gets created during the 'manifest'
+   action. [John E. Malmberg]
+
+ - Fixed a catdir() that should have been a catfile() when creating a
+   ppmdist. [John E. Malmberg]
+
+ - Removed some assumptions about what makefiles are called (not
+   necessarily "Makefile") and how they take their arguments, to get
+   VMS tests working better. [John E. Malmberg]
+
+ - Fixed our check for Archive::Tar in the t/runthrough.t test, which
+   fixes a common failure on Win32. [Spotted by Chris Williams]
+
+ - Fixed a File::Spec mal-ism in t/destinations.t [Craig A. Berry]
+
+ - Exposed the internal ExtUtils::CBuilder object as part of our API,
+   via the cbuilder() method. [Zefram]
+
+ - Upgraded to version.pm 0.74 (fixes bug #30004.)
+
+ - Overwrite core (post-5.9.4) Module::Build installs (bug #20528.)
+
+ - Pass quiet() option to ExtUtils::CBuilder object.
+
+0.2808_01 - Wed Oct 24 11:51:25 2007
+
  - All .pm files in the Module-Build distribution (except for
    M::B::Version.pm, which is kind of tied to version.pm) now have the
    same $VERSION number explicitly specified.

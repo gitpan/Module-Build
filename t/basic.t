@@ -4,25 +4,18 @@ use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
 use MBTest tests => 52;
 
-use Cwd ();
-my $cwd = Cwd::cwd;
+use_ok 'Module::Build';
+ensure_blib('Module::Build');
+
 my $tmp = MBTest->tmpdir;
 
 use DistGen;
 my $dist = DistGen->new( dir => $tmp );
 $dist->regen;
 
-chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+$dist->chdir_in;
 
 #########################
-
-
-use_ok 'Module::Build';
-
-SKIP: {
-  skip "no blib in core", 1 if $ENV{PERL_CORE};
-  like $INC{'Module/Build.pm'}, qr/\bblib\b/, "Make sure Module::Build was loaded from blib/";
-}
 
 
 # Test object creation
@@ -170,11 +163,10 @@ SKIP: {
   is $args{foo}, 1;
 
   # revert test distribution to pristine state because we modified a file
-  chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
   $dist->remove;
   $dist = DistGen->new( dir => $tmp );
   $dist->regen;
-  chdir( $dist->dirname ) or die "Can't chdir to '@{[$dist->dirname]}': $!";
+  $dist->chdir_in;
 }
 
 # Test author stuff
@@ -213,8 +205,4 @@ SKIP: {
 
 
 # cleanup
-chdir( $cwd ) or die "Can''t chdir to '$cwd': $!";
 $dist->remove;
-
-use File::Path;
-rmtree( $tmp );

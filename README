@@ -384,10 +384,10 @@ ACTIONS
     test
         [version 0.01]
 
-        This will use `Test::Harness' to run any regression tests and report
-        their results. Tests can be defined in the standard places: a file
-        called `test.pl' in the top-level directory, or several files ending
-        with `.t' in a `t/' directory.
+        This will use `Test::Harness' or `TAP::Harness' to run any
+        regression tests and report their results. Tests can be defined in
+        the standard places: a file called `test.pl' in the top-level
+        directory, or several files ending with `.t' in a `t/' directory.
 
         If you want tests to be 'verbose', i.e. show details of test
         execution rather than just summary information, pass the argument
@@ -395,6 +395,14 @@ ACTIONS
 
         If you want to run tests under the perl debugger, pass the argument
         `debugger=1'.
+
+        If you want to have Module::Build find test files with different
+        file name extensions, pass the `test_file_exts' argument with an
+        array of extensions, such as `[qw( .t .s .z )]'.
+
+        If you want test to be run by `TAP::Harness', rather than
+        `Test::Harness', pass the argument `tap_harness_args' as an array
+        reference of arguments to pass to the TAP::Harness constructor.
 
         In addition, if a file called `visual.pl' exists in the top-level
         directory, this file will be executed as a Perl script and its
@@ -441,7 +449,7 @@ ACTIONS
             ...
             test_types  => {
               special => '.st',
-              author  => '.at',
+              author  => ['.at', '.pt' ],
             },
             ...
 

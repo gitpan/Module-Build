@@ -61,11 +61,12 @@ t/parents.t
 t/pod_parser.t
 t/ppm.t
 t/runthrough.t
+t/script_dist.t
 t/signature.t
+t/test_file_exts.t
 t/test_type.t
 t/test_types.t
 t/tilde.t
+t/use_tap_harness.t
 t/versions.t
 t/xs.t
-SIGNATURE    Added here by Module::Build
-SIGNATURE    Added here by Module::Build
