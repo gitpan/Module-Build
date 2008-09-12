@@ -8,7 +8,7 @@ package Module::Build::ModuleInfo;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.2808_03';
+$VERSION = '0.2808_04';
 $VERSION = eval $VERSION;
 
 use File::Spec;
@@ -73,7 +73,7 @@ sub _init {
   my %props = @_;
 
   my( %valid_props, @valid_props );
-  @valid_props = qw( collect_pod inc module );
+  @valid_props = qw( collect_pod inc );
   @valid_props{@valid_props} = delete( @props{@valid_props} );
   warn "Unknown properties: @{[keys %props]}\n" if scalar( %props );
 
