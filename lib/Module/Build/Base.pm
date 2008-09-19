@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.2808_04';
+$VERSION = '0.2808_05';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -85,6 +85,8 @@ sub resume {
   }
   
   $self->{invoked_action} = $self->{action} ||= 'build';
+
+  $self->_set_install_paths;
   
   return $self;
 }
@@ -330,7 +332,6 @@ sub _quote_args {
   # proper quoting so that the subprocess sees this same list of args.
   my ($self, @args) = @_;
 
-  my $return_args = '';
   my @quoted;
 
   for (@args) {
@@ -365,6 +366,8 @@ sub _backticks {
   }
 }
 
+# Tells us whether the construct open($fh, '-|', @command) is
+# supported.  It would probably be better to dynamically sense this.
 sub have_forkpipe { 1 }
 
 # Determine whether a given binary is the same as the perl
@@ -1850,9 +1853,9 @@ sub merge_args {
     if ($key eq 'config') {
       $self->config($_ => $val->{$_}) foreach keys %$val;
     } else {
-      my $add_to = ( $additive{$key} ? $self->{properties}{$key}
-		     : $self->valid_property($key) ? $self->{properties}
-		     : $self->{args});
+      my $add_to = $additive{$key}             ? $self->{properties}{$key} :
+                   $self->valid_property($key) ? $self->{properties}       :
+                   $self->{args}               ;
 
       if ($additive{$key}) {
 	$add_to->{$_} = $val->{$_} foreach keys %$val;

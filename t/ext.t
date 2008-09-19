@@ -4,13 +4,15 @@ use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
 use MBTest;
 
+use Module::Build;
+
 my @unix_splits = 
   (
    { q{one t'wo th'ree f"o\"ur " "five" } => [ 'one', 'two three', 'fo"ur ', 'five' ] },
    { q{ foo bar }                         => [ 'foo', 'bar'                         ] },
    { q{ D\'oh f\{g\'h\"i\]\* }            => [ "D'oh", "f{g'h\"i]*"                 ] },
    { q{ D\$foo }                          => [ 'D$foo'                              ] },
-   { qq{one\\\ntwo}                       => [ "one\ntwo"                           ] },
+   { qq{one\\\ntwo}                       => [ "one\ntwo"                           ] },  # TODO
   );
 
 my @win_splits = 
@@ -56,9 +58,8 @@ my @win_splits =
    { 'a " b " c'            => [ 'a', ' b ', 'c' ] },
 );
 
-plan tests => 11 + 4*@unix_splits + 4*@win_splits;
+plan tests => 10 + 4*@unix_splits + 4*@win_splits;
 
-use_ok 'Module::Build';
 ensure_blib('Module::Build');
 
 #########################
@@ -71,8 +72,13 @@ foreach my $platform ('', '::Platform::Unix', '::Platform::Windows') {
   is "@result", "foo bar baz", "Split using $pkg";
 }
 
+# I think 3.24 isn't actually the majik version, my 3.23 seems to pass...
+my $low_TPW_version = Text::ParseWords->VERSION < 3.24;
 use Module::Build::Platform::Unix;
 foreach my $test (@unix_splits) {
+  # Text::ParseWords bug:
+  local $TODO = $low_TPW_version && ((keys %$test)[0] =~ m{\\\n});
+
   do_split_tests('Module::Build::Platform::Unix', $test);
 }
 
@@ -145,5 +151,7 @@ sub do_split_tests {
   is( 0 + grep( !defined(), @result ), # all defined
       0,
       "'$string' result all defined" );
-  is_deeply(\@result, $expected);
+  is_deeply(\@result, $expected) or
+    diag("$package split_like_shell error \n" .
+      ">$string< is not splitting as >" . join("|", @$expected) . '<');
 }

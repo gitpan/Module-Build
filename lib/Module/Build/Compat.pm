@@ -2,7 +2,7 @@ package Module::Build::Compat;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.2808_04';
+$VERSION = '0.2808_05';
 
 use File::Spec;
 use IO::File;
@@ -11,19 +11,50 @@ use Module::Build;
 use Module::Build::ModuleInfo;
 use Data::Dumper;
 
+my %convert_installdirs = (
+    PERL        => 'core',
+    SITE        => 'site',
+    VENDOR      => 'vendor',
+);
+
 my %makefile_to_build = 
   (
    TEST_VERBOSE => 'verbose',
    VERBINST     => 'verbose',
    INC          => sub { map {(extra_compiler_flags => $_)} Module::Build->split_like_shell(shift) },
    POLLUTE      => sub { (extra_compiler_flags => '-DPERL_POLLUTE') },
-   INSTALLDIRS  => sub { local $_ = shift; (installdirs => (/^perl$/ ? 'core' : $_)) },
-   LIB          => sub { (install_path => ('lib='.shift())) },
+   INSTALLDIRS  => sub { (installdirs => $convert_installdirs{uc shift()}) },
+   LIB          => sub {
+       my $lib = shift;
+       my %config = (
+           installprivlib  => $lib,
+           installsitelib  => $lib,
+           installarchlib  => "$lib/$Config{archname}",
+           installsitearch => "$lib/$Config{archname}"
+       );
+       return map { (config => "$_=$config{$_}") } keys %config;
+   },
+
+   # Convert INSTALLVENDORLIB and friends.
+   (
+       map {
+           my $name = "INSTALL".$_."LIB";
+           $name => sub {
+                 my @ret = (config => { lc $name => shift });
+                 print STDERR "# Converted to @ret\n";
+
+                 return @ret;
+           }
+       } keys %convert_installdirs
+   ),
 
    # Some names they have in common
    map {$_, lc($_)} qw(DESTDIR PREFIX INSTALL_BASE UNINST),
   );
 
+my %macro_to_build = %makefile_to_build;
+# "LIB=foo make" is not the same as "perl Makefile.PL LIB=foo"
+delete $macro_to_build{LIB};
 
 
 sub create_makefile_pl {
@@ -208,7 +239,7 @@ sub _argvify {
 
 sub makefile_to_build_macros {
   my @out;
-  while (my ($macro, $trans) = each %makefile_to_build) {
+  while (my ($macro, $trans) = each %macro_to_build) {
     # On some platforms (e.g. Cygwin with 'make'), the mere presence
     # of "EXPORT: FOO" in the Makefile will make $ENV{FOO} defined.
     # Therefore we check length() too.
@@ -272,13 +303,13 @@ EOF
   if ($self->_is_vms_mms) {
     # Roll our own .EXPORT as MMS/MMK don't honor that directive.
     $maketext .= "\n.FIRST\n\t\@ $noop\n"; 
-    for my $macro (keys %makefile_to_build) {
+    for my $macro (keys %macro_to_build) {
       $maketext .= ".IFDEF $macro\n\tDEFINE $macro \"\$($macro)\"\n.ENDIF\n";
     }
     $maketext .= "\n"; 
   }
   else {
-    $maketext .= "\n.EXPORT : " . join(' ', keys %makefile_to_build) . "\n\n";
+    $maketext .= "\n.EXPORT : " . join(' ', keys %macro_to_build) . "\n\n";
   }
   
   return $maketext;
