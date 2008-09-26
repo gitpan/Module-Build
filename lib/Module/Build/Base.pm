@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.2808_05';
+$VERSION = '0.30';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -1084,7 +1084,7 @@ sub check_autofeatures {
 
   $self->log_info("Checking features:\n");
 
-  my $max_name_len;
+  my $max_name_len = 0;
   $max_name_len = ( length($_) > $max_name_len ) ?
                     length($_) : $max_name_len
     for keys %$features;
