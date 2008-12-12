@@ -34,7 +34,9 @@ Makefile.PL
 MANIFEST
 META.yml
 README
+scripts/bundle.pl
 scripts/config_data
+t/add_property.t
 t/basic.t
 t/bundled/Tie/CPHash.pm
 t/compat.t
@@ -67,5 +69,4 @@ t/tilde.t
 t/use_tap_harness.t
 t/versions.t
 t/xs.t
-SIGNATURE    Added here by Module::Build
-SIGNATURE    Added here by Module::Build
+LICENSE

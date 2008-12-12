@@ -50,6 +50,7 @@ my $build = Module::Build->new(
   },
   sign          => 1,
   create_readme => 1,
+  create_license => 1,
 
   # overwrite the M::B that shipped in core
   installdirs   => ($] >= 5.009004 ? 'core' : 'site'),
