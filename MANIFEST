@@ -30,6 +30,7 @@ lib/Module/Build/PodParser.pm
 lib/Module/Build/PPMMaker.pm
 lib/Module/Build/Version.pm
 lib/Module/Build/YAML.pm
+LICENSE
 Makefile.PL
 MANIFEST
 META.yml
@@ -69,4 +70,3 @@ t/tilde.t
 t/use_tap_harness.t
 t/versions.t
 t/xs.t
-LICENSE
