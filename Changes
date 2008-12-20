@@ -1,5 +1,9 @@
 Revision history for Perl extension Module::Build.
 
+ Deprecations
+ - Use of attributes as class methods is deprecated (this was never a
+   documented feature and appears to only have worked accidentally.)
+
 0.30_02 - Mon Dec 15 12:23:55 PST 2008
 
  Bug Fixes

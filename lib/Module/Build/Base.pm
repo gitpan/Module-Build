@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.30_02';
+$VERSION = '0.31';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -1593,6 +1593,9 @@ sub _call_action {
 sub cull_options {
     my $self = shift;
     my (@argv) = @_;
+
+    # XXX is it even valid to call this as a class method?
+    return({}, @argv) unless(ref($self)); # no object
 
     my $specs = $self->get_options;
     return({}, @argv) unless($specs and %$specs); # no user options
