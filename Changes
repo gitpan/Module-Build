@@ -1,5 +1,15 @@
 Revision history for Perl extension Module::Build.
 
+0.3101 - Mon Jan 12 13:52:36 PST 2009
+
+ Other
+ - added 'mirbsd' as a Unix-type OS [BinGOs]
+ - added 'haiku' as a Unix-type OS (backported from bleadperl)
+ - skips certain tests on VMS (backported from bleadperl)
+ - sets $^X to absolute path in tests (backported from bleadperl)
+
+0.31 - Sat Dec 20 15:03:33 2008
+
  Deprecations
  - Use of attributes as class methods is deprecated (this was never a
    documented feature and appears to only have worked accidentally.)
