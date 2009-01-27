@@ -1,5 +1,21 @@
 Revision history for Perl extension Module::Build.
 
+0.31_02 Tue Jan 27 09:16:43 PST 2009
+
+ Other
+ - tests now use File::Temp (added to build_requires); appears to fix
+   Win32 testing heisenbug on directory removal during high system loads
+ - use_tap_harness.t will skip unless a release version of TAP::Harness
+   is installed
+ - improved diagnostics to ensure_blib() tests in t/lib/MBTest.pm
+
+ Compat
+ - passthrough Makefile.PL will now play nice with cpantesters' on
+   exit(0) (RT#32018) [Eric Wilhelm]
+
+ Bug Fixes
+ - fix for doubling-up of --prefix (RT#19951)
+
 0.31012 - Wed Jan 14 01:36:19 PST 2009
 
  Bug Fixes

@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.31012';
+$VERSION = '0.31_02';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -3966,8 +3966,6 @@ sub _prefixify {
     return $self->_prefixify_default( $type, $rprefix );
   } elsif( !File::Spec->file_name_is_absolute($path) ) {
     $self->log_verbose("    path is relative, not prefixifying.\n");
-  } elsif( $sprefix eq $rprefix ) {
-    $self->log_verbose("  no new prefix.\n");
   } elsif( $path !~ s{^\Q$sprefix\E\b}{}s ) {
     $self->log_verbose("    cannot prefixify, falling back to default.\n");
     return $self->_prefixify_default( $type, $rprefix );
@@ -4400,12 +4398,15 @@ sub copy_if_modified {
 	     );
   $args{verbose} = !$self->quiet
     unless exists $args{verbose};
-  
+
   my $file = $args{from};
   unless (defined $file and length $file) {
     die "No 'from' parameter given to copy_if_modified";
   }
-  
+ 
+  # makes no sense to replicate an absolute path, so assume flatten 
+  $args{flatten} = 1 if File::Spec->file_name_is_absolute( $file );
+
   my $to_path;
   if (defined $args{to} and length $args{to}) {
     $to_path = $args{to};
