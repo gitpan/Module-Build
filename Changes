@@ -1,6 +1,19 @@
 Revision history for Perl extension Module::Build.
 
-0.31_02 Tue Jan 27 09:16:43 PST 2009
+0.31_03 - Sun Feb  8 14:54:01 PST 2009
+
+ Enhancements
+ - added a "prereq_data" action that prints a Perl data structure of
+   all prerequisites; can be loaded by external tools using eval()
+   [David Golden]
+
+ Bug-fixes
+ - 'fakeinstall' action warns and skips without ExtUtils::Install 1.32+
+   [David Golden, reported by Zefram]
+ - allows Module::Build version mismatch when installing self; works around
+   limitations in CPANPLUS::Dist::Build [David Golden]
+
+0.31_02 - Tue Jan 27 09:16:43 PST 2009
 
  Other
  - tests now use File::Temp (added to build_requires); appears to fix

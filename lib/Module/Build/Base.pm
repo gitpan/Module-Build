@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.31_02';
+$VERSION = '0.31_03';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -1188,7 +1188,7 @@ sub check_autofeatures {
     }
   }
 
-  $self->log_warn("\n");
+  $self->log_warn("\n") unless $self->quiet;
 }
 
 sub prereq_failures {
@@ -2054,15 +2054,25 @@ sub ACTION_prereq_report {
   $self->log_info( $self->prereq_report );
 }
 
-sub prereq_report {
+sub ACTION_prereq_data {
+  my $self = shift;
+  $self->log_info( Module::Build::Dumper->_data_dump( $self->prereq_data ) );
+}
+
+sub prereq_data {
   my $self = shift;
   my @types = @{ $self->prereq_action_types };
-  my $info = { map { $_ => $self->$_() } @types };
+  my $info = { map { $_ => $self->$_() } grep { %{$self->$_()} } @types };
+  return $info;
+}
+
+sub prereq_report {
+  my $self = shift;
+  my $info = $self->prereq_data;
 
   my $output = '';
-  foreach my $type (@types) {
+  foreach my $type (keys %$info) {
     my $prereqs = $info->{$type};
-    next unless %$prereqs;
     $output .= "\n$type:\n";
     my $mod_len = 2;
     my $ver_len = 4;
@@ -2949,6 +2959,14 @@ sub ACTION_install {
 sub ACTION_fakeinstall {
   my ($self) = @_;
   require ExtUtils::Install;
+  my $eui_version = ExtUtils::Install->VERSION;
+  if ( $eui_version < 1.32 ) {
+    $self->log_warn(
+      "The 'fakeinstall' action requires Extutils::Install 1.32 or later.\n"
+      . "(You only have version $eui_version)."
+    );
+    return;
+  }
   $self->depends_on('build');
   ExtUtils::Install::install($self->install_map, !$self->quiet, 1, $self->{args}{uninst}||0);
 }
