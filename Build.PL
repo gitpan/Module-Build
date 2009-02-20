@@ -19,7 +19,7 @@ my $build = Module::Build->new(
   build_requires        => {
     'File::Temp'            => 0.15,    # tmpdir() + fixes
     'Test::More'            => 0.49,
-    'Test::Harness'         => 2.03,    # when TODO tests worked
+    'Test::Harness'         => 3.16,    # PERL5LIB fixes
   },
   requires    => {
     'perl'                  => '5.006001',
