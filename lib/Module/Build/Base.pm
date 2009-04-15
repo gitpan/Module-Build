@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.32';
+$VERSION = '0.32_01';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -129,6 +129,7 @@ sub _construct {
 				   %input,
 				  },
 		    phash => {},
+                    stash => {}, # temporary caching, not stored in _build
 		   }, $package;
 
   $self->_set_defaults;
@@ -3424,7 +3425,7 @@ sub file_qr {
 
 sub dist_dir {
   my ($self) = @_;
-  return "$self->{properties}{dist_name}-$self->{properties}{dist_version}";
+  return join "-", $self->dist_name, $self->dist_version;
 }
 
 sub ppm_name {
@@ -3566,34 +3567,50 @@ sub do_create_metafile {
     push @INC, File::Spec->catdir($self->blib, 'lib');
   }
 
-  $self->write_metafile;
+  if ( $self->write_metafile( $self->metafile, $self->generate_metadata ) ) {
+    $self->{wrote_metadata} = 1;
+    $self->_add_to_manifest('MANIFEST', $metafile);
+  }
+
+  return 1;
 }
 
-sub write_metafile {
+sub generate_metadata {
   my $self = shift;
-  my $metafile = $self->metafile;
+  my $node = {};
 
   if ($self->_mb_feature('YAML_support')) {
     require YAML;
     require YAML::Node;
-
     # We use YAML::Node to get the order nice in the YAML file.
-    $self->prepare_metadata( my $node = YAML::Node->new({}) );
-    
-    # YAML API changed after version 0.30
-    my $yaml_sub = $YAML::VERSION le '0.30' ? \&YAML::StoreFile : \&YAML::DumpFile;
-    $self->{wrote_metadata} = $yaml_sub->($metafile, $node );
-
+    $self->prepare_metadata( $node = YAML::Node->new({}) );
   } else {
     require Module::Build::YAML;
-    my (%node, @order_keys);
-    $self->prepare_metadata(\%node, \@order_keys);
-    $node{_order} = \@order_keys;
-    &Module::Build::YAML::DumpFile($metafile, \%node);
-    $self->{wrote_metadata} = 1;
+    my @order_keys;
+    $self->prepare_metadata($node, \@order_keys);
+    $node->{_order} = \@order_keys;
   }
+  return $node;
+}
 
-  $self->_add_to_manifest('MANIFEST', $metafile);
+sub write_metafile {
+  my $self = shift;
+  my ($metafile, $node) = @_;
+
+  if ($self->_mb_feature('YAML_support')) {
+    # XXX this is probably redundant, but stick with it
+    require YAML;
+    require YAML::Node;
+    delete $node->{_order}; # XXX also probably redundant, but for safety
+    # YAML API changed after version 0.30
+    my $yaml_sub = $YAML::VERSION le '0.30' ? \&YAML::StoreFile : \&YAML::DumpFile;
+    $yaml_sub->( $metafile, $node );
+  } else {
+    # XXX probably redundant
+    require Module::Build::YAML;
+    &Module::Build::YAML::DumpFile($metafile, $node);
+  }
+  return 1;
 }
 
 sub prepare_metadata {
@@ -3617,17 +3634,19 @@ sub prepare_metadata {
 
   if (defined( my $l = $self->license )) {
     die "Unknown license string '$l'"
-      unless exists $self->valid_licenses->{ $self->license };
+      unless exists $self->valid_licenses->{ $l };
 
-    if (my $key = $self->valid_licenses->{ $self->license }) {
+    if (my $key = $self->valid_licenses->{ $l }) {
       my $class = "Software::License::$key";
       if (eval "use $class; 1") {
         # S::L requires a 'holder' key
         $node->{resources}{license} = $class->new({holder=>"nobody"})->url;
-      } else {
-        $node->{resources}{license} = $self->_license_url($key);
+      }
+      else {
+        $node->{resources}{license} = $self->_license_url($l);
       }
     }
+    # XXX we are silently omitting the url for any unknown license
   }
 
   if (exists $p->{configure_requires}) {
@@ -3663,8 +3682,8 @@ sub prepare_metadata {
   $add_node->('generated_by', "Module::Build version $Module::Build::VERSION");
 
   $add_node->('meta-spec', 
-	      {version => '1.2',
-	       url     => 'http://module-build.sourceforge.net/META-spec-v1.2.html',
+	      {version => '1.4',
+	       url     => 'http://module-build.sourceforge.net/META-spec-v1.4.html',
 	      });
 
   while (my($k, $v) = each %{$self->meta_add}) {
@@ -4144,13 +4163,13 @@ sub cbuilder {
   # Returns a CBuilder object
 
   my $self = shift;
-  my $p = $self->{properties};
-  return $p->{_cbuilder} if $p->{_cbuilder};
+  my $s = $self->{stash};
+  return $s->{_cbuilder} if $s->{_cbuilder};
   die "Module::Build is not configured with C_support"
 	  unless $self->_mb_feature('C_support');
 
   require ExtUtils::CBuilder;
-  return $p->{_cbuilder} = ExtUtils::CBuilder->new(
+  return $s->{_cbuilder} = ExtUtils::CBuilder->new(
     config => $self->config,
     ($self->quiet ? (quiet => 1 ) : ()),
   );
