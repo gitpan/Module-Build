@@ -1,5 +1,22 @@
 Revision history for Perl extension Module::Build.
 
+0.33_01 - Sat Jun 13 20:24:42 EDT 2009
+
+ Bug-fixes:
+ - Fixed RT#42724: consolidated VMS fixes [patch by CBERRY]
+ - Fixed RT#46338: passthrough Makefile.PL cleans Makefile during distclean
+ - Fixed RT#45700: t/compat.t for HP/UX make
+
+ Other:
+ - Adds current Module::Build to configure_requires (and build_requires) 
+   if no configure_requires is specified
+ - Always normalizes version number tuples in META.yml (e.g. 'v1.2.0')
+   (Partially addresses RT#46150) 
+ - Normalizes a generated dist_version (e.g. from a .pm file) -- 
+   dist_version set manually in Build.PL is not normalized
+ - Documentation update for create_license
+ - Minor POD cleanup
+
 0.33 - Sun May  3 20:16:34 PDT 2009
 
  Bug-fixes:
@@ -118,7 +135,7 @@ Revision history for Perl extension Module::Build.
  - We now support a 'create_license' parameter to new() that will
    create a LICENSE file during the 'dist' phase with the full text of
    the license.  This requires Software::License on the author's
-   machine.  THIS ALSO STILL NEEDS DOCS.
+   machine.
  - Added lgpl2/lgpl3 entries to the supported licenses (RT#40532).
  - Support for validating properties with a check subref. [David
    Wheeler]

@@ -2,7 +2,7 @@ package Module::Build::Compat;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.33';
+$VERSION = '0.33_01';
 
 use File::Spec;
 use IO::File;
@@ -282,7 +282,7 @@ sub fake_makefile {
 
   my $Build = 'Build' . $filetype . ' --makefile_env_macros 1';
   my $unlink = $class->oneliner('1 while unlink $ARGV[0]', [], [$args{makefile}]);
-  $unlink =~ s/\$/\$\$/g;
+  $unlink =~ s/\$/\$\$/g unless $class->is_vmsish;
 
   my $maketext = <<"EOF";
 all : force_do_it
@@ -290,13 +290,17 @@ all : force_do_it
 realclean : force_do_it
 	$perl $Build realclean
 	$unlink
+distclean : force_do_it
+	$perl $Build distclean
+	$unlink
+
 
 force_do_it :
 	@ $noop
 EOF
 
   foreach my $action ($class->known_actions) {
-    next if $action =~ /^(all|realclean|force_do_it)$/;  # Don't double-define
+    next if $action =~ /^(all|distclean|realclean|force_do_it)$/;  # Don't double-define
     $maketext .= <<"EOF";
 $action : force_do_it
 	$perl $Build $action
