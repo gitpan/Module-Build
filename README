@@ -100,7 +100,7 @@ ACTIONS
         If you run the "Build" script without any arguments, it runs the
         "build" action, which in turn runs the "code" and "docs" actions.
 
-        This is analogous to the MakeMaker 'make all' target.
+        This is analogous to the "MakeMaker" *make all* target.
 
     clean
         [version 0.01]
@@ -112,7 +112,7 @@ ACTIONS
     code
         [version 0.20]
 
-        This action builds your codebase.
+        This action builds your code base.
 
         By default it just creates a "blib/" directory and copies any ".pm"
         and ".pod" files from your "lib/" directory into the "blib/"
@@ -186,7 +186,7 @@ ACTIONS
 
         Creates the META.yml file that describes the distribution.
 
-        META.yml is a file containing various bits of "metadata" about the
+        META.yml is a file containing various bits of *metadata* about the
         distribution. The metadata includes the distribution name, version,
         abstract, prerequisites, license, and various other data about the
         distribution. This file is created as META.yml in YAML format. It is
@@ -218,12 +218,12 @@ ACTIONS
     docs
         [version 0.20]
 
-        This will generate documentation (e.g. Unix man pages and html
+        This will generate documentation (e.g. Unix man pages and HTML
         documents) for any installable items under blib/ that contain POD.
         If there are no "bindoc" or "libdoc" installation targets defined
         (as will be the case on systems that don't support Unix manpages) no
         action is taken for manpages. If there are no "binhtml" or "libhtml"
-        installation targets defined no action is taken for html documents.
+        installation targets defined no action is taken for HTML documents.
 
     fakeinstall
         [version 0.02]
@@ -321,7 +321,7 @@ ACTIONS
         Build a PPD file for your distribution.
 
         This action takes an optional argument "codebase" which is used in
-        the generated ppd file to specify the (usually relative) URL of the
+        the generated PPD file to specify the (usually relative) URL of the
         distribution. By default, this value is the distribution name
         without any path information.
 
@@ -333,7 +333,7 @@ ACTIONS
         [version 0.23]
 
         Generates a PPM binary distribution and a PPD description file. This
-        action also invokes the 'ppd' action, so it can accept the same
+        action also invokes the "ppd" action, so it can accept the same
         "codebase" argument described under that action.
 
         This uses the same mechanism as the "dist" action to tar & zip its
@@ -343,8 +343,8 @@ ACTIONS
     prereq_data
         [version 0.32]
 
-        This action prints out a Perl data structure of all prerequsites and
-        the versions required. The output can be loaded again using
+        This action prints out a Perl data structure of all prerequisites
+        and the versions required. The output can be loaded again using
         "eval()". This can be useful for external tools that wish to query a
         Build script for prerequisites.
 
@@ -434,7 +434,7 @@ ACTIONS
           ./Build test --test_files 't/01-*.t'
 
     testall
-        [verion 0.2807]
+        [version 0.2807]
 
         [Note: the 'testall' action and the code snippets below are
         currently in alpha stage, see
@@ -529,9 +529,9 @@ OPTIONS
     NOTE: There is some preliminary support for options to use the more
     familiar long option style. Most options can be preceded with the "--"
     long option prefix, and the underscores changed to dashes (e.g.
-    --use-rcfile). Additionally, the argument to boolean options is
-    optional, and boolean options can be negated by prefixing them with 'no'
-    or 'no-' (e.g. --noverbose or --no-verbose).
+    "--use-rcfile"). Additionally, the argument to boolean options is
+    optional, and boolean options can be negated by prefixing them with "no"
+    or "no-" (e.g. "--noverbose" or "--no-verbose").
 
     quiet
         Suppress informative messages on output.
@@ -580,7 +580,7 @@ OPTIONS
                --install_path html=/home/ken/docs/html
 
     If you wish to locate your resource file in a different location, you
-    can set the environment variable 'MODULEBUILDRC' to the complete
+    can set the environment variable "MODULEBUILDRC" to the complete
     absolute path of the file containing your options.
 
 INSTALL PATHS
@@ -624,10 +624,10 @@ INSTALL PATHS
         pages belonging to the 'man3' category.
 
     binhtml
-        This is the same as "bindoc" above, but applies to html documents.
+        This is the same as "bindoc" above, but applies to HTML documents.
 
     libhtml
-        This is the same as "bindoc" above, but applies to html documents.
+        This is the same as "bindoc" above, but applies to HTML documents.
 
     Four other parameters let you control various aspects of how
     installation paths are determined:
@@ -652,7 +652,7 @@ INSTALL PATHS
           binhtml => installhtml1dir installsitehtml1dir installvendorhtml1dir [*]
           libhtml => installhtml3dir installsitehtml3dir installvendorhtml3dir [*]
 
-          * Under some OS (eg. MSWin32) the destination for html documents is
+          * Under some OS (eg. MSWin32) the destination for HTML documents is
             determined by the C<Config.pm> entry C<installhtmldir>.
 
         The default value of "installdirs" is "site". If you're creating
@@ -670,7 +670,7 @@ INSTALL PATHS
         "installdirs" to "core" to overwrite the module in its present
         location.
 
-        (Note that the 'script' line is different from MakeMaker -
+        (Note that the 'script' line is different from "MakeMaker" -
         unfortunately there's no such thing as "installsitescript" or
         "installvendorscript" entry in "Config.pm", so we use the
         "installsitebin" and "installvendorbin" entries to at least get the
@@ -703,7 +703,7 @@ INSTALL PATHS
           binhtml => /home/ken/html
           libhtml => /home/ken/html
 
-        Note that this is *different* from how MakeMaker's "PREFIX"
+        Note that this is *different* from how "MakeMaker"'s "PREFIX"
         parameter works. "install_base" just gives you a default layout
         under the directory you specify, which may have little to do with
         the "installdirs=site" layout.
@@ -729,10 +729,10 @@ INSTALL PATHS
         platform you're installing on.
 
     prefix
-        Provided for compatibility with ExtUtils::MakeMaker's PREFIX
+        Provided for compatibility with "ExtUtils::MakeMaker"'s PREFIX
         argument. "prefix" should be used when you wish Module::Build to
         install your modules, documentation and scripts in the same place
-        ExtUtils::MakeMaker does.
+        "ExtUtils::MakeMaker" does.
 
         The following are equivalent.
 
@@ -740,21 +740,22 @@ INSTALL PATHS
             perl Makefile.PL PREFIX=/tmp/foo
 
         Because of the very complex nature of the prefixification logic, the
-        behavior of PREFIX in MakeMaker has changed subtly over time.
+        behavior of PREFIX in "MakeMaker" has changed subtly over time.
         Module::Build's --prefix logic is equivalent to the PREFIX logic
-        found in ExtUtils::MakeMaker 6.30.
+        found in "ExtUtils::MakeMaker" 6.30.
 
-        If you do not need to retain compatibility with ExtUtils::MakeMaker
-        or are starting a fresh Perl installation we recommand you use
-        "install_base" instead (and "INSTALL_BASE" in ExtUtils::MakeMaker).
-        See "Instaling in the same location as ExtUtils::MakeMaker" in
-        Module::Build::Cookbook for further information.
+        If you do not need to retain compatibility with
+        "ExtUtils::MakeMaker" or are starting a fresh Perl installation we
+        recommend you use "install_base" instead (and "INSTALL_BASE" in
+        "ExtUtils::MakeMaker"). See "Instaling in the same location as
+        ExtUtils::MakeMaker" in Module::Build::Cookbook for further
+        information.
 
 MOTIVATIONS
     There are several reasons I wanted to start over, and not just fix what
-    I didn't like about MakeMaker:
+    I didn't like about "MakeMaker":
 
-    *   I don't like the core idea of MakeMaker, namely that "make" should
+    *   I don't like the core idea of "MakeMaker", namely that "make" should
         be involved in the build process. Here are my reasons:
 
         +   When a person is installing a Perl module, what can you assume
@@ -769,23 +770,23 @@ MOTIVATIONS
         For years, these things have been a barrier to people getting the
         build/install process to do what they want.
 
-    *   There are several architectural decisions in MakeMaker that make it
-        very difficult to customize its behavior. For instance, when using
-        MakeMaker you do "use ExtUtils::MakeMaker", but the object created
-        in "WriteMakefile()" is actually blessed into a package name that's
-        created on the fly, so you can't simply subclass
+    *   There are several architectural decisions in "MakeMaker" that make
+        it very difficult to customize its behavior. For instance, when
+        using "MakeMaker" you do "use ExtUtils::MakeMaker", but the object
+        created in "WriteMakefile()" is actually blessed into a package name
+        that's created on the fly, so you can't simply subclass
         "ExtUtils::MakeMaker". There is a workaround "MY" package that lets
-        you override certain MakeMaker methods, but only certain explicitly
-        preselected (by MakeMaker) methods can be overridden. Also, the
-        method of customization is very crude: you have to modify a string
-        containing the Makefile text for the particular target. Since these
-        strings aren't documented, and *can't* be documented (they take on
-        different values depending on the platform, version of perl, version
-        of MakeMaker, etc.), you have no guarantee that your modifications
-        will work on someone else's machine or after an upgrade of MakeMaker
-        or perl.
+        you override certain "MakeMaker" methods, but only certain
+        explicitly preselected (by "MakeMaker") methods can be overridden.
+        Also, the method of customization is very crude: you have to modify
+        a string containing the Makefile text for the particular target.
+        Since these strings aren't documented, and *can't* be documented
+        (they take on different values depending on the platform, version of
+        perl, version of "MakeMaker", etc.), you have no guarantee that your
+        modifications will work on someone else's machine or after an
+        upgrade of "MakeMaker" or perl.
 
-    *   It is risky to make major changes to MakeMaker, since it does so
+    *   It is risky to make major changes to "MakeMaker", since it does so
         many things, is so important, and generally works. "Module::Build"
         is an entirely separate package so that I can work on it all I want,
         without worrying about backward compatibility.

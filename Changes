@@ -1,5 +1,30 @@
 Revision history for Perl extension Module::Build.
 
+0.33_03 - Mon Jun 22 17:22:56 EDT 2009
+
+ Bug-fixes:
+ - Removes Module::Build from its own configure/build_requires
+ - ConfigData->feature() confirms that modules actually load successfully,
+   not just that they are present. (RT#43557)
+ - Module::Build::Compat handling of INSTALL*LIB (RT#43827)
+ - Module::Build::Compat and recursive test files (RT#39171)
+ - Fixed bug linking non-standard XS names on Windows (RT#38065)
+ - Run PL files that don't generate any file (RT#39365)
+ - HTML generation failure no longer fatal (RT#36660)
+ - realclean might not delete Build.bat on Windows (RT#43863)
+ - include_dirs parameter now works correctly when given a single
+   string argument (RT#40177)
+ - Lots of spelling fixes in the POD (RT#45528)
+ - On Unix-like systems, tilde expansion is more liberal in username
+   characters accepted (RT#33492)
+
+ Other
+ - On MSWin32, bumped File::Spec prereq to 3.30 for a variety of fixes
+ - Add support for VMS in Unix compatibility mode (RT#42157)
+ - Added a can_action($name) method (RT#45172)
+ - Documented that subclass methods should not permanently change
+   current directory (RT#46919)
+
 0.33_02 - Mon Jun 15 12:23:55 EDT 2009
 
  Bug-fixes:

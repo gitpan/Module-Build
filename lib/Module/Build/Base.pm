@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.33_02';
+$VERSION = '0.33_03';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -165,9 +165,14 @@ sub _construct {
   $p->{requires} = delete $p->{prereq} if defined $p->{prereq};
   $p->{script_files} = delete $p->{scripts} if defined $p->{scripts};
 
-  # Convert to arrays
+  # Convert to from shell strings to arrays
   for ('extra_compiler_flags', 'extra_linker_flags') {
     $p->{$_} = [ $self->split_like_shell($p->{$_}) ] if exists $p->{$_};
+  }
+
+  # Convert to arrays
+  for ('include_dirs') {
+    $p->{$_} = [ $p->{$_} ] if exists $p->{$_} && !ref $p->{$_}
   }
 
   $self->add_to_cleanup( @{delete $p->{add_to_cleanup}} )
@@ -409,7 +414,7 @@ sub _perl_is_same {
   }
 }
 
-# Returns the absolute path of the perl interperter used to invoke
+# Returns the absolute path of the perl interpreter used to invoke
 # this process. The path is derived from $^X or $Config{perlpath}. On
 # some platforms $^X contains the complete absolute path of the
 # interpreter, on other it may contain a relative path, or simply
@@ -1070,11 +1075,11 @@ sub _pod_parse {
   return $p->{$member} = $parser->$method();
 }
 
-sub version_from_file { # Method provided for backwards compatability
+sub version_from_file { # Method provided for backwards compatibility
   return Module::Build::ModuleInfo->new_from_file($_[1])->version();
 }
 
-sub find_module_by_name { # Method provided for backwards compatability
+sub find_module_by_name { # Method provided for backwards compatibility
   return Module::Build::ModuleInfo->find_module_by_name(@_[1,2]);
 }
 
@@ -1585,9 +1590,14 @@ sub _call_action {
   return if $self->{_completed_actions}{$action}++;
 
   local $self->{action} = $action;
-  my $method = "ACTION_$action";
-  die "No action '$action' defined, try running the 'help' action.\n" unless $self->can($method);
+  my $method = $self->can_action( $action );
+  die "No action '$action' defined, try running the 'help' action.\n" unless $method;
   return $self->$method();
+}
+
+sub can_action {
+  my ($self, $action) = @_;
+  return $self->can( "ACTION_$action" );
 }
 
 # cuts the user-specified options out of the command-line args
@@ -1691,7 +1701,7 @@ sub _read_arg {
   }
 }
 
-# decide whether or not an option requires/has an opterand
+# decide whether or not an option requires/has an operand
 sub _optional_arg {
   my $self = shift;
   my $opt  = shift;
@@ -1760,6 +1770,11 @@ sub read_args {
     $args{$_} = [ $self->split_like_shell($args{$_}) ] if exists $args{$_};
   }
 
+  # Convert to arrays
+  for ('include_dirs') {
+    $args{$_} = [ $args{$_} ] if exists $args{$_} && !ref $args{$_}
+  }
+
   # Hashify these parameters
   for ($self->hash_properties, 'config') {
     next unless exists $args{$_};
@@ -1786,7 +1801,7 @@ sub read_args {
     for my $subkey (keys %{$args{$key}}) {
       next if !defined $args{$key}{$subkey};
       my $subkey_ext = $self->_detildefy($args{$key}{$subkey});
-      if ( $subkey eq 'html' ) { # translate for compatability
+      if ( $subkey eq 'html' ) { # translate for compatibility
 	$args{$key}{binhtml} = $subkey_ext;
 	$args{$key}{libhtml} = $subkey_ext;
       } else {
@@ -2617,7 +2632,8 @@ sub ACTION_testpod {
                               exclude => [ file_qr('\.bat$') ])}
     or die "Couldn't find any POD files to test\n";
 
-  { package Module::Build::PodTester;  # Don't want to pollute the main namespace
+  { package # hide from PAUSE
+      Module::Build::PodTester;  # Don't want to pollute the main namespace
     Test::Pod->import( tests => scalar @files );
     pod_file_ok($_) foreach @files;
   }
@@ -2869,7 +2885,8 @@ sub htmlify_pods {
 
     $self->log_info("HTMLifying $infile -> $outfile\n");
     $self->log_verbose("pod2html @opts\n");
-    Pod::Html::pod2html(@opts);	# or warn "pod2html @opts failed: $!";
+    eval { Pod::Html::pod2html(@opts); 1 } 
+      or $self->log_warn("pod2html @opts failed: $@");
   }
 
 }
@@ -3202,7 +3219,7 @@ sub do_create_makefile_pl {
 
 sub do_create_license {
   my $self = shift;
-  $self->log_info("Creating LICENSE file");
+  $self->log_info("Creating LICENSE file\n");
 
   my $l = $self->license
     or die "No license specified";
@@ -3357,7 +3374,7 @@ sub _write_default_maniskip {
 \B\.svn\b
 \B\.cvsignore$
 
-# Avoid Makemaker generated and utility files.
+# Avoid MakeMaker generated and utility files.
 \bMakefile$
 \bblib
 \bMakeMaker-\d
@@ -3365,7 +3382,7 @@ sub _write_default_maniskip {
 \bblibdirs$
 ^MANIFEST\.SKIP$
 
-# Avoid VMS specific Makmaker generated files
+# Avoid VMS specific MakeMaker generated files
 \bDescrip.MMS$
 \bDESCRIP.MMS$
 \bdescrip.mms$
@@ -3418,7 +3435,7 @@ sub ACTION_manifest {
   ExtUtils::Manifest::mkmanifest();
 }
 
-# Case insenstive regex for files
+# Case insensitive regex for files
 sub file_qr {
     return File::Spec->case_tolerant ? qr($_[0])i : qr($_[0]);
 }
@@ -3466,7 +3483,9 @@ sub script_files {
     return $_ = {$_ => 1};
   }
   
-  return $_ = { map {$_,1} $self->_files_in('bin') };
+  my %pl_files = map { File::Spec->canonpath($_) => 1 }
+                 keys %{ $self->PL_files || {} };
+  return $_ = { map {$_ => 1} grep !$pl_files{$_}, $self->_files_in('bin') };
 }
 BEGIN { *scripts = \&script_files; }
 
@@ -3692,7 +3711,9 @@ sub prepare_metadata {
 
   # add current Module::Build to configure_requires if there 
   # isn't a configure_requires already specified
-  if ( ! $prereq_types{'configure_requires'} ) {
+  if ( $self->dist_name ne 'Module-Build' 
+    && ! $prereq_types{'configure_requires'} 
+  ) {
     for my $t ('configure_requires', 'build_requires') {
       $prereq_types{$t}{'Module::Build'} = $VERSION;
     }
@@ -3761,7 +3782,7 @@ sub find_dist_packages {
   my @pm_files = grep {exists $dist_files{$_}} keys %{ $self->find_pm_files };
 
   # First, we enumerate all packages & versions,
-  # seperating into primary & alternative candidates
+  # separating into primary & alternative candidates
   my( %prime, %alt );
   foreach my $file (@pm_files) {
     next if $dist_files{$file} =~ m{^t/};  # Skip things in t/
@@ -3804,7 +3825,7 @@ sub find_dist_packages {
 
       if ( $result->{err} ) {
 	# Use the selected primary package, but there are conflicting
-	# errors amoung multiple alternative packages that need to be
+	# errors among multiple alternative packages that need to be
 	# reported
         $self->log_warn(
 	  "Found conflicting versions for package '$package'\n" .
@@ -3867,7 +3888,7 @@ sub find_dist_packages {
   return \%prime;
 }
 
-# seperate out some of the conflict resolution logic from
+# separate out some of the conflict resolution logic from
 # $self->find_dist_packages(), above, into a helper function.
 #
 sub _resolve_module_versions {
@@ -4246,10 +4267,8 @@ sub compile_c {
 }
 
 sub link_c {
-  my ($self, $to, $file_base) = @_;
+  my ($self, $spec) = @_;
   my $p = $self->{properties}; # For convenience
-
-  my $spec = $self->_infer_xs_spec($file_base);
 
   $self->add_to_cleanup($spec->{lib_file});
 
@@ -4259,8 +4278,7 @@ sub link_c {
     if $self->up_to_date([$spec->{obj_file}, @$objects],
 			 $spec->{lib_file});
 
-  my $module_name = $self->module_name;
-  $module_name  ||= $spec->{module_name};
+  my $module_name = $spec->{module_name} || $self->module_name;
 
   $self->cbuilder->link(
     module_name => $module_name,
@@ -4440,7 +4458,7 @@ sub process_xs {
   }
 
   # .o -> .(a|bundle)
-  $self->link_c($spec->{archdir}, $file_base);
+  $self->link_c($spec);
 }
 
 sub do_system {
@@ -4525,7 +4543,8 @@ sub up_to_date {
   $source  = [$source]  unless ref $source;
   $derived = [$derived] unless ref $derived;
 
-  return 0 if grep {not -e} @$derived;
+  # empty $derived means $source should always run
+  return 0 if @$source && !@$derived || grep {not -e} @$derived;
 
   my $most_recent_source = time / (24*60*60);
   foreach my $file (@$source) {
