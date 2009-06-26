@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.33_03';
+$VERSION = '0.33_04';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -2077,7 +2077,7 @@ sub ACTION_prereq_data {
 
 sub prereq_data {
   my $self = shift;
-  my @types = @{ $self->prereq_action_types };
+  my @types = ('configure_requires', @{ $self->prereq_action_types } );
   my $info = { map { $_ => $self->$_() } grep { %{$self->$_()} } @types };
   return $info;
 }
@@ -3639,9 +3639,7 @@ sub normalize_version {
   }
   elsif ( ref $version eq 'version' || 
           ref $version eq 'Module::Build::Version' ) { # version objects
-    my $string = $version->stringify;
-    # normalize leading-v: "v1.2" -> "v1.2.0"
-    $version = substr($string,0,1) eq 'v' ? $version->normal : $string;
+    $version = $version->is_qv ? $version->normal : $version->stringify;
   }
   elsif ( $version =~ /^[^v][^.]*\.[^.]+\./ ) { # no leading v, multiple dots
     # normalize string tuples without "v": "1.2.3" -> "v1.2.3"
