@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.33_04';
+$VERSION = '0.33_05';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -824,6 +824,7 @@ sub _make_accessor {
 ########################################################################
 
 # Add the default properties.
+__PACKAGE__->add_property(auto_configure_requires => 1);
 __PACKAGE__->add_property(blib => 'blib');
 __PACKAGE__->add_property(build_class => 'Module::Build');
 __PACKAGE__->add_property(build_elements => [qw(PL support pm xs pod script)]);
@@ -3357,35 +3358,81 @@ sub ACTION_disttest {
       });
 }
 
+
+=begin private
+
+  my $has_include = $build->_eumanifest_has_include;
+
+Returns true if the installed version of ExtUtils::Manifest supports
+#include and #include_default directives.  False otherwise.
+
+=end private
+
+=cut
+
+# #!include and #!include_default were added in 1.50
+sub _eumanifest_has_include {
+    my $self = shift;
+
+    require ExtUtils::Manifest;
+    return ExtUtils::Manifest->VERSION >= 1.50 ? 1 : 0;
+    return 0;
+}
+
+
+=begin private
+
+  my $maniskip_file = $build->_default_maniskip;
+
+Returns the location of the installed MANIFEST.SKIP file used by
+default.
+
+=end private
+
+=cut
+
+sub _default_maniskip {
+    my $self = shift;
+
+    my $default_maniskip;
+    for my $dir (@INC) {
+        $default_maniskip = File::Spec->catfile($dir, "ExtUtils", "MANIFEST.SKIP");
+        last if -r $default_maniskip;
+    }
+
+    return $default_maniskip;
+}
+
+
+=begin private
+
+  my $content = $build->_slurp($file);
+
+Reads $file and returns the $content.
+
+=end private
+
+=cut
+
+sub _slurp {
+    my $self = shift;
+    my $file = shift;
+    open my $fh, "<", $file or croak "Can't open $file: $!";
+    local $/;
+    return <$fh>;
+}
+
+
 sub _write_default_maniskip {
   my $self = shift;
   my $file = shift || 'MANIFEST.SKIP';
   my $fh = IO::File->new("> $file")
     or die "Can't open $file: $!";
 
-  # This is derived from MakeMaker's default MANIFEST.SKIP file with
-  # some new entries
+  my $content = $self->_eumanifest_has_include ? "#!include_default\n"
+                                               : $self->_slurp( $self->_default_maniskip );
 
-  print $fh <<'EOF';
-# Avoid version control files.
-\bRCS\b
-\bCVS\b
-,v$
-\B\.svn\b
-\B\.cvsignore$
-
-# Avoid MakeMaker generated and utility files.
-\bMakefile$
-\bblib
-\bMakeMaker-\d
-\bpm_to_blib$
-\bblibdirs$
-^MANIFEST\.SKIP$
-
-# Avoid VMS specific MakeMaker generated files
-\bDescrip.MMS$
-\bDESCRIP.MMS$
-\bdescrip.mms$
+  $content .= <<'EOF';
 
 # Avoid Module::Build generated and utility files.
 \bBuild$
@@ -3395,30 +3442,15 @@ sub _write_default_maniskip {
 \bBUILD.COM$
 \bbuild.com$
 
-# Avoid Devel::Cover generated files
-\bcover_db
-
-# Avoid temp and backup files.
-~$
-\.tmp$
-\.old$
-\.bak$
-\#$
-\.#
-\.rej$
-
-# Avoid OS-specific files/dirs
-#   Mac OSX metadata
-\B\.DS_Store
-#   Mac OSX SMB mount metadata files
-\B\._
 # Avoid archives of this distribution
 EOF
 
   # Skip, for example, 'Module-Build-0.27.tar.gz'
-  print $fh '\b'.$self->dist_name.'-[\d\.\_]+'."\n";
+  $content .= '\b'.$self->dist_name.'-[\d\.\_]+'."\n";
 
-  $fh->close();
+  print $fh $content;
+
+  return;
 }
 
 sub ACTION_manifest {
@@ -3687,15 +3719,6 @@ sub prepare_metadata {
     # XXX we are silently omitting the url for any unknown license
   }
 
-  if (exists $p->{configure_requires}) {
-    foreach my $spec (keys %{$p->{configure_requires}}) {
-      warn ("Warning: $spec is listed in 'configure_requires', but ".
-            "it is not found in any of the other prereq fields.\n")
-        unless grep exists $p->{$_}{$spec}, 
-              grep !/conflicts$/, @{$self->prereq_action_types};
-    }
-  }
-
   # copy prereq data structures so we can modify them before writing to META
   my %prereq_types;
   for my $type ( 'configure_requires', @{$self->prereq_action_types} ) {
@@ -3708,13 +3731,12 @@ sub prepare_metadata {
   }
 
   # add current Module::Build to configure_requires if there 
-  # isn't a configure_requires already specified
+  # isn't one already specified (but not ourself, so we're not circular)
   if ( $self->dist_name ne 'Module-Build' 
-    && ! $prereq_types{'configure_requires'} 
+    && $self->auto_configure_requires
+    && ! exists $prereq_types{'configure_requires'}{'Module::Build'}
   ) {
-    for my $t ('configure_requires', 'build_requires') {
-      $prereq_types{$t}{'Module::Build'} = $VERSION;
-    }
+    $prereq_types{configure_requires}{'Module::Build'} = $VERSION;
   }
 
   for my $t ( keys %prereq_types ) {
