@@ -549,6 +549,10 @@ OPTIONS
         invoked when building the distribution (i.e. when the "Build.PL"
         script was first run). Use with caution.
 
+    debug
+        Prints Module::Build debugging information to STDOUT, such as a
+        trace of executed build actions.
+
   Default Options File (.modulebuildrc)
     [version 0.28]
 
