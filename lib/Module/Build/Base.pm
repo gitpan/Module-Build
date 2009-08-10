@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.340201';
+$VERSION = '0.34_05';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -3754,7 +3754,8 @@ sub prepare_metadata {
     && $self->auto_configure_requires
     && ! exists $prereq_types{'configure_requires'}{'Module::Build'}
   ) {
-    $prereq_types{configure_requires}{'Module::Build'} = $VERSION;
+    (my $ver = $VERSION) =~ s/^(\d+\.\d\d).*$/$1/; # last major release only
+    $prereq_types{configure_requires}{'Module::Build'} = $ver;
   }
 
   for my $t ( keys %prereq_types ) {
@@ -3976,7 +3977,10 @@ sub make_tarball {
     $self->do_system($self->split_like_shell($self->{args}{tar}), $tar_flags, "$file.tar", $dir);
     $self->do_system($self->split_like_shell($self->{args}{gzip}), "$file.tar") if $self->{args}{gzip};
   } else {
-    require Archive::Tar;
+    eval { require Archive::Tar && Archive::Tar->VERSION(1.08); 1 }
+      or die "You must install Archive::Tar to make a distribution tarball\n".
+             "or specify a binary tar program with the '--tar' option.\n".
+             "See the documentation for the 'dist' action.\n";
 
     # Archive::Tar versions >= 1.09 use the following to enable a compatibility
     # hack so that the resulting archive is compatible with older clients.

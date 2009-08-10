@@ -74,5 +74,3 @@ t/use_tap_harness.t
 t/versions.t
 t/write_default_maniskip.t
 t/xs.t
-SIGNATURE    Added here by Module::Build
-SIGNATURE    Added here by Module::Build
