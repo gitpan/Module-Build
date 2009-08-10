@@ -1,30 +1,15 @@
 Revision history for Perl extension Module::Build.
 
-0.34_04 - Sat Aug  8 11:02:24 EDT 2009
+0.340201 - Sun Aug  9 22:11:04 EDT 2009
 
  Other:
- - Added documentation warning that 'get_options' should be capitalized
-   to avoid conflicting with future Module::Build options and changed
-   the examples accordingly.
-
-0.34_03 - Sat Aug  8 07:39:16 EDT 2009
-
- Bug fixes:
- - Fixed failing xs.t if /tmp is mounted noexec (RT#47331) [David Golden]
- - Fixed failing debug.t on VMS (RT#48362) [Craig Berry]
- - Prevent par.t from dying on error in .zip extraction [David Golden]
- - Fixed potential runthrough.t failure on 5.6.2 [David Golden]
-
- Other:
- - Archive::Tar changed from 'requires' to 'recommends' so non-authors
-   without IO::Zlib can still use Module::Build to install modules
-   [reported by Matt Trout, fix by David Golden]
+ - Version bump for Perl core for 5.10.1 release; no other changes
 
 0.34_02 - Sun Jul 26 22:50:40 EDT 2009
 
  Bug-fixes:
  - Bundled Module::Build::Version updated to bring into sync with CPAN
-   version.pm 0.77 [John Peacock]
+   version.pm 0.77
 
 0.34_01 - Sat Jul 18 16:32:09 EDT 2009
 
