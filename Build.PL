@@ -49,6 +49,7 @@ my $build = Module::Build->new(
     'Module::Signature'  => 0.21,
     'version'            => 0.74,
   },
+  recursive_test_files => 1,
   sign          => 1,
   create_readme => 1,
   create_license => 1,

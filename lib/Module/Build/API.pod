@@ -1812,8 +1812,6 @@ accessor methods for the following properties:
 
 =item install_base()
 
-=item install_sets()
-
 =item installdirs()
 
 =item libdoc_dirs()
@@ -1833,8 +1831,6 @@ accessor methods for the following properties:
 =item module_name()
 
 =item orig_dir()
-
-=item original_prefix()
 
 =item perl()
 
