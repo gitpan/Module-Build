@@ -25,8 +25,7 @@ if ( $Config{make} && $^O ne 'VMS' ? find_in_path($Config{make}) : 1 ) {
 
 my $is_vms_mms = ($^O eq 'VMS') && ($Config{make} =~ /MM[SK]/i);
 
-use_ok 'Module::Build';
-ensure_blib('Module::Build');
+blib_load('Module::Build');
 
 
 #########################
@@ -43,8 +42,8 @@ $dist->chdir_in;
 
 #########################
 
-use Module::Build;
-use Module::Build::Compat;
+blib_load('Module::Build');
+blib_load('Module::Build::Compat');
 
 use Carp;  $SIG{__WARN__} = \&Carp::cluck;
 
@@ -299,12 +298,18 @@ ok $mb, "Module::Build->new_from_context";
 
   create_makefile_pl('traditional', $mb);
   my $args = extract_writemakefile_args() || {};
-  is $args->{TESTS}, 
-    join( q{ }, 
-      File::Spec->catfile(qw(t *.t)),
-      File::Spec->catfile(qw(t deep *.t))
-    ),
-    'Makefile.PL has correct TESTS line for recursive test files';
+
+  if ( exists $args->{test}->{TESTS} ) {
+    is $args->{test}->{TESTS},
+      join( q{ },
+        File::Spec->catfile(qw(t *.t)),
+        File::Spec->catfile(qw(t deep *.t))
+      ),
+      'Makefile.PL has correct TESTS line for recursive test files';
+  } else {
+    ok( ! exists $args->{TESTS}, 'Not using incorrect recursive tests key' );
+  }
+
 }
 
 # cleanup
@@ -472,7 +477,8 @@ sub extract_writemakefile_args {
 }
 
 sub create_makefile_pl {
-    Module::Build::Compat->create_makefile_pl(@_);
+    my @args = @_;
+    stdout_of( sub { Module::Build::Compat->create_makefile_pl(@args) } );
     my $ok = ok -e 'Makefile.PL', "$_[0] Makefile.PL created";
 
     # Some really conservative make's, like HP/UX, assume files with the same

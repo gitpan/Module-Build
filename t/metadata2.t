@@ -2,14 +2,12 @@
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 20;
+use MBTest tests => 18;
 
-use_ok 'Module::Build';
-ensure_blib('Module::Build');
+blib_load('Module::Build');
+blib_load('Module::Build::ConfigData');
 
 my $tmp = MBTest->tmpdir;
-
-use Module::Build::ConfigData;
 use DistGen;
 
 
@@ -26,7 +24,8 @@ SKIP: {
 
   ok ! -e 'MANIFEST';
 
-  my $mb = Module::Build->new_from_context;
+  my $mb;
+  stderr_of( sub { $mb = Module::Build->new_from_context } );
 
   my $out;
   $out = eval { stderr_of(sub{$mb->dispatch('distmeta')}) };

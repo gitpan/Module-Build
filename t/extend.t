@@ -2,10 +2,9 @@
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 66;
+use MBTest tests => 64;
 
-use_ok 'Module::Build';
-ensure_blib('Module::Build');
+blib_load('Module::Build');
 
 my $tmp = MBTest->tmpdir;
 
@@ -79,7 +78,7 @@ print "Hello, World!\n";
 
   $mb->add_build_element('foo');
   $mb->add_build_element('foo');
-  is_deeply $mb->build_elements, [qw(PL support pm xs pod script foo)],
+  is_deeply $mb->build_elements, [qw(PL support pm xs share_dir pod script foo)],
       'The foo element should be in build_elements only once';
 
   $mb->dispatch('build');

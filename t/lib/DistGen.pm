@@ -428,7 +428,9 @@ sub remove_file {
 }
 
 sub change_build_pl {
-  my ($self, $opts) = @_;
+  my ($self, @opts) = @_;
+
+  my $opts = ref $opts[0] eq 'HASH' ? $opts[0] : { @opts };
 
   local $Data::Dumper::Terse = 1;
   (my $args = Dumper($opts)) =~ s/^\s*\{|\}\s*$//g;
@@ -488,6 +490,12 @@ sub chdir_original {
   chdir_all($dir) or die "Can't chdir to '$dir': $!";
 }
 ########################################################################
+
+sub new_from_context {
+  my ($self, @args) = @_;
+  require Module::Build;
+  return Module::Build->new_from_context( quiet => 1, @args );
+}
 
 sub run_build_pl {
   my ($self, @args) = @_;
