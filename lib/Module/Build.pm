@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.35_01';
+$VERSION = '0.35_02';
 $VERSION = eval $VERSION;
 
 # Okay, this is the brute-force method of finding out what kind of
@@ -167,24 +167,24 @@ This illustrates initial configuration and the running of three
 'actions'.  In this case the actions run are 'build' (the default
 action), 'test', and 'install'.  Other actions defined so far include:
 
-  build                          manpages    
-  clean                          pardist     
-  code                           ppd         
-  config_data                    ppmdist     
-  diff                           prereq_data 
-  dist                           prereq_report
-  distcheck                      pure_install
-  distclean                      realclean   
-  distdir                        retest      
-  distmeta                       skipcheck   
-  distsign                       test        
-  disttest                       testall     
-  docs                           testcover   
-  fakeinstall                    testdb      
-  help                           testpod     
-  html                           testpodcoverage
-  install                        versioninstall
-  manifest                                   
+  build                          manifest    
+  clean                          manpages    
+  code                           pardist     
+  config_data                    ppd         
+  diff                           ppmdist     
+  dist                           prereq_data 
+  distcheck                      prereq_report
+  distclean                      pure_install
+  distdir                        realclean   
+  distmeta                       retest      
+  distsign                       skipcheck   
+  disttest                       test        
+  docs                           testall     
+  fakeinstall                    testcover   
+  help                           testdb      
+  html                           testpod     
+  install                        testpodcoverage
+  installdeps                    versioninstall
 
 
 You can run the 'help' action for a complete list of actions.
@@ -444,6 +444,24 @@ do so:
 This can be a good idea, as it helps prevent multiple versions of a
 module from being present on your system, which can be a confusing
 situation indeed.
+
+=item installdeps
+
+[version 0.36]
+
+This action will use the C<cpan_client> parameter as a command to install
+missing prerequisites.  You will be prompted whether to install
+optional dependencies.
+
+The C<cpan_client> option defaults to 'cpan' but can be set as an option or in
+F<.modulebuildrc>.  It must be a shell command that takes a list of modules to
+install as arguments (e.g. 'cpanp -i' for CPANPLUS).  If the program part is a
+relative path (e.g. 'cpan' or 'cpanp'), it will be located relative to the perl
+program that executed Build.PL.
+
+  /opt/perl/5.8.9/bin/perl Build.PL
+  ./Build installdeps --cpan_client 'cpanp -i'
+  # installs to 5.8.9
 
 =item manifest
 
@@ -731,14 +749,19 @@ C<no> or C<no-> (e.g. C<--noverbose> or C<--no-verbose>).
 
 Suppress informative messages on output.
 
+=item verbose
+
+Display extra information about the Build on output.
+
+=item cpan_client
+
+Sets the C<cpan_client> command for use with the C<installdeps> action.
+See C<installdeps> for more details.
+
 =item use_rcfile
 
 Load the F<~/.modulebuildrc> option file.  This option can be set to
 false to prevent the custom resource file from being loaded.
-
-=item verbose
-
-Display extra information about the Build on output.
 
 =item allow_mb_mismatch
 
@@ -782,10 +805,11 @@ key C<*> (asterisk) denotes any global options that should be applied
 to all actions, and the key 'Build_PL' specifies options to be applied
 when you invoke C<perl Build.PL>.
 
-  *        verbose=1   # global options
-  diff     flags=-u
-  install  --install_base /home/ken
-           --install_path html=/home/ken/docs/html
+  *           verbose=1   # global options
+  diff        flags=-u
+  install     --install_base /home/ken
+              --install_path html=/home/ken/docs/html
+  installdeps --cpan_client 'cpanp -i'
 
 If you wish to locate your resource file in a different location, you
 can set the environment variable C<MODULEBUILDRC> to the complete

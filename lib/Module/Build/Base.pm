@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.35_01';
+$VERSION = '0.35_02';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -23,6 +23,7 @@ use Text::ParseWords ();
 use Module::Build::ModuleInfo;
 use Module::Build::Notes;
 use Module::Build::Config;
+use Module::Build::Version;
 
 
 #################### Constructors ###########################
@@ -36,6 +37,7 @@ sub new {
     if $self->{action} && $self->{action} ne 'Build_PL';
 
   $self->check_manifest;
+  $self->auto_require;
   $self->check_prereq;
   $self->check_autofeatures;
 
@@ -91,17 +93,7 @@ sub resume {
 sub new_from_context {
   my ($package, %args) = @_;
   
-  # XXX Read the META.yml and see whether we need to run the Build.PL?
-  
-  # Run the Build.PL.  We use do() rather than run_perl_script() so
-  # that it runs in this process rather than a subprocess, because we
-  # need to make sure that the environment is the same during Build.PL
-  # as it is during resume() (and thereafter).
-  {
-    local @ARGV = $package->unparse_args(\%args);
-    do './Build.PL';
-    die $@ if $@;
-  }
+  $package->run_perl_script('Build.PL',[],[$package->unparse_args(\%args)]);
   return $package->resume;
 }
 
@@ -681,10 +673,10 @@ sub ACTION_config_data {
 
   sub valid_properties_defaults {
     my %out;
-    for (reverse shift->_mb_classes) {
-      @out{ keys %{ $valid_properties{$_} } } = map {
+    for my $class (reverse shift->_mb_classes) {
+      @out{ keys %{ $valid_properties{$class} } } = map {
         $_->()
-      } values %{ $valid_properties{$_} };
+      } values %{ $valid_properties{$class} };
     }
     return \%out;
   }
@@ -710,9 +702,11 @@ sub ACTION_config_data {
     my %p = @_ == 1 ? ( default => shift ) : @_;
 
     my $type = ref $p{default};
-    $valid_properties{$class}{$property} = $type eq 'CODE'
-      ? $p{default}
-      : sub { $p{default} };
+    $valid_properties{$class}{$property} = 
+      $type eq 'CODE' ? $p{default}                           :
+      $type eq 'HASH' ? sub { return { %{ $p{default} } }   } :
+      $type eq 'ARRAY'? sub { return [ @{ $p{default} } ]   } :
+                        sub { return $p{default}            } ;
 
     push @{$additive_properties{$class}->{$type}}, $property
       if $type;
@@ -846,6 +840,7 @@ __PACKAGE__->add_property(allow_mb_mismatch => 0);
 __PACKAGE__->add_property(config => undef);
 __PACKAGE__->add_property(test_file_exts => ['.t']);
 __PACKAGE__->add_property(use_tap_harness => 0);
+__PACKAGE__->add_property(cpan_client => 'cpan');
 __PACKAGE__->add_property(tap_harness_args => {});
 __PACKAGE__->add_property(
   'installdirs',
@@ -911,6 +906,7 @@ __PACKAGE__->add_property($_) for qw(
   magic_number
   mb_version
   module_name
+  needs_compiler
   orig_dir
   perl
   pm_files
@@ -1205,6 +1201,58 @@ sub check_autofeatures {
   $self->log_warn("\n") unless $self->quiet;
 }
 
+# Automatically detect and add prerequisites based on configuration
+sub auto_require {
+  my ($self) = @_;
+  my $p = $self->{properties};
+
+  # add current Module::Build to configure_requires if there 
+  # isn't one already specified (but not ourself, so we're not circular)
+  if ( $self->dist_name ne 'Module-Build' 
+    && $self->auto_configure_requires
+    && ! exists $p->{configure_requires}{'Module::Build'}
+  ) {
+    (my $ver = $VERSION) =~ s/^(\d+\.\d\d).*$/$1/; # last major release only
+    $self->_add_prereq('configure_requires', 'Module::Build', $ver);
+  }
+
+  # If needs_compiler is not explictly set, automatically set it
+  # If set, we need ExtUtils::CBuilder (and a compiler)
+  my $xs_files = $self->find_xs_files;
+  if ( ! defined $p->{needs_compiler} ) {
+    $self->needs_compiler( keys %$xs_files || defined $self->c_source );
+  }
+  if ($self->needs_compiler) {
+    $self->_add_prereq('build_requires', 'ExtUtils::CBuilder', 0);
+    if ( ! $self->have_c_compiler ) {
+      $self->log_warn(<<'EOM');
+Warning: ExtUtils::CBuilder not installed or no compiler detected
+Proceeding with configuration, but compilation may fail during Build
+
+EOM
+    }
+  }
+
+  # If using share_dir, require File::ShareDir
+  if ( $self->share_dir ) {
+    $self->_add_prereq( 'requires', 'File::ShareDir', '1.00' );
+  }
+
+  return;
+}
+
+sub _add_prereq {
+  my ($self, $type, $module, $version) = @_;
+  my $p = $self->{properties};
+  $version = 0 unless defined $version;
+  if ( exists $p->{$type}{$module} ) {
+    return if $self->compare_versions( $version, '<=', $p->{$type}{$module} );
+  }
+  $self->log_info("Adding to $type\: $module => $version\n");
+  $p->{$type}{$module} = $version;
+  return 1;
+}
+  
 sub prereq_failures {
   my ($self, $info) = @_;
 
@@ -1255,14 +1303,6 @@ sub _enum_prereqs {
 sub check_prereq {
   my $self = shift;
 
-  # If we have XS files, make sure we can process them.
-  my $xs_files = $self->find_xs_files;
-  if (keys %$xs_files && !$self->_mb_feature('C_support')) {
-    $self->log_warn("Warning: this distribution contains XS files, ".
-		    "but Module::Build is not configured with C_support.  ".
-		    "Please install ExtUtils::CBuilder to enable C_support.\n");
-  }
-
   # Check to see if there are any prereqs to check
   my $info = $self->_enum_prereqs;
   return 1 unless $info;
@@ -1286,6 +1326,12 @@ ERRORS/WARNINGS FOUND IN PREREQUISITES.  You may wish to install the versions
 of the modules indicated above before proceeding with this installation
 
 EOF
+    unless ( $ENV{PERL5_CPANPLUS_IS_RUNNING} || $ENV{PERL5_CPAN_IS_RUNNING} ) {
+      $self->log_info(
+        "Run 'Build installdeps' to install missing prerequisites.\n\n"
+      );
+    }
+
     return 0;
 
   } else {
@@ -1703,6 +1749,7 @@ sub _translate_option {
     use_rcfile
     use_tap_harness
     tap_harness_args
+    cpan_client
   ); # normalize only selected option names
 
   return $opt;
@@ -2287,7 +2334,9 @@ sub do_tests {
     my $args = $self->tap_harness_args;
     if($self->use_tap_harness or ($args and %$args)) {
       my $aggregate = $self->run_tap_harness($tests);
-      $self->_tap_harness_exit($aggregate) if $aggregate->has_errors;
+      if ( $aggregate->has_errors ) {
+        die "Errors in testing.  Cannot continue.\n";
+      }
     }
     else {
       $self->run_test_harness($tests);
@@ -2315,28 +2364,6 @@ sub run_tap_harness {
   })->runtests(@$tests);
 
   return $aggregate;
-}
-
-# Emulate death on failure behavior of Test::Harness
-sub _tap_harness_exit {
-  my ($self, $aggregate) = @_;
-
-  my $total  = $aggregate->total;
-  my $passed = $aggregate->passed;
-  my $failed = $aggregate->failed;
-
-  my @parsers = $aggregate->parsers;
-
-  my $num_bad = 0;
-  for my $parser (@parsers) {
-    $num_bad++ if $parser->has_problems;
-  }
-
-  die(sprintf(
-      "Failed %d/%d test programs. %d/%d subtests failed.\n",
-      $num_bad, scalar @parsers, $failed, $total
-    )
-  ) if $num_bad;
 }
 
 sub run_test_harness {
@@ -2491,8 +2518,6 @@ sub process_share_dir_files {
   my $files = $self->_find_share_dir_files;
   return unless $files;
 
-  # XXX need to add File::ShareDir as 'requires'
-  
   # root for all File::ShareDir paths
   my $share_prefix = File::Spec->catdir($self->blib, qw/lib auto share/);
 
@@ -3105,6 +3130,60 @@ sub ACTION_versioninstall {
   my %onlyargs = map {exists($self->{args}{$_}) ? ($_ => $self->{args}{$_}) : ()}
     qw(version versionlib);
   only::install::install(%onlyargs);
+}
+
+sub ACTION_installdeps {
+  my ($self) = @_;
+
+  # XXX include feature prerequisites as optional prereqs?
+
+  my $info = $self->_enum_prereqs;
+  if (! $info ) {
+    $self->log_info( "No prerequisites detected\n" );
+    return;
+  }
+
+  my $failures = $self->prereq_failures($info);
+  if ( ! $failures ) {
+    $self->log_info( "All prerequisites satisfied\n" );
+    return;
+  }
+
+  my @install;
+  while (my ($type, $prereqs) = each %$failures) {
+    if($type =~ m/^(?:\w+_)?requires$/) {
+      push(@install, keys %$prereqs);
+      next;
+    }
+    $self->log_info("Checking optional dependencies:\n");
+    while (my ($module, $status) = each %$prereqs) {
+      push(@install, $module) if($self->y_n("Install $module?", 'y'));
+    }
+  }
+
+  return unless @install;
+
+  my ($command, @opts) = $self->split_like_shell($self->cpan_client);
+
+  # relative command should be relative to our active Perl
+  # so we need to locate that command
+  if ( ! File::Spec->file_name_is_absolute( $command ) ) {
+    my @bindirs = File::Basename::dirname($self->perl);
+    push @bindirs, map {$self->config->{"install${_}bin"}} '','site','vendor';
+    for my $d ( @bindirs ) {
+      my $abs_cmd = File::Spec->catfile( $d, $command );
+      if ( -x $abs_cmd ) {
+        $command = $abs_cmd;
+        last;
+      }
+    }
+  }
+
+  if ( ! -x $command ) {
+    die "cpan_client '$command' is not executable\n";
+  }
+
+  $self->do_system($command, @opts, @install);
 }
 
 sub ACTION_clean {
@@ -3939,16 +4018,6 @@ sub prepare_metadata {
     }
   }
 
-  # add current Module::Build to configure_requires if there 
-  # isn't one already specified (but not ourself, so we're not circular)
-  if ( $self->dist_name ne 'Module-Build' 
-    && $self->auto_configure_requires
-    && ! exists $prereq_types{'configure_requires'}{'Module::Build'}
-  ) {
-    (my $ver = $VERSION) =~ s/^(\d+\.\d\d).*$/$1/; # last major release only
-    $prereq_types{configure_requires}{'Module::Build'} = $ver;
-  }
-
   for my $t ( keys %prereq_types ) {
       $add_node->($t, $prereq_types{$t});
   }
@@ -4517,19 +4586,23 @@ sub have_c_compiler {
   my ($self) = @_;
   
   my $p = $self->{properties};
-  return $p->{have_compiler} if defined $p->{have_compiler};
+  return $p->{_have_c_compiler} if defined $p->{_have_c_compiler};
   
   $self->log_verbose("Checking if compiler tools configured... ");
   my $b = eval { $self->cbuilder };
-  my $have = $b && $b->have_compiler;
+  my $have = $b && eval { $b->have_compiler };
   $self->log_verbose($have ? "ok.\n" : "failed.\n");
-  return $p->{have_compiler} = $have;
+  return $p->{_have_c_compiler} = $have;
 }
 
 sub compile_c {
   my ($self, $file, %args) = @_;
-  my $b = $self->cbuilder;
 
+  if ( ! $self->have_c_compiler ) {
+    die "Error: no compiler detected to compile '$file'.  Aborting\n";
+  }
+
+  my $b = $self->cbuilder;
   my $obj_file = $b->object_file($file);
   $self->add_to_cleanup($obj_file);
   return $obj_file if $self->up_to_date($file, $obj_file);
@@ -4590,7 +4663,7 @@ sub compile_xs {
         'ExtUtils::typemap', \@INC
     );
     my $lib_typemap = Module::Build::ModuleInfo->find_module_by_name(
-        'typemap', [File::Basename::dirname($file)]
+        'typemap', [File::Basename::dirname($file), File::Spec->rel2abs('.')]
     );
     push @typemaps, $lib_typemap if $lib_typemap;
     @typemaps = map {+'-typemap', $_} @typemaps;
@@ -4741,7 +4814,7 @@ sub process_xs {
 
 sub do_system {
   my ($self, @cmd) = @_;
-  $self->log_info("@cmd\n");
+  $self->log_verbose("@cmd\n");
 
   # Some systems proliferate huge PERL5LIBs, try to ameliorate:
   my %seen;

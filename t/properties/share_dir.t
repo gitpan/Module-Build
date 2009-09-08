@@ -9,7 +9,7 @@ use File::Spec::Functions qw/catdir catfile/;
 # Begin testing
 #--------------------------------------------------------------------------#
 
-plan tests => 19;
+plan tests => 21;
 
 blib_load('Module::Build');
 
@@ -21,10 +21,7 @@ my $tmp = MBTest->tmpdir;
 
 use DistGen;
 my $dist = DistGen->new( dir => $tmp, name => 'Simple::Share' );
-
 $dist->regen;
-END{ $dist->remove }
-
 $dist->chdir_in;
 
 #--------------------------------------------------------------------------#
@@ -37,6 +34,9 @@ my $mb = $dist->new_from_context;
 ok( $mb, "Created Module::Build object" );
 is( $mb->share_dir, undef,
   "default share undef if no 'share' dir exists"
+);
+ok( ! exists $mb->{properties}{requires}{'File::ShareDir'},
+  "File::ShareDir not added to 'requires'"
 );
 
 # Add 'share' dir and an 'other' dir and content
@@ -51,9 +51,12 @@ ok( -e catfile(qw/share foo.txt/), "Created 'share' directory" );
 ok( -e catfile(qw/other share bar.txt/), "Created 'other/share' directory" );
 
 # Check default when share_dir is not given
-$mb = $dist->new_from_context;
+stdout_stderr_of( sub { $mb = $dist->new_from_context });
 is_deeply( $mb->share_dir, { dist => [ 'share' ] },
   "Default share_dir set as dist-type share"
+);
+is( $mb->{properties}{requires}{'File::ShareDir'}, '1.00', 
+  "File::ShareDir 1.00 added to 'requires'"
 );
 
 # share_dir set to scalar
@@ -65,7 +68,7 @@ $dist->change_build_pl(
   }
 );
 $dist->regen;
-$mb = $dist->new_from_context;
+stdout_stderr_of( sub { $mb = $dist->new_from_context });
 is_deeply( $mb->share_dir, { dist => [ 'share' ] },
   "Scalar share_dir set as dist-type share"
 );
@@ -79,7 +82,7 @@ $dist->change_build_pl(
   }
 );
 $dist->regen;
-$mb = $dist->new_from_context;
+stdout_stderr_of( sub { $mb = $dist->new_from_context });
 is_deeply( $mb->share_dir, { dist => [ 'share' ] },
   "Arrayref share_dir set as dist-type share"
 );
@@ -93,7 +96,7 @@ $dist->change_build_pl(
   }
 );
 $dist->regen;
-$mb = $dist->new_from_context;
+stdout_stderr_of( sub { $mb = $dist->new_from_context });
 is_deeply( $mb->share_dir, { dist => [ 'share' ] },
   "Hashref share_dir w/ scalar dist set as dist-type share"
 );
@@ -107,7 +110,7 @@ $dist->change_build_pl(
   }
 );
 $dist->regen;
-$mb = $dist->new_from_context;
+stdout_stderr_of( sub { $mb = $dist->new_from_context });
 is_deeply( $mb->share_dir, { dist => [ 'share' ] },
   "Hashref share_dir w/ arrayref dist set as dist-type share"
 );
@@ -124,7 +127,7 @@ $dist->change_build_pl(
   }
 );
 $dist->regen;
-$mb = $dist->new_from_context;
+stdout_stderr_of( sub { $mb = $dist->new_from_context });
 is_deeply( $mb->share_dir, 
   { dist => [ 'share' ], 
     module => { $dist->name => ['other/share']  },
@@ -144,7 +147,7 @@ $dist->change_build_pl(
   }
 );
 $dist->regen;
-$mb = $dist->new_from_context;
+stdout_stderr_of( sub { $mb = $dist->new_from_context });
 is_deeply( $mb->share_dir, 
   { dist => [ 'share' ], 
     module => { $dist->name => ['other/share']  },
@@ -176,7 +179,7 @@ ok( -d 'blib/lib/auto/share', "blib/lib/auto/share exists" );
 my $share_list = Module::Build->rscan_dir('blib/lib/auto/share', sub {-f});
 
 is_deeply( 
-  $share_list, [ 
+  [ sort @$share_list ], [ 
     'blib/lib/auto/share/dist/Simple-Share/foo.txt',
     'blib/lib/auto/share/module/Simple-Share/bar.txt',
   ], 
@@ -199,7 +202,7 @@ $share_list = Module::Build->rscan_dir(
 );
 
 is_deeply( 
-  $share_list, [ 
+  [ sort @$share_list ], [ 
     "$temp_install/lib/perl5/auto/share/dist/Simple-Share/foo.txt",
     "$temp_install/lib/perl5/auto/share/module/Simple-Share/bar.txt",
   ], 
