@@ -4,9 +4,10 @@
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 16;
+use MBTest tests => 18;
 
-blib_load('Module::Build');
+use_ok 'Module::Build';
+ensure_blib('Module::Build');
 
 my $tmp = MBTest->tmpdir;
 
@@ -110,3 +111,6 @@ SKIP: {
     like( run_sample( $p => "~$me/foo")->$p(),  qr($expected)i );
 }
 
+
+# cleanup
+$dist->remove;

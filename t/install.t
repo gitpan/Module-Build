@@ -2,9 +2,10 @@
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 34;
+use MBTest tests => 36;
 
-blib_load('Module::Build');
+use_ok 'Module::Build';
+ensure_blib('Module::Build');
 
 use Config;
 use Cwd ();
@@ -224,7 +225,10 @@ Simple Man <simple@example.com>
   is keys %$pms, 0;
 
   # revert to pristine state
-  $dist->regen( clean => 1 );
+  $dist->remove;
+  $dist = DistGen->new( dir => $tmp );
+  $dist->regen;
+  $dist->chdir_in;
 }
 
 sub strip_volume {
@@ -239,3 +243,6 @@ sub file_exists {
   ok -e $file or diag("Expected $file to exist, but it doesn't");
 }
 
+
+# cleanup
+$dist->remove;

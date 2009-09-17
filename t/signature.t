@@ -6,7 +6,7 @@ use MBTest;
 
 if ( $ENV{TEST_SIGNATURE} ) {
   if ( have_module( 'Module::Signature' ) ) {
-    plan tests => 13;
+    plan tests => 15;
   } else {
     plan skip_all => '$ENV{TEST_SIGNATURE} is set, but Module::Signature not found';
   }
@@ -14,7 +14,8 @@ if ( $ENV{TEST_SIGNATURE} ) {
   plan skip_all => '$ENV{TEST_SIGNATURE} is not set';
 }
 
-blib_load('Module::Build');
+use_ok 'Module::Build';
+ensure_blib('Module::Build');
 
 #########################
 
@@ -98,3 +99,5 @@ $dist->chdir_in;
     ok -e 'SIGNATURE', 'Build.PL --sign=1 signs';
 }
 
+# cleanup
+$dist->remove;

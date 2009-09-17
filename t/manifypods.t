@@ -3,14 +3,15 @@
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
 use MBTest;
-blib_load('Module::Build');
-blib_load('Module::Build::ConfigData');
+use Module::Build;
+use Module::Build::ConfigData;
 
 if ( Module::Build::ConfigData->feature('manpage_support') ) {
-  plan tests => 21;
+  plan tests => 22;
 } else {
   plan skip_all => 'manpage_support feature is not enabled';
 }
+ensure_blib('Module::Build');
 
 
 #########################
@@ -138,7 +139,11 @@ $mb->dispatch('realclean');
 
 
 # revert to a pristine state
-$dist->regen( clean => 1 );
+$dist->remove;
+$dist = DistGen->new( dir => $tmp );
+$dist->regen;
+$dist->chdir_in;
+
 
 my $mb2 = Module::Build->new(
   module_name => $dist->name,
@@ -158,3 +163,6 @@ foreach ('testcover', 'disttest') {
   unlike $docs, qr/\n=/, $docs;
 }
 
+
+# cleanup
+$dist->remove;

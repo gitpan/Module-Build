@@ -2,9 +2,10 @@
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 11;
+use MBTest tests => 13;
 
-blib_load('Module::Build');
+use_ok 'Module::Build';
+ensure_blib('Module::Build');
 
 my $tmp = MBTest->tmpdir;
 
@@ -64,3 +65,6 @@ $mb = Module::Build->resume;
 ok $mb;
 is $mb->notes('foo'), 'bar';
 
+
+# cleanup
+$dist->remove;

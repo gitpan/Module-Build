@@ -9,9 +9,10 @@ BEGIN {
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 7;
+use MBTest tests => 9;
 
-blib_load('Module::Build');
+use_ok 'Module::Build';
+ensure_blib('Module::Build');
 
 my $tmp = MBTest->tmpdir;
 
@@ -70,5 +71,7 @@ my $output = uc(stdout_of(
 like($output, qr/\.\. ?OK/);
 
 is($::x, 3, "called a third time");
+
+$dist->remove;
 
 # vim:ts=4:sw=4:et:sta

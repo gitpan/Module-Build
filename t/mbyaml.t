@@ -4,7 +4,8 @@ use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
 use MBTest 'no_plan';
 
-blib_load('Module::Build::YAML');
+use_ok 'Module::Build::YAML';
+ensure_blib('Module::Build::YAML');
 
 my ($dir);
 $dir = ".";

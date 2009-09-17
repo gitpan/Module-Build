@@ -2,9 +2,10 @@
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 58;
+use MBTest tests => 60;
 
-blib_load('Module::Build');
+use_ok 'Module::Build';
+ensure_blib('Module::Build');
 
 my $tmp = MBTest->tmpdir;
 
@@ -162,7 +163,10 @@ $dist->chdir_in;
   is $args{foo}, 1;
 
   # revert test distribution to pristine state because we modified a file
-  $dist->regen( clean => 1 );
+  $dist->remove;
+  $dist = DistGen->new( dir => $tmp );
+  $dist->regen;
+  $dist->chdir_in;
 }
 
 # Test author stuff
@@ -232,3 +236,5 @@ $dist->chdir_in;
   is_deeply $mb->include_dirs, ['/foo'], 'Should have single include dir';
 }
 
+# cleanup
+$dist->remove;

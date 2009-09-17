@@ -4,7 +4,7 @@ use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
 use MBTest tests => 8;
 use DistGen;
-blib_load('Module::Build');
+use Module::Build;
 
 my $dist;
 

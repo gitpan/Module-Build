@@ -3,10 +3,11 @@
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
 use MBTest;
+
+use Module::Build;
+use Module::Build::ConfigData;
 use Config;
 
-blib_load('Module::Build');
-blib_load('Module::Build::ConfigData');
 my $manpage_support = Module::Build::ConfigData->feature('manpage_support');
 my $HTML_support = Module::Build::ConfigData->feature('HTML_support');
 
@@ -25,12 +26,14 @@ my $HTML_support = Module::Build::ConfigData->feature('HTML_support');
   } elsif ( $^O eq 'VMS' ) {
     plan skip_all => "Needs porting work on VMS";
   } else {
-    plan tests => 12;
+    plan tests => 13;
   }
 }
+ensure_blib('Module::Build');
 
 
 my $tmp = MBTest->tmpdir;
+
 
 use DistGen;
 my $dist = DistGen->new( dir => $tmp, xs => 1 );
@@ -63,6 +66,7 @@ $dist->chdir_in;
 
 use File::Spec::Functions qw(catdir);
 
+use Module::Build;
 my @installstyle = qw(lib perl5);
 my $mb = Module::Build->new_from_context(
   verbose => 0,
@@ -179,6 +183,9 @@ SKIP: {
   $mb->dispatch('realclean');
   $dist->clean;
 }
+
+
+$dist->remove;
 
 
 ########################################

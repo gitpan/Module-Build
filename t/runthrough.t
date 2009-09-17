@@ -2,10 +2,12 @@
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 30;
+use MBTest tests => 32;
 
-blib_load('Module::Build');
-blib_load('Module::Build::ConfigData');
+use_ok 'Module::Build';
+ensure_blib('Module::Build');
+
+use Module::Build::ConfigData;
 my $have_yaml = Module::Build::ConfigData->feature('YAML_support');
 
 #########################
@@ -22,9 +24,6 @@ $dist->change_build_pl
   requires    => { 'File::Spec' => 0 },
 });
 
-$dist->add_file( 'MANIFEST.SKIP', <<'---' );
-^MYMETA.yml$
----
 $dist->add_file( 'script', <<'---' );
 #!perl -w
 print "Hello, World!\n";
@@ -190,6 +189,8 @@ ok ! -e $mb->build_script;
 ok ! -e $mb->config_dir;
 ok ! -e $mb->dist_dir;
 
+$dist->remove;
+
 SKIP: {
   skip( 'Windows-only test', 4 ) unless $^O =~ /^MSWin/;
 
@@ -222,5 +223,8 @@ echo Hello, World!
   my $out = slurp( $script_file );
   is $out, $script_data, '  unmodified by pl2bat';
 
+  $dist->remove;
 }
 
+# cleanup
+$dist->remove;

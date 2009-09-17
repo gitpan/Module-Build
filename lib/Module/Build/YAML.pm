@@ -1,7 +1,6 @@
 package Module::Build::YAML;
 
 use strict;
-use Config;
 use vars qw($VERSION @EXPORT @EXPORT_OK);
 $VERSION = "0.50";
 @EXPORT = ();
@@ -41,7 +40,7 @@ sub DumpFile {
     }
     open my $OUT, "$mode $filename"
       or die "Can't open $filename for writing: $!";
-    binmode($OUT, ':utf8') if $] >= 5.008 && $Config{useperlio};
+    binmode($OUT, ':utf8') if $] >= 5.008;
     print $OUT Dump(@_);
     close $OUT;
 }
@@ -52,7 +51,7 @@ sub LoadFile {
     my $filename = shift;
     open my $IN, $filename
       or die "Can't open $filename for reading: $!";
-    binmode($IN, ':utf8') if $] >= 5.008 && $Config{useperlio};
+    binmode($IN, ':utf8') if $] >= 5.008;
     return Load(do { local $/; <$IN> });
     close $IN;
 }

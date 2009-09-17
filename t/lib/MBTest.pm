@@ -92,7 +92,7 @@ my @extra_exports = qw(
   find_in_path
   check_compiler
   have_module
-  blib_load
+  ensure_blib
 );
 push @EXPORT, @extra_exports;
 __PACKAGE__->export(scalar caller, @extra_exports);
@@ -103,9 +103,7 @@ __PACKAGE__->export(scalar caller, @extra_exports);
 
 # always return to the current directory
 { 
-  my $cwd = File::Spec->rel2abs(Cwd::cwd);
-
-  sub original_cwd { return $cwd }
+  my $cwd = Cwd::cwd;
 
   END {
     # Go back to where you came from!
@@ -123,11 +121,13 @@ __PACKAGE__->export(scalar caller, @extra_exports);
 }
 ########################################################################
 
-# Setup a temp directory
-sub tmpdir {
-  my ($self, @args) = @_;
-  my $dir = $ENV{PERL_CORE} ? MBTest->original_cwd : File::Spec->tmpdir;
-  return File::Temp::tempdir('MB-XXXXXXXX', CLEANUP => 1, DIR => $dir, @args);
+# Setup a temp directory 
+sub tmpdir { 
+  my ($self, $usr_tmp) = @_;
+  return File::Temp::tempdir( 'MB-XXXXXXXX', 
+    CLEANUP => 1, DIR => $ENV{PERL_CORE} ? Cwd::cwd : 
+                         $usr_tmp        ? $usr_tmp : File::Spec->tmpdir 
+  );
 }
 
 sub save_handle {
@@ -196,7 +196,6 @@ sub check_compiler {
 
   local $SIG{__WARN__} = sub {};
 
-  blib_load('Module::Build');
   my $mb = Module::Build->current;
   $mb->verbose( 0 );
 
@@ -221,23 +220,21 @@ sub check_compiler {
 
 sub have_module {
   my $module = shift;
-  return eval "require $module; 1";
+  return eval "use $module; 1";
 }
 
-sub blib_load {
-  # Load the given module and ensure it came from blib/, not the larger system
+sub ensure_blib {
+  # Make sure the given module was loaded from blib/, not the larger system
   my $mod = shift;
-  have_module($mod) or die "Error loading $mod\: $@\n";
-
   (my $path = $mod) =~ s{::}{/}g;
-  $path .= ".pm";
-  my ($pkg, $file, $line) = caller;
-  unless($ENV{PERL_CORE}) {
-    unless($INC{$path} =~ m/\bblib\b/) {
-      (my $load_from = $INC{$path}) =~ s{$path$}{};
-      die "$mod loaded from '$load_from'\nIt should have been loaded from blib.  \@INC contains:\n  ",
-      join("\n  ", @INC) . "\nFatal error occured in blib_load() at $file, line $line.\n";
-    }
+ 
+  local $Test::Builder::Level = $Test::Builder::Level + 1; 
+ SKIP: {
+    skip "no blib in core", 1 if $ENV{PERL_CORE};
+    like $INC{"$path.pm"}, qr/\bblib\b/, "Make sure $mod was loaded from blib/"
+      or diag "PERL5LIB: " . ($ENV{PERL5LIB} || '') . "\n" .
+              "PERL5OPT: " . ($ENV{PERL5OPT} || '') . "\n" .
+              "\@INC contains:\n  " . join("\n  ", @INC) . "\n"; 
   }
 }
 

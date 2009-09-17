@@ -2,9 +2,10 @@
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 4;
+use MBTest tests => 6;
 
-blib_load('Module::Build');
+use_ok 'Module::Build';
+ensure_blib('Module::Build');
 
 use IO::File;
 my $tmp = MBTest->tmpdir;
@@ -45,3 +46,5 @@ my $mb = Module::Build->new_from_context;
   ok( Module::Build->dir_contains($first, $second) );
 }
 
+# cleanup
+$dist->remove;

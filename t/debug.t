@@ -2,15 +2,18 @@
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 1;
+use MBTest tests => 3;
 
-blib_load('Module::Build');
+require_ok('Module::Build');
+ensure_blib('Module::Build');
 
 my $tmp = MBTest->tmpdir;
 
 use DistGen;
 my $dist = DistGen->new( dir => $tmp );
 $dist->regen;
+END{ $dist->remove }
+
 $dist->chdir_in;
 
 #########################
@@ -25,3 +28,6 @@ $dist->chdir_in;
   );
 }
 
+#########################
+
+# cleanup

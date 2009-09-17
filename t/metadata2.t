@@ -2,11 +2,14 @@
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 18;
+use MBTest tests => 20;
 
-blib_load('Module::Build');
-blib_load('Module::Build::ConfigData');
+use_ok 'Module::Build';
+ensure_blib('Module::Build');
 
+my $tmp = MBTest->tmpdir;
+
+use Module::Build::ConfigData;
 use DistGen;
 
 
@@ -16,12 +19,14 @@ SKIP: {
   skip( 'YAML_support feature is not enabled', 4 )
       unless Module::Build::ConfigData->feature('YAML_support');
 
-  my $dist = DistGen->new( no_manifest => 1 )->chdir_in->regen;
+  my $dist = DistGen->new( dir => $tmp, no_manifest => 1 );
+  $dist->regen;
+
+  $dist->chdir_in;
 
   ok ! -e 'MANIFEST';
 
-  my $mb;
-  stderr_of( sub { $mb = Module::Build->new_from_context } );
+  my $mb = Module::Build->new_from_context;
 
   my $out;
   $out = eval { stderr_of(sub{$mb->dispatch('distmeta')}) };
@@ -31,6 +36,7 @@ SKIP: {
 
   ok -e 'META.yml';
 
+  $dist->remove;
 }
 
 
@@ -56,7 +62,7 @@ Simple Simon <simon@simple.sim>
 =cut
 ---
 
-my $dist = DistGen->new->chdir_in;
+my $dist = DistGen->new( dir => $tmp );
 
 $dist->change_build_pl
 ({
@@ -65,6 +71,10 @@ $dist->change_build_pl
     license             => 'perl',
     create_readme       => 1,
 });
+$dist->regen;
+
+$dist->chdir_in;
+
 
 # .pm File with pod
 #
@@ -129,3 +139,7 @@ is( $mb->dist_author->[0], 'Simple Simon <simon@simple.sim>',
 is( $mb->dist_abstract, "A simple module",
     "Extracting abstract from .pod over .pm");
 
+
+############################################################
+# cleanup
+$dist->remove;

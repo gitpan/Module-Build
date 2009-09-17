@@ -8,7 +8,8 @@ use MBTest 'no_plan';
 use DistGen;
 use Cwd;
 
-blib_load('Module::Build');
+use_ok 'Module::Build';
+ensure_blib 'Module::Build';
 
 {
     my $cwd = Cwd::cwd;

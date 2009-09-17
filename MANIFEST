@@ -37,7 +37,6 @@ MANIFEST
 META.yml
 README
 scripts/config_data
-t/actions/installdeps.t
 t/add_property.t
 t/basic.t
 t/bundled/Tie/CPHash.pm
@@ -58,7 +57,6 @@ t/mbyaml.t
 t/metadata.t
 t/metadata2.t
 t/moduleinfo.t
-t/mymeta.t
 t/new_from_context.t
 t/notes.t
 t/par.t
@@ -66,11 +64,7 @@ t/parents.t
 t/PL_files.t
 t/pod_parser.t
 t/ppm.t
-t/properties/needs_compiler.t
-t/properties/share_dir.t
-t/README.pod
 t/runthrough.t
-t/sample.t
 t/script_dist.t
 t/signature.t
 t/test_file_exts.t
