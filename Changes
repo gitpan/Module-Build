@@ -1,15 +1,97 @@
 Revision history for Perl extension Module::Build.
 
-0.3500_01 - Thu Sep 17 19:16:13 EDT 2009
+0.35_03 - Wed Oct 21 21:20:59 EDT 2009
+
+ *** API CHANGE *** 
+ - The prepare_metadata() method used to take a YAML::Node object as an
+   argument for modification.  The method now takes no arguments and just
+   returns a hash reference of metadata. [David Golden]
+
+ Enhancements
+ - Command line options may be set via the PERL_MB_OPT environment
+   variable (similar to PERL_MM_OPT in ExtUtils::MakeMaker)
 
  Bug fixes:
- - Changes Module::Build::Version internals to avoid requiring a reboot
-   after installation on Windows [David Golden]
+ - Updated PPM generation to PPM v4 (RT#49600) [Olivier Mengue]
+ - When c_source is specified, the directory scan will include additional,
+   less-common C++ extensions (RT49298) [David Golden]
+ - When module_name is not supplied, no packlist was being written; fixed
+   by guessing module_name from dist_version_from or the directory name
+   (just like ExtUtils::Manifest does without NAME) [David Golden]
+ - Bumped IO::File prereq to fix binmode failures in PPMMaker on Perl
+   prior to 5.8.8 [David Golden]
+
+ Other:
+ - Replaced use of YAML.pm with YAML::Tiny; Module::Build::YAML is now
+   based on YAML::Tiny as well [David Golden]
+ - Reduced amount of console output under normal operation (use --verbose
+   to see all output)
+
+0.35_02 - Mon Sep  7 22:37:42 EDT 2009
+
+ Enhancements:
+ - Added 'needs_compiler' property.  Defaults to true if XS or c_source
+   exist.  If true, ExtUtils::CBuilder is also added to build_requires.
+   [David Golden]
+ - File::ShareDir automatically added to 'requires' if 'share_dir' is set
+   [David Golden]
+ - Added 'Build installdeps' action to install needed dependencies via
+   a user-configurable command line program.  (Defaults to 'cpan'.)
+   [Eric Wilhelm]
+
+ Bug fixes:
+ - Failure to detect a compiler will now warn during Build.PL and be a
+   fatal error when trying to compile during Build. (RT#48918) [David
+   Golden]
+ - Fixed directory sorting failure in share_dir.t [David Golden]
+ - Property defaults that are data structures were being assigned as
+   references to new objects. Changed so that defaults are cloned instead.
+   (This mostly affects testing, which often creates multiple objects in the
+   same process) [David Golden]
+ - Simplified error message on exit under use_tap_harness [suggested by
+   David Wheeler]
+ - Fixed typemap search to use a dist-level typemap if a typemap is not
+   found in the directory with the *.xs file; (was manifesting as warnings
+   in Perl 5.6 tests) [David Golden]
+
+ Other:
+ - Replaced guts of new_from_context().  Build.PL is now executed in a
+   separate process before resume() is called.  (This is generally only of
+   interest to Module::Build or toolchain developers) (RT#49350) [David
+   Golden, Eric Wilhelm, Ken Williams]
+ - Revised test helper classes to fix potential bugs and add new features
+   to make writing tests simpler and easier.  Changes incorporated into
+   t/README.pod and t/sample.t as examples for new testing. [David Golden]
+
+0.35_01 - Mon Aug 31 12:11:10 EDT 2009
+
+ Enhancements:
+ - Generates MYMETA.yml during Build.PL (new standard protocol for 
+   communicating configuration results between toolchain components)
+   [David Golden]
+ - Added 'share_dir' property to provide File::ShareDir support;
+   set automatically if a directory called 'share' exists
+   [David Golden]
+
+ Bug fixes:
+ - Fix the t/destinations.t fix. [David Golden, with thanks to Eric Wilhelm]
+ - Fix recursive test files in generated Makefile.PL (RT#49254) [Sawyer X]
+ - Guard against trying :utf8 when :utf8 isn't available
+ - The "test" action now dies when using the 'use_tap_harness'
+   option and tests fail, matching the behavior under Test::Harness. 
+   (RT#49080) [initial patch from David Wheeler; revised by David Golden]
+
+ Other:
+ - Added t/README.pod and t/sample.t to guide developers writing new tests
+   [David Golden, with some code from Eric Wilhelm]
+ - Module::Build::Compat 'passthrough' style has been deprecated.  Using
+   'passthrough' will issue warnings on Makefile.PL generation.  See
+   Module::Build::Compat documentation for rationale.
 
 0.35 - Thu Aug 27 09:12:02 EDT 2009
 
  Bug fixes:
- - Fix t/destinations.t segfault on 5.6.2
+ - Fix t/destinations.t segfault on 5.6.2 [David Golden]
 
 0.34_06 - Sat Aug 22 21:58:26 EDT 2009
 

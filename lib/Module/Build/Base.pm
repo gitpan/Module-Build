@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.3500_01';
+$VERSION = '0.35_03';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -23,6 +23,7 @@ use Text::ParseWords ();
 use Module::Build::ModuleInfo;
 use Module::Build::Notes;
 use Module::Build::Config;
+use Module::Build::Version;
 
 
 #################### Constructors ###########################
@@ -36,12 +37,25 @@ sub new {
     if $self->{action} && $self->{action} ne 'Build_PL';
 
   $self->check_manifest;
-  $self->check_prereq;
-  $self->check_autofeatures;
+  $self->auto_require;
+  if ( $self->check_prereq + $self->check_autofeatures != 2) {
+    $self->log_warn(<<EOF);
+
+ERRORS/WARNINGS FOUND IN PREREQUISITES.  You may wish to install the versions
+of the modules indicated above before proceeding with this installation
+
+EOF
+    unless ( $ENV{PERL5_CPANPLUS_IS_RUNNING} || $ENV{PERL5_CPAN_IS_RUNNING} ) {
+      $self->log_warn(
+        "Run 'Build installdeps' to install missing prerequisites.\n\n"
+      );
+    }
+  }
 
   $self->dist_name;
   $self->dist_version;
-
+  $self->_guess_module_name unless $self->module_name;
+  
   $self->_find_nested_builds;
 
   return $self;
@@ -91,17 +105,7 @@ sub resume {
 sub new_from_context {
   my ($package, %args) = @_;
   
-  # XXX Read the META.yml and see whether we need to run the Build.PL?
-  
-  # Run the Build.PL.  We use do() rather than run_perl_script() so
-  # that it runs in this process rather than a subprocess, because we
-  # need to make sure that the environment is the same during Build.PL
-  # as it is during resume() (and thereafter).
-  {
-    local @ARGV = $package->unparse_args(\%args);
-    do './Build.PL';
-    die $@ if $@;
-  }
+  $package->run_perl_script('Build.PL',[],[$package->unparse_args(\%args)]);
   return $package->resume;
 }
 
@@ -497,6 +501,28 @@ sub _discover_perl_interpreter {
       "in (@paths)\n";
 }
 
+# Adapted from IPC::Cmd::can_run()
+sub find_command {
+    my ($self, $command) = @_;
+
+    if( File::Spec->file_name_is_absolute($command) ) {
+        return $self->_maybe_command($command);
+
+    } else {
+        for my $dir ( File::Spec->path ) {
+            my $abs = File::Spec->catfile($dir, $command);
+            return $abs if $abs = $self->_maybe_command($abs);
+        }
+    }
+}
+
+# Copied from ExtUtils::MM_Unix::maybe_command
+sub _maybe_command {
+    my($self,$file) = @_;
+    return $file if -x $file && ! -d $file;
+    return;
+}
+
 sub _is_interactive {
   return -t STDIN && (-t STDOUT || !(-f STDOUT || -c STDOUT)) ;   # Pipe?
 }
@@ -646,7 +672,7 @@ sub ACTION_config_data {
 			       $self->config_file('features')
 			      ], $notes_pm);
 
-  $self->log_info("Writing config notes to $notes_pm\n");
+  $self->log_verbose("Writing config notes to $notes_pm\n");
   File::Path::mkpath(File::Basename::dirname($notes_pm));
 
   Module::Build::Notes->write_config_data
@@ -681,10 +707,10 @@ sub ACTION_config_data {
 
   sub valid_properties_defaults {
     my %out;
-    for (reverse shift->_mb_classes) {
-      @out{ keys %{ $valid_properties{$_} } } = map {
+    for my $class (reverse shift->_mb_classes) {
+      @out{ keys %{ $valid_properties{$class} } } = map {
         $_->()
-      } values %{ $valid_properties{$_} };
+      } values %{ $valid_properties{$class} };
     }
     return \%out;
   }
@@ -710,9 +736,11 @@ sub ACTION_config_data {
     my %p = @_ == 1 ? ( default => shift ) : @_;
 
     my $type = ref $p{default};
-    $valid_properties{$class}{$property} = $type eq 'CODE'
-      ? $p{default}
-      : sub { $p{default} };
+    $valid_properties{$class}{$property} = 
+      $type eq 'CODE' ? $p{default}                           :
+      $type eq 'HASH' ? sub { return { %{ $p{default} } }   } :
+      $type eq 'ARRAY'? sub { return [ @{ $p{default} } ]   } :
+                        sub { return $p{default}            } ;
 
     push @{$additive_properties{$class}->{$type}}, $property
       if $type;
@@ -831,12 +859,14 @@ sub _make_accessor {
 __PACKAGE__->add_property(auto_configure_requires => 1);
 __PACKAGE__->add_property(blib => 'blib');
 __PACKAGE__->add_property(build_class => 'Module::Build');
-__PACKAGE__->add_property(build_elements => [qw(PL support pm xs pod script)]);
+__PACKAGE__->add_property(build_elements => [qw(PL support pm xs share_dir pod script)]);
 __PACKAGE__->add_property(build_script => 'Build');
 __PACKAGE__->add_property(build_bat => 0);
 __PACKAGE__->add_property(config_dir => '_build');
 __PACKAGE__->add_property(include_dirs => []);
+__PACKAGE__->add_property(license => 'unknown');
 __PACKAGE__->add_property(metafile => 'META.yml');
+__PACKAGE__->add_property(mymetafile => 'MYMETA.yml');
 __PACKAGE__->add_property(recurse_into => []);
 __PACKAGE__->add_property(use_rcfile => 1);
 __PACKAGE__->add_property(create_packlist => 1);
@@ -844,6 +874,7 @@ __PACKAGE__->add_property(allow_mb_mismatch => 0);
 __PACKAGE__->add_property(config => undef);
 __PACKAGE__->add_property(test_file_exts => ['.t']);
 __PACKAGE__->add_property(use_tap_harness => 0);
+__PACKAGE__->add_property(cpan_client => 'cpan');
 __PACKAGE__->add_property(tap_harness_args => {});
 __PACKAGE__->add_property(
   'installdirs',
@@ -906,10 +937,10 @@ __PACKAGE__->add_property($_) for qw(
   has_config_data
   install_base
   libdoc_dirs
-  license
   magic_number
   mb_version
   module_name
+  needs_compiler
   orig_dir
   perl
   pm_files
@@ -921,6 +952,7 @@ __PACKAGE__->add_property($_) for qw(
   recursive_test_files
   script_files
   scripts
+  share_dir
   sign
   test_files
   verbose
@@ -996,7 +1028,7 @@ sub subclass {
   
   my $filename = File::Spec->catfile($build_dir, 'lib', split '::', $opts{class}) . '.pm';
   my $filedir  = File::Basename::dirname($filename);
-  $pack->log_info("Creating custom builder $filename in $filedir\n");
+  $pack->log_verbose("Creating custom builder $filename in $filedir\n");
   
   File::Path::mkpath($filedir);
   die "Can't create directory $filedir: $!" unless -d $filedir;
@@ -1016,6 +1048,33 @@ EOF
   die $@ if $@;
 
   return $opts{class};
+}
+
+sub _guess_module_name {
+  my $self = shift;
+  my $p = $self->{properties};
+  return if $p->{module_name};
+  if ( $p->{dist_version_from} && -e $p->{dist_version_from} ) {
+    my $mi = Module::Build::ModuleInfo->new_from_file($self->dist_version_from);
+    $p->{module_name} = $mi->name;
+  }
+  else {
+    my $mod_path = my $mod_name = File::Basename::basename($self->base_dir);
+    $mod_name =~ s{-}{::}g;
+    $mod_path =~ s{-}{/}g;
+    $mod_path .= ".pm";
+    if ( -e $mod_path || -e File::Spec->catfile('lib', $mod_path) ) {
+      $p->{module_name} = $mod_name;
+    }
+    else {
+      $self->log_warn( << 'END_WARN' );
+No 'module_name' was provided and it could not be inferred
+from other properties.  This will prevent a packlist from
+being written for this file.  Please set either 'module_name'
+or 'dist_version_from' in Build.PL.
+END_WARN
+    }
+  }
 }
 
 sub dist_name {
@@ -1159,9 +1218,7 @@ sub check_autofeatures {
   my ($self) = @_;
   my $features = $self->auto_features;
   
-  return unless %$features;
-
-  $self->log_info("Checking features:\n");
+  return 1 unless %$features;
 
   # TODO refactor into ::Util
   my $longest = sub {
@@ -1177,32 +1234,94 @@ sub check_autofeatures {
   };
   my $max_name_len = length($longest->(keys %$features));
 
+  my ($num_disabled, $log_text) = (0, "\nChecking optional features...\n");
   while (my ($name, $info) = each %$features) {
-    $self->log_info("  $name" . '.' x ($max_name_len - length($name) + 4));
+    my $feature_text = "  $name" . '.' x ($max_name_len - length($name) + 4);
 
+    my $disabled;
     if ( my $failures = $self->prereq_failures($info) ) {
-      my $disabled = grep( /^(?:\w+_)?(?:requires|conflicts)$/,
+      $disabled = grep( /^(?:\w+_)?(?:requires|conflicts)$/,
 			   keys %$failures ) ? 1 : 0;
-      $self->log_info( $disabled ? "disabled\n" : "enabled\n" );
+      $feature_text .= $disabled ? "disabled\n" : "enabled\n";
+      $num_disabled++ if $disabled;
 
-      my $log_text;
       while (my ($type, $prereqs) = each %$failures) {
 	while (my ($module, $status) = each %$prereqs) {
 	  my $required =
 	    ($type =~ /^(?:\w+_)?(?:requires|conflicts)$/) ? 1 : 0;
 	  my $prefix = ($required) ? '-' : '*';
-	  $log_text .= "    $prefix $status->{message}\n";
+	  $feature_text .= "    $prefix $status->{message}\n";
 	}
       }
-      $self->log_warn("$log_text") unless $self->quiet;
     } else {
-      $self->log_info("enabled\n");
+      $feature_text .= "enabled\n";
+    }
+    $log_text .= $feature_text if $disabled || $self->verbose;
+  }
+
+  # warn user if features disabled
+  if ( $num_disabled ) {
+    $self->log_warn( $log_text );
+    return 0;
+  }
+  else {
+    $self->log_verbose( $log_text );
+    return 1;
+  }
+}
+
+# Automatically detect and add prerequisites based on configuration
+sub auto_require {
+  my ($self) = @_;
+  my $p = $self->{properties};
+
+  # add current Module::Build to configure_requires if there 
+  # isn't one already specified (but not ourself, so we're not circular)
+  if ( $self->dist_name ne 'Module-Build' 
+    && $self->auto_configure_requires
+    && ! exists $p->{configure_requires}{'Module::Build'}
+  ) {
+    (my $ver = $VERSION) =~ s/^(\d+\.\d\d).*$/$1/; # last major release only
+    $self->_add_prereq('configure_requires', 'Module::Build', $ver);
+  }
+
+  # If needs_compiler is not explictly set, automatically set it
+  # If set, we need ExtUtils::CBuilder (and a compiler)
+  my $xs_files = $self->find_xs_files;
+  if ( ! defined $p->{needs_compiler} ) {
+    $self->needs_compiler( keys %$xs_files || defined $self->c_source );
+  }
+  if ($self->needs_compiler) {
+    $self->_add_prereq('build_requires', 'ExtUtils::CBuilder', 0);
+    if ( ! $self->have_c_compiler ) {
+      $self->log_warn(<<'EOM');
+Warning: ExtUtils::CBuilder not installed or no compiler detected
+Proceeding with configuration, but compilation may fail during Build
+
+EOM
     }
   }
 
-  $self->log_warn("\n") unless $self->quiet;
+  # If using share_dir, require File::ShareDir
+  if ( $self->share_dir ) {
+    $self->_add_prereq( 'requires', 'File::ShareDir', '1.00' );
+  }
+
+  return;
 }
 
+sub _add_prereq {
+  my ($self, $type, $module, $version) = @_;
+  my $p = $self->{properties};
+  $version = 0 unless defined $version;
+  if ( exists $p->{$type}{$module} ) {
+    return if $self->compare_versions( $version, '<=', $p->{$type}{$module} );
+  }
+  $self->log_verbose("Adding to $type\: $module => $version\n");
+  $p->{$type}{$module} = $version;
+  return 1;
+}
+  
 sub prereq_failures {
   my ($self, $info) = @_;
 
@@ -1224,7 +1343,7 @@ sub prereq_failures {
       } elsif ($type =~ /^(?:\w+_)?recommends$/) {
 	next if $status->{ok};
 	$status->{message} = (!ref($status->{have}) && $status->{have} eq '<none>'
-			      ? "Optional prerequisite $modname is not installed"
+			      ? "$modname is not installed"
 			      : "$modname ($status->{have}) is installed, but we prefer to have $spec");
       } else {
 	next if $status->{ok};
@@ -1253,42 +1372,30 @@ sub _enum_prereqs {
 sub check_prereq {
   my $self = shift;
 
-  # If we have XS files, make sure we can process them.
-  my $xs_files = $self->find_xs_files;
-  if (keys %$xs_files && !$self->_mb_feature('C_support')) {
-    $self->log_warn("Warning: this distribution contains XS files, ".
-		    "but Module::Build is not configured with C_support.  ".
-		    "Please install ExtUtils::CBuilder to enable C_support.\n");
-  }
-
   # Check to see if there are any prereqs to check
   my $info = $self->_enum_prereqs;
   return 1 unless $info;
 
-  $self->log_info("Checking prerequisites...\n");
+  my $log_text = "Checking prerequisites...\n";
 
   my $failures = $self->prereq_failures($info);
 
   if ( $failures ) {
-
-    while (my ($type, $prereqs) = each %$failures) {
-      while (my ($module, $status) = each %$prereqs) {
-	my $prefix = ($type =~ /^(?:\w+_)?recommends$/) ? '*' : '- ERROR:';
-	$self->log_warn(" $prefix $status->{message}\n");
+    for my $type ( @{ $self->prereq_action_types } ) {
+      my $prereqs = $failures->{$type};
+      for my $module ( sort keys %$prereqs ) {
+        my $status = $prereqs->{$module};
+        my $prefix = ($type =~ /^(?:\w+_)?recommends$/) ? "* $type:" : "! $type:";
+        $log_text .= "$prefix $status->{message}\n";
       }
     }
 
-    $self->log_warn(<<EOF);
-
-ERRORS/WARNINGS FOUND IN PREREQUISITES.  You may wish to install the versions
-of the modules indicated above before proceeding with this installation
-
-EOF
+    $self->log_warn( $log_text );
     return 0;
 
   } else {
 
-    $self->log_info("Looks good\n\n");
+    $self->log_verbose($log_text . "Looks good\n\n");
     return 1;
 
   }
@@ -1532,20 +1639,29 @@ EOF
 sub create_build_script {
   my ($self) = @_;
   $self->write_config;
-  
+
+  # Create MYMETA.yml
+  my $mymetafile = $self->mymetafile;
+  if ( $self->delete_filetree($mymetafile) ) {
+    $self->log_verbose("Removed previous '$mymetafile'\n");
+  }
+  $self->log_info("Creating new '$mymetafile' with configuration results\n");
+  $self->write_metafile( $mymetafile, $self->prepare_metadata );
+
+  # Create Build
   my ($build_script, $dist_name, $dist_version)
     = map $self->$_(), qw(build_script dist_name dist_version);
-  
+
   if ( $self->delete_filetree($build_script) ) {
-    $self->log_info("Removed previous script '$build_script'\n\n");
+    $self->log_verbose("Removed previous script '$build_script'\n");
   }
 
   $self->log_info("Creating new '$build_script' script for ",
-		  "'$dist_name' version '$dist_version'\n");
+                  "'$dist_name' version '$dist_version'\n");
   my $fh = IO::File->new(">$build_script") or die "Can't create '$build_script': $!";
   $self->print_build_script($fh);
   close $fh;
-  
+
   $self->make_executable($build_script);
 
   return 1;
@@ -1561,13 +1677,13 @@ sub check_manifest {
   require ExtUtils::Manifest;  # ExtUtils::Manifest is not warnings clean.
   local ($^W, $ExtUtils::Manifest::Quiet) = (0,1);
   
-  $self->log_info("Checking whether your kit is complete...\n");
+  $self->log_verbose("Checking whether your kit is complete...\n");
   if (my @missed = ExtUtils::Manifest::manicheck()) {
     $self->log_warn("WARNING: the following files are missing in your kit:\n",
 		    "\t", join("\n\t", @missed), "\n",
 		    "Please inform the author.\n\n");
   } else {
-    $self->log_info("Looks good\n\n");
+    $self->log_verbose("Looks good\n\n");
   }
 }
 
@@ -1692,6 +1808,7 @@ sub _translate_option {
     use_rcfile
     use_tap_harness
     tap_harness_args
+    cpan_client
   ); # normalize only selected option names
 
   return $opt;
@@ -1977,7 +2094,10 @@ sub merge_args {
 
 sub cull_args {
   my $self = shift;
-  my ($args, $action) = $self->read_args(@_);
+  my @arg_list = @_;
+  unshift @arg_list, $self->split_like_shell($ENV{PERL_MB_OPT})
+    if $ENV{PERL_MB_OPT};
+  my ($args, $action) = $self->read_args(@arg_list);
   $self->merge_args($action, %$args);
   $self->merge_modulebuildrc( $action, %$args );
 }
@@ -2265,6 +2385,8 @@ sub generic_test {
   $self->do_tests;
 }
 
+# Test::Harness dies on failure but TAP::Harness does not, so we must
+# die if running under TAP::Harness
 sub do_tests {
   my $self = shift;
 
@@ -2273,7 +2395,10 @@ sub do_tests {
   if(@$tests) {
     my $args = $self->tap_harness_args;
     if($self->use_tap_harness or ($args and %$args)) {
-      $self->run_tap_harness($tests);
+      my $aggregate = $self->run_tap_harness($tests);
+      if ( $aggregate->has_errors ) {
+        die "Errors in testing.  Cannot continue.\n";
+      }
     }
     else {
       $self->run_test_harness($tests);
@@ -2293,12 +2418,14 @@ sub run_tap_harness {
 
   # TODO allow the test @INC to be set via our API?
 
-  TAP::Harness->new({
+  my $aggregate = TAP::Harness->new({
     lib => [@INC],
     verbosity => $self->{properties}{verbose},
     switches  => [ $self->harness_switches ],
     %{ $self->tap_harness_args },
   })->runtests(@$tests);
+
+  return $aggregate;
 }
 
 sub run_test_harness {
@@ -2442,10 +2569,61 @@ sub process_support_files {
   
   push @{$p->{include_dirs}}, $p->{c_source};
   
-  my $files = $self->rscan_dir($p->{c_source}, file_qr('\.c(pp)?$'));
+  my $files = $self->rscan_dir($p->{c_source}, file_qr('\.c(c|p|pp|xx|\+\+)?$'));
   foreach my $file (@$files) {
     push @{$p->{objects}}, $self->compile_c($file);
   }
+}
+
+sub process_share_dir_files {
+  my $self = shift;
+  my $files = $self->_find_share_dir_files;
+  return unless $files;
+
+  # root for all File::ShareDir paths
+  my $share_prefix = File::Spec->catdir($self->blib, qw/lib auto share/);
+
+  # copy all share files to blib
+  while (my ($file, $dest) = each %$files) {
+    $self->copy_if_modified( 
+      from => $file, to => File::Spec->catfile( $share_prefix, $dest )
+    );
+  }
+}
+
+sub _find_share_dir_files {
+  my $self = shift;
+  my $share_dir = $self->share_dir;
+  return unless $share_dir;
+  
+  my @file_map;
+  if ( $share_dir->{dist} ) {
+    my $prefix = File::Spec->catdir( "dist", $self->dist_name );
+    push @file_map, $self->_share_dir_map( $prefix, $share_dir->{dist} );
+  }
+
+  if ( $share_dir->{module} ) {
+    for my $mod ( keys %{ $share_dir->{module} } ) {
+      (my $altmod = $mod) =~ s{::}{-}g;
+      my $prefix = File::Spec->catdir("module", $altmod);
+      push @file_map, $self->_share_dir_map($prefix, $share_dir->{module}{$mod});
+    }
+  }
+
+  return { @file_map };
+}
+
+sub _share_dir_map {
+  my ($self, $prefix, $list) = @_;
+  my %files;
+  for my $dir ( @$list ) { 
+    for my $f ( @{ $self->rscan_dir( $dir, sub {-f} )} ) {
+      $files{File::Spec->canonpath($f)} = File::Spec->catfile(
+        $prefix, File::Spec->abs2rel( $f, $dir )
+      );
+    }
+  }
+  return %files;  
 }
 
 sub process_PL_files {
@@ -2738,7 +2916,7 @@ sub manify_bin_pods {
 	          $self->config( 'man1ext' );
     my $outfile = File::Spec->catfile($mandir, $manpage);
     next if $self->up_to_date( $file, $outfile );
-    $self->log_info("Manifying $file -> $outfile\n");
+    $self->log_verbose("Manifying $file -> $outfile\n");
     eval { $parser->parse_from_file( $file, $outfile ); 1 }
       or $self->log_warn("Error creating '$outfile': $@\n"); 
     $files->{$file} = $outfile;
@@ -2763,7 +2941,7 @@ sub manify_lib_pods {
 	          $self->config( 'man3ext' );
     my $outfile = File::Spec->catfile( $mandir, $manpage);
     next if $self->up_to_date( $file, $outfile );
-    $self->log_info("Manifying $file -> $outfile\n");
+    $self->log_verbose("Manifying $file -> $outfile\n");
     eval { $parser->parse_from_file( $file, $outfile ); 1 }
       or $self->log_warn("Error creating '$outfile': $@\n"); 
     $files->{$file} = $outfile;
@@ -2897,7 +3075,7 @@ sub htmlify_pods {
       push( @opts, "--css=$path2root/" . $self->html_css) if $self->html_css;
     }
 
-    $self->log_info("HTMLifying $infile -> $outfile\n");
+    $self->log_verbose("HTMLifying $infile -> $outfile\n");
     $self->log_verbose("pod2html @opts\n");
     eval { Pod::Html::pod2html(@opts); 1 } 
       or $self->log_warn("pod2html @opts failed: $@");
@@ -2985,7 +3163,7 @@ sub ACTION_install {
   my ($self) = @_;
   require ExtUtils::Install;
   $self->depends_on('build');
-  ExtUtils::Install::install($self->install_map, !$self->quiet, 0, $self->{args}{uninst}||0);
+  ExtUtils::Install::install($self->install_map, $self->verbose, 0, $self->{args}{uninst}||0);
 }
 
 sub ACTION_fakeinstall {
@@ -3016,6 +3194,60 @@ sub ACTION_versioninstall {
   only::install::install(%onlyargs);
 }
 
+sub ACTION_installdeps {
+  my ($self) = @_;
+
+  # XXX include feature prerequisites as optional prereqs?
+
+  my $info = $self->_enum_prereqs;
+  if (! $info ) {
+    $self->log_info( "No prerequisites detected\n" );
+    return;
+  }
+
+  my $failures = $self->prereq_failures($info);
+  if ( ! $failures ) {
+    $self->log_info( "All prerequisites satisfied\n" );
+    return;
+  }
+
+  my @install;
+  while (my ($type, $prereqs) = each %$failures) {
+    if($type =~ m/^(?:\w+_)?requires$/) {
+      push(@install, keys %$prereqs);
+      next;
+    }
+    $self->log_info("Checking optional dependencies:\n");
+    while (my ($module, $status) = each %$prereqs) {
+      push(@install, $module) if($self->y_n("Install $module?", 'y'));
+    }
+  }
+
+  return unless @install;
+
+  my ($command, @opts) = $self->split_like_shell($self->cpan_client);
+
+  # relative command should be relative to our active Perl
+  # so we need to locate that command
+  if ( ! File::Spec->file_name_is_absolute( $command ) ) {
+    my @bindirs = File::Basename::dirname($self->perl);
+    push @bindirs, map {$self->config->{"install${_}bin"}} '','site','vendor';
+    for my $d ( @bindirs ) {
+      my $abs_cmd = $self->find_command(File::Spec->catfile( $d, $command ));
+      if ( defined $abs_cmd ) {
+        $command = $abs_cmd;
+        last;
+      }
+    }
+  }
+
+  if ( ! -x $command ) {
+    die "cpan_client '$command' is not executable\n";
+  }
+
+  $self->do_system($command, @opts, @install);
+}
+
 sub ACTION_clean {
   my ($self) = @_;
   foreach my $item (map glob($_), $self->cleanup) {
@@ -3026,7 +3258,9 @@ sub ACTION_clean {
 sub ACTION_realclean {
   my ($self) = @_;
   $self->depends_on('clean');
-  $self->delete_filetree($self->config_dir, $self->build_script);
+  $self->delete_filetree(
+    $self->config_dir, $self->mymetafile, $self->build_script
+  );
 }
 
 sub ACTION_ppd {
@@ -3127,6 +3361,8 @@ sub ACTION_dist {
 sub ACTION_distcheck {
   my ($self) = @_;
 
+  $self->_check_mymeta_skip('MANIFEST.SKIP');
+
   require ExtUtils::Manifest;
   local $^W; # ExtUtils::Manifest is not warnings clean.
   my ($missing, $extra) = ExtUtils::Manifest::fullcheck();
@@ -3138,6 +3374,21 @@ sub ACTION_distcheck {
     die $msg;
   } else {
     warn $msg;
+  }
+}
+
+sub _check_mymeta_skip {
+  my $self = shift;
+  my $maniskip = shift || 'MANIFEST.SKIP';
+
+  require ExtUtils::Manifest;
+  local $^W; # ExtUtils::Manifest is not warnings clean.
+
+  my $skip_check = ExtUtils::Manifest::maniskip($maniskip);
+  my $mymetafile = $self->mymetafile;
+  if ( ! $skip_check->( $mymetafile ) ) {
+    $self->log_warn("File '$maniskip' does not include '$mymetafile'. Adding it now.\n");
+    $self->_append_maniskip("^$mymetafile\$", $maniskip);
   }
 }
 
@@ -3165,7 +3416,7 @@ sub _add_to_manifest {
   close $fh;
   chmod($mode, $manifest);
 
-  $self->log_info(map "Added to $manifest: $_\n", @$lines);
+  $self->log_verbose(map "Added to $manifest: $_\n", @$lines);
 }
 
 sub _sign_dir {
@@ -3330,9 +3581,12 @@ sub ACTION_distdir {
   my ($self) = @_;
 
   $self->depends_on('distmeta');
+  
+  # Must not include MYMETA
+  $self->_check_mymeta_skip('MANIFEST.SKIP');
 
   my $dist_files = $self->_read_manifest('MANIFEST')
-    or die "Can't create distdir without a MANIFEST file - run 'manifest' action first";
+    or die "Can't create distdir without a MANIFEST file - run 'manifest' action first.\n";
   delete $dist_files->{SIGNATURE};  # Don't copy, create a fresh one
   die "No files found in MANIFEST - try running 'manifest' action?\n"
     unless ($dist_files and keys %$dist_files);
@@ -3436,6 +3690,19 @@ sub _slurp {
 }
 
 
+
+sub _append_maniskip {
+  my $self = shift;
+  my $skip = shift;
+  my $file = shift || 'MANIFEST.SKIP';
+  return unless defined $skip && length $skip;
+  my $fh = IO::File->new(">> $file")
+    or die "Can't open $file: $!";
+
+  print $fh "$skip\n";
+  $fh->close();
+}
+
 sub _write_default_maniskip {
   my $self = shift;
   my $file = shift || 'MANIFEST.SKIP';
@@ -3446,6 +3713,8 @@ sub _write_default_maniskip {
                                                : $self->_slurp( $self->_default_maniskip );
 
   $content .= <<'EOF';
+# Avoid configuration metadata file
+^MYMETA.yml$
 
 # Avoid Module::Build generated and utility files.
 \bBuild$
@@ -3470,9 +3739,14 @@ sub ACTION_manifest {
   my ($self) = @_;
 
   my $maniskip = 'MANIFEST.SKIP';
-  unless ( -e 'MANIFEST' || -e $maniskip ) {
+
+  if ( ! -e $maniskip ) {
     $self->log_warn("File '$maniskip' does not exist: Creating a default '$maniskip'\n");
     $self->_write_default_maniskip($maniskip);
+  }
+  else {
+    # MYMETA must not be added to MANIFEST, so always confirm the skip
+    $self->_check_mymeta_skip( $maniskip );
   }
 
   require ExtUtils::Manifest;  # ExtUtils::Manifest is not warnings clean.
@@ -3509,6 +3783,63 @@ sub _files_in {
     push @files, $full_path;
   }
   return @files;
+}
+
+sub share_dir {
+  my $self = shift;
+  my $p = $self->{properties};
+  
+  $p->{share_dir} = shift if @_;
+
+  # Always coerce to proper hash form
+  if    ( ! defined $p->{share_dir} ) {
+    # not set -- use default 'share' dir if exists
+    $p->{share_dir} = { dist => [ 'share' ] } if -d 'share';
+  }
+  elsif ( ! ref $p->{share_dir}  ) {
+    # scalar -- treat as a single 'dist' directory
+    $p->{share_dir} = { dist => [ $p->{share_dir} ] };
+  }
+  elsif ( ref $p->{share_dir} eq 'ARRAY' ) {
+    # array -- treat as a list of 'dist' directories
+    $p->{share_dir} = { dist => $p->{share_dir} };
+  }
+  elsif ( ref $p->{share_dir} eq 'HASH' ) {
+    # hash -- check structure
+    my $share_dir = $p->{share_dir};
+    # check dist key
+    if ( defined $share_dir->{dist} ) {
+      if ( ! ref $share_dir->{dist} ) {
+        # scalar, so upgrade to arrayref
+        $share_dir->{dist} = [ $share_dir->{dist} ];
+      }
+      elsif ( ref $share_dir->{dist} ne 'ARRAY' ) {
+        die "'dist' key in 'share_dir' must be scalar or arrayref";
+      }
+    }
+    # check module key
+    if ( defined $share_dir->{module} ) {
+      my $mod_hash = $share_dir->{module};
+      if ( ref $mod_hash eq 'HASH' ) {
+        for my $k ( keys %$mod_hash ) {
+          if ( ! ref $mod_hash->{$k} ) {
+            $mod_hash->{$k} = [ $mod_hash->{$k} ];
+          }
+          elsif( ref $mod_hash->{$k} ne 'ARRAY' ) {
+            die "modules in 'module' key of 'share_dir' must be scalar or arrayref";
+          }
+        }
+      }
+      else {
+          die "'module' key in 'share_dir' must be hashref";
+      }
+    }
+  }
+  else {
+    die "'share_dir' must be hashref, arrayref or string";
+  }
+
+  return $p->{share_dir};
 }
 
 sub script_files {
@@ -3639,7 +3970,7 @@ sub do_create_metafile {
     push @INC, File::Spec->catdir($self->blib, 'lib');
   }
 
-  if ( $self->write_metafile( $self->metafile, $self->generate_metadata ) ) {
+  if ( $self->write_metafile( $self->metafile, $self->prepare_metadata ) ) {
     $self->{wrote_metadata} = 1;
     $self->_add_to_manifest('MANIFEST', $metafile);
   }
@@ -3647,42 +3978,22 @@ sub do_create_metafile {
   return 1;
 }
 
-sub generate_metadata {
-  my $self = shift;
-  my $node = {};
-
-  if ($self->_mb_feature('YAML_support')) {
-    require YAML;
-    require YAML::Node;
-    # We use YAML::Node to get the order nice in the YAML file.
-    $self->prepare_metadata( $node = YAML::Node->new({}) );
-  } else {
-    require Module::Build::YAML;
-    my @order_keys;
-    $self->prepare_metadata($node, \@order_keys);
-    $node->{_order} = \@order_keys;
-  }
-  return $node;
-}
-
 sub write_metafile {
   my $self = shift;
   my ($metafile, $node) = @_;
+  my $yaml;
 
   if ($self->_mb_feature('YAML_support')) {
     # XXX this is probably redundant, but stick with it
-    require YAML;
-    require YAML::Node;
-    delete $node->{_order}; # XXX also probably redundant, but for safety
-    # YAML API changed after version 0.30
-    my $yaml_sub = $YAML::VERSION le '0.30' ? \&YAML::StoreFile : \&YAML::DumpFile;
-    $yaml_sub->( $metafile, $node );
+    require YAML::Tiny;
+    $yaml = YAML::Tiny->new($node);
   } else {
-    # XXX probably redundant
     require Module::Build::YAML;
-    &Module::Build::YAML::DumpFile($metafile, $node);
+    $yaml = Module::Build::YAML->new($node);
   }
-  return 1;
+  my $result = $yaml->write($metafile) 
+    or $self->log_warn( "Error writing '$metafile': " . $yaml->errstr . "\n");
+  return $result;
 }
 
 sub normalize_version {
@@ -3705,20 +4016,20 @@ sub normalize_version {
 }
 
 sub prepare_metadata {
-  my ($self, $node, $keys) = @_;
+  my ($self) = @_;
   my $p = $self->{properties};
+  my $node = {};
 
   # A little helper sub
   my $add_node = sub {
     my ($name, $val) = @_;
     $node->{$name} = $val;
-    push @$keys, $name if $keys;
   };
 
   foreach (qw(dist_name dist_version dist_author dist_abstract license)) {
     (my $name = $_) =~ s/^dist_//;
     $add_node->($name, $self->$_());
-    die "ERROR: Missing required field '$_' for META.yml\n"
+    die "ERROR: Missing required field '$_' for metafile\n"
       unless defined($node->{$name}) && length($node->{$name});
   }
   $node->{version} = $self->normalize_version($node->{version}); 
@@ -3751,16 +4062,6 @@ sub prepare_metadata {
     }
   }
 
-  # add current Module::Build to configure_requires if there 
-  # isn't one already specified (but not ourself, so we're not circular)
-  if ( $self->dist_name ne 'Module-Build' 
-    && $self->auto_configure_requires
-    && ! exists $prereq_types{'configure_requires'}{'Module::Build'}
-  ) {
-    (my $ver = $VERSION) =~ s/^(\d+\.\d\d).*$/$1/; # last major release only
-    $prereq_types{configure_requires}{'Module::Build'} = $ver;
-  }
-
   for my $t ( keys %prereq_types ) {
       $add_node->($t, $prereq_types{$t});
   }
@@ -3771,7 +4072,7 @@ sub prepare_metadata {
   my $pkgs = eval { $self->find_dist_packages };
   if ($@) {
     $self->log_warn("$@\nWARNING: Possible missing or corrupt 'MANIFEST' file.\n" .
-		    "Nothing to enter for 'provides' field in META.yml\n");
+		    "Nothing to enter for 'provides' field in metafile.\n");
   } else {
     $node->{provides} = $pkgs if %$pkgs;
   }
@@ -3815,7 +4116,7 @@ sub find_dist_packages {
   # private stock.
 
   my $manifest = $self->_read_manifest('MANIFEST')
-    or die "Can't find dist packages without a MANIFEST file - run 'manifest' action first";
+    or die "Can't find dist packages without a MANIFEST file\nRun 'Build manifest' to generate one\n";
 
   # Localize
   my %dist_files = map { $self->localize_file_path($_) => $_ }
@@ -4294,7 +4595,7 @@ sub delete_filetree {
   my $deleted = 0;
   foreach (@_) {
     next unless -e $_;
-    $self->log_info("Deleting $_\n");
+    $self->log_verbose("Deleting $_\n");
     File::Path::rmtree($_, 0, 0);
     die "Couldn't remove '$_': $!\n" if -e $_;
     $deleted++;
@@ -4329,19 +4630,23 @@ sub have_c_compiler {
   my ($self) = @_;
   
   my $p = $self->{properties};
-  return $p->{have_compiler} if defined $p->{have_compiler};
+  return $p->{_have_c_compiler} if defined $p->{_have_c_compiler};
   
   $self->log_verbose("Checking if compiler tools configured... ");
   my $b = eval { $self->cbuilder };
-  my $have = $b && $b->have_compiler;
+  my $have = $b && eval { $b->have_compiler };
   $self->log_verbose($have ? "ok.\n" : "failed.\n");
-  return $p->{have_compiler} = $have;
+  return $p->{_have_c_compiler} = $have;
 }
 
 sub compile_c {
   my ($self, $file, %args) = @_;
-  my $b = $self->cbuilder;
 
+  if ( ! $self->have_c_compiler ) {
+    die "Error: no compiler detected to compile '$file'.  Aborting\n";
+  }
+
+  my $b = $self->cbuilder;
   my $obj_file = $b->object_file($file);
   $self->add_to_cleanup($obj_file);
   return $obj_file if $self->up_to_date($file, $obj_file);
@@ -4382,7 +4687,7 @@ sub link_c {
 sub compile_xs {
   my ($self, $file, %args) = @_;
   
-  $self->log_info("$file -> $args{outfile}\n");
+  $self->log_verbose("$file -> $args{outfile}\n");
 
   if (eval {require ExtUtils::ParseXS; 1}) {
     
@@ -4402,7 +4707,7 @@ sub compile_xs {
         'ExtUtils::typemap', \@INC
     );
     my $lib_typemap = Module::Build::ModuleInfo->find_module_by_name(
-        'typemap', [File::Basename::dirname($file)]
+        'typemap', [File::Basename::dirname($file), File::Spec->rel2abs('.')]
     );
     push @typemaps, $lib_typemap if $lib_typemap;
     @typemaps = map {+'-typemap', $_} @typemaps;
@@ -4553,7 +4858,7 @@ sub process_xs {
 
 sub do_system {
   my ($self, @cmd) = @_;
-  $self->log_info("@cmd\n");
+  $self->log_verbose("@cmd\n");
 
   # Some systems proliferate huge PERL5LIBs, try to ameliorate:
   my %seen;
@@ -4612,7 +4917,7 @@ sub copy_if_modified {
   # Create parent directories
   File::Path::mkpath(File::Basename::dirname($to_path), 0, oct(777));
   
-  $self->log_info("Copying $file -> $to_path\n") if $args{verbose};
+  $self->log_verbose("Copying $file -> $to_path\n");
   
   if ($^O eq 'os2') {# copy will not overwrite; 0x1 = overwrite
     chmod 0666, $to_path;

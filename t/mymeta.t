@@ -2,7 +2,7 @@
 
 use strict;
 use lib $ENV{PERL_CORE} ? '../lib/Module/Build/t/lib' : 't/lib';
-use MBTest tests => 1;
+use MBTest tests => 3;
 
 blib_load('Module::Build');
 
@@ -15,13 +15,16 @@ $dist->chdir_in;
 
 #########################
 
-# Test debug output
+# Test MYMETA generation
 {
+  ok( ! -e "MYMETA.yml", "MYMETA.yml doesn't exist before Build.PL runs" );
   my $output;
   $output = stdout_of sub { $dist->run_build_pl };
-  $output = stdout_of sub { $dist->run_build('--debug') };
-  like($output, '/Starting ACTION_build.*?Starting ACTION_code.*?Finished ACTION_code.*?Finished ACTION_build/ms',
-    "found nested ACTION_* debug statements"
+  like($output, qr/Creating new 'MYMETA.yml' with configuration results/,
+    "Saw MYMETA.yml creation message"
   );
+  ok( -e "MYMETA.yml", "MYMETA.yml exists" );
 }
+
+#########################
 

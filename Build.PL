@@ -33,7 +33,7 @@ my $build = Module::Build->new(
     'ExtUtils::Install'     => 0,
     'ExtUtils::Manifest'    => 0,
     'ExtUtils::Mkbootstrap' => 0,
-    'IO::File'              => 0,
+    'IO::File'              => 1.13, # fixes binmode bug on perl < 5.8.8
     'Cwd'                   => 0,
     'Text::Abbrev'          => 0,
     'Text::ParseWords'      => 0,
@@ -42,9 +42,9 @@ my $build = Module::Build->new(
   },
   recommends => {
     'Archive::Tar'       => 1.08,
-    'ExtUtils::CBuilder' => 0.15,
+    'ExtUtils::CBuilder' => 0.260301, # numerous bug fixes
     'ExtUtils::Install'  => 0.30,
-    'ExtUtils::ParseXS'  => 1.02,
+    'ExtUtils::ParseXS'  => 2.21,
     'Pod::Readme'        => 0.04,
     'Module::Signature'  => 0.21,
     'version'            => 0.74,
@@ -66,13 +66,13 @@ my $build = Module::Build->new(
 
   auto_features => {
     YAML_support => {
-      description => "Use YAML.pm to write META.yml files",
-      requires    => {YAML => ' >= 0.35, != 0.49_01 '},
+      description => "Use YAML::Tiny to write META.yml files",
+      requires    => {'YAML::Tiny' => 1.38},
     },
     C_support => {
       description => "Compile/link C & XS code",
-      requires    => {'ExtUtils::CBuilder' => 0.15,},
-      recommends  => {'ExtUtils::ParseXS' => 1.02,},
+      requires    => {'ExtUtils::CBuilder' => 0.260301,},
+      recommends  => {'ExtUtils::ParseXS' => 2.21,},
     },
     manpage_support => {
       description => "Create Unix man pages",

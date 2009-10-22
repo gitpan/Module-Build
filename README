@@ -190,10 +190,10 @@ ACTIONS
         distribution. The metadata includes the distribution name, version,
         abstract, prerequisites, license, and various other data about the
         distribution. This file is created as META.yml in YAML format. It is
-        recommended that the "YAML" module be installed to create it. If the
-        "YAML" module is not installed, an internal module supplied with
-        Module::Build will be used to write the META.yml file, and this will
-        most likely be fine.
+        recommended that the "YAML::Tiny" module be installed to create it.
+        If the "YAML::Tiny" module is not installed, an internal module
+        supplied with Module::Build will be used to write the META.yml file,
+        and this will most likely be fine.
 
         META.yml file must also be listed in MANIFEST - if it's not, a
         warning will be issued.
@@ -271,6 +271,24 @@ ACTIONS
         This can be a good idea, as it helps prevent multiple versions of a
         module from being present on your system, which can be a confusing
         situation indeed.
+
+    installdeps
+        [version 0.36]
+
+        This action will use the "cpan_client" parameter as a command to
+        install missing prerequisites. You will be prompted whether to
+        install optional dependencies.
+
+        The "cpan_client" option defaults to 'cpan' but can be set as an
+        option or in .modulebuildrc. It must be a shell command that takes a
+        list of modules to install as arguments (e.g. 'cpanp -i' for
+        CPANPLUS). If the program part is a relative path (e.g. 'cpan' or
+        'cpanp'), it will be located relative to the perl program that
+        executed Build.PL.
+
+          /opt/perl/5.8.9/bin/perl Build.PL
+          ./Build installdeps --cpan_client 'cpanp -i'
+          # installs to 5.8.9
 
     manifest
         [version 0.05]
@@ -536,12 +554,16 @@ OPTIONS
     quiet
         Suppress informative messages on output.
 
+    verbose
+        Display extra information about the Build on output.
+
+    cpan_client
+        Sets the "cpan_client" command for use with the "installdeps"
+        action. See "installdeps" for more details.
+
     use_rcfile
         Load the ~/.modulebuildrc option file. This option can be set to
         false to prevent the custom resource file from being loaded.
-
-    verbose
-        Display extra information about the Build on output.
 
     allow_mb_mismatch
         Suppresses the check upon startup that the version of Module::Build
@@ -578,14 +600,29 @@ OPTIONS
     all actions, and the key 'Build_PL' specifies options to be applied when
     you invoke "perl Build.PL".
 
-      *        verbose=1   # global options
-      diff     flags=-u
-      install  --install_base /home/ken
-               --install_path html=/home/ken/docs/html
+      *           verbose=1   # global options
+      diff        flags=-u
+      install     --install_base /home/ken
+                  --install_path html=/home/ken/docs/html
+      installdeps --cpan_client 'cpanp -i'
 
     If you wish to locate your resource file in a different location, you
     can set the environment variable "MODULEBUILDRC" to the complete
     absolute path of the file containing your options.
+
+  Environment variables
+    MODULEBUILDRC
+        [version 0.28]
+
+        Specifies an alternate location for a default options file as
+        described above.
+
+    PERL_MB_OPT
+        [version 0.36]
+
+        Command line options that are applied to Build.PL or any Build
+        action. The string is split as the shell would (e.g. whitespace) and
+        the result is prepended to any actual command-line arguments.
 
 INSTALL PATHS
     [version 0.19]
@@ -833,7 +870,7 @@ COPYRIGHT
 
 SEE ALSO
     perl(1), Module::Build::Cookbook, Module::Build::Authoring,
-    Module::Build::API, ExtUtils::MakeMaker, YAML
+    Module::Build::API, ExtUtils::MakeMaker, YAML::Tiny
 
     META.yml Specification:
     <http://module-build.sourceforge.net/META-spec-current.html>

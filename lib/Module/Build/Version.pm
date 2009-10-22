@@ -1,8 +1,7 @@
 package Module::Build::Version;
 use strict;
 
-# $version and $vpp are set in a BEGIN block at end of this file
-use vars qw($VERSION $version $vpp);
+use vars qw($VERSION);
 $VERSION = 0.77;
 
 eval "use version $VERSION";
@@ -10,9 +9,25 @@ if ($@) { # can't locate version files, use our own
 
     # Avoid redefined warnings if an old version.pm was available
     delete $version::{$_} foreach keys %version::;
-    delete $version::vpp::{$_} foreach keys %version::vpp::;
 
-    # but we eval version::vpp first since version depends on it
+    # first we get the stub version module
+    my $version;
+    while (<DATA>) {
+	s/(\$VERSION)\s=\s\d+/\$VERSION = 0/;
+	$version .= $_ if $_;
+	last if /^1;$/;
+    }
+
+    # and now get the current version::vpp code
+    my $vpp;
+    while (<DATA>) {
+	s/(\$VERSION)\s=\s\d+/\$VERSION = 0/;
+	$vpp .= $_ if $_;
+	last if /^1;$/;
+    }
+
+    # but we eval them in reverse order since version depends on
+    # version::vpp to already exist
     eval $vpp; die $@ if $@;
     $INC{'version/vpp.pm'} = 'inside Module::Build::Version';
     eval $version; die $@ if $@;
@@ -23,10 +38,8 @@ if ($@) { # can't locate version files, use our own
 use vars qw(@ISA);
 @ISA = qw(version);
 
-### EMBEDDED VERSION.PM CODE FOLLOWS ###
-
-BEGIN { 
-  $version = << 'END_VERSION_CODE';
+1;
+__DATA__
 # stub version module to make everything else happy
 package version;
 
@@ -100,9 +113,7 @@ sub import {
 }
 
 1;
-END_VERSION_CODE
 
-  $vpp = << 'END_VPP_CODE';
 # replace everything from here to the end with the current version/vpp.pm
 package version::vpp;
 use strict;
@@ -671,9 +682,3 @@ sub _VERSION {
 }
 
 1; #this line is important and will help the module return a true value
-END_VPP_CODE
-
-} # BEGIN
-
-1;
-
