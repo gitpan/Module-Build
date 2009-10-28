@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.35_04';
+$VERSION = '0.35_05';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -3361,7 +3361,7 @@ sub ACTION_dist {
 sub ACTION_distcheck {
   my ($self) = @_;
 
-  $self->_check_mymeta_skip('MANIFEST.SKIP');
+  $self->_check_manifest_skip;
 
   require ExtUtils::Manifest;
   local $^W; # ExtUtils::Manifest is not warnings clean.
@@ -3384,9 +3384,13 @@ sub _check_mymeta_skip {
   require ExtUtils::Manifest;
   local $^W; # ExtUtils::Manifest is not warnings clean.
 
-  my $skip_check = ExtUtils::Manifest::maniskip($maniskip);
+  # older ExtUtils::Manifest had a private _maniskip
+  my $skip_factory = ExtUtils::Manifest->can('maniskip')
+                  || ExtUtils::Manifest->can('_maniskip');
+
   my $mymetafile = $self->mymetafile;
-  if ( ! $skip_check->( $mymetafile ) ) {
+  # we can't check it, just add it anyway to be safe
+  unless ( $skip_factory && $skip_factory->($maniskip)->($mymetafile) ) {
     $self->log_warn("File '$maniskip' does not include '$mymetafile'. Adding it now.\n");
     $self->_append_maniskip("^$mymetafile\$", $maniskip);
   }
@@ -3642,8 +3646,7 @@ sub _eumanifest_has_include {
     my $self = shift;
 
     require ExtUtils::Manifest;
-    return ExtUtils::Manifest->VERSION >= 1.50 ? 1 : 0;
-    return 0;
+    return eval { ExtUtils::Manifest->VERSION(1.50); 1 };
 }
 
 
@@ -3714,7 +3717,7 @@ sub _write_default_maniskip {
 
   $content .= <<'EOF';
 # Avoid configuration metadata file
-^MYMETA.yml$
+^MYMETA\.$
 
 # Avoid Module::Build generated and utility files.
 \bBuild$
@@ -3735,7 +3738,7 @@ EOF
   return;
 }
 
-sub ACTION_manifest {
+sub _check_manifest_skip {
   my ($self) = @_;
 
   my $maniskip = 'MANIFEST.SKIP';
@@ -3748,6 +3751,14 @@ sub ACTION_manifest {
     # MYMETA must not be added to MANIFEST, so always confirm the skip
     $self->_check_mymeta_skip( $maniskip );
   }
+
+  return;
+}
+
+sub ACTION_manifest {
+  my ($self) = @_;
+
+  $self->_check_manifest_skip;
 
   require ExtUtils::Manifest;  # ExtUtils::Manifest is not warnings clean.
   local ($^W, $ExtUtils::Manifest::Quiet) = (0,1);
