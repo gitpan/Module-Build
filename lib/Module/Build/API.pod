@@ -454,8 +454,13 @@ Specifies the licensing terms of your distribution.  Valid options include:
 
 =item apache
 
-The distribution is licensed under the Apache Software License
-(L<http://opensource.org/licenses/apachepl.php>).
+The distribution is licensed under the Apache License, Version 2.0
+(L<http://apache.org/licenses/LICENSE-2.0>).
+
+=item apache_1_1
+
+The distribution is licensed under the Apache Software License, Version 1.1
+(L<http://apache.org/licenses/LICENSE-1.1>).
 
 =item artistic
 
@@ -1823,6 +1828,10 @@ accessor methods for the following properties:
 =item build_requires()
 
 =item build_script()
+
+=item bundle_inc()
+
+=item bundle_inc_preload()
 
 =item c_source()
 

@@ -1,12 +1,14 @@
 Build.PL
 Changes
 contrib/bash_completion.module-build
-contrib/bundle.pl
 INSTALL
+lib/inc/latest.pm
+lib/inc/latest/private.pm
 lib/Module/Build.pm
 lib/Module/Build/API.pod
 lib/Module/Build/Authoring.pod
 lib/Module/Build/Base.pm
+lib/Module/Build/Bundling.pod
 lib/Module/Build/Compat.pm
 lib/Module/Build/Config.pm
 lib/Module/Build/Cookbook.pm
@@ -40,6 +42,7 @@ scripts/config_data
 t/actions/installdeps.t
 t/add_property.t
 t/basic.t
+t/bundle_inc.t
 t/bundled/Tie/CPHash.pm
 t/compat.t
 t/compat/exit.t
@@ -70,6 +73,7 @@ t/properties/module_name.t
 t/properties/needs_compiler.t
 t/properties/share_dir.t
 t/README.pod
+t/really/long/file/path/that/will/hold/a/file/that/is/just/longer/than/100/chars/foobarbambazwibblewobbledingdangdong
 t/runthrough.t
 t/sample.t
 t/script_dist.t
@@ -82,3 +86,5 @@ t/use_tap_harness.t
 t/versions.t
 t/write_default_maniskip.t
 t/xs.t
+SIGNATURE    Added here by Module::Build
+SIGNATURE    Added here by Module::Build

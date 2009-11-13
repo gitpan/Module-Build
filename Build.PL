@@ -31,6 +31,7 @@ my $build = Module::Build->new(
     'File::Path'            => 0,
     'File::Spec'            => ($^O eq 'MSWin32' ? 3.30 : '0.82'), # rel2abs()
     'ExtUtils::Install'     => 0,
+    'ExtUtils::Installed'   => 0,
     'ExtUtils::Manifest'    => 0,
     'ExtUtils::Mkbootstrap' => 0,
     'IO::File'              => 1.13, # fixes binmode bug on perl < 5.8.8
@@ -77,7 +78,7 @@ my $build = Module::Build->new(
     },
     manpage_support => {
       description => "Create Unix man pages",
-      requires    => {'Pod::Man' => 0},
+      requires    => {'Pod::Man' => 0, 'Pod::Simple' => 0},
     },
     HTML_support => {
       description => "Create HTML documentation",

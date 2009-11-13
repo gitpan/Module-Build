@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.35_05';
+$VERSION = '0.35_06';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -51,6 +51,8 @@ EOF
       );
     }
   }
+
+  $self->set_bundle_inc;
 
   $self->dist_name;
   $self->dist_version;
@@ -862,6 +864,8 @@ __PACKAGE__->add_property(build_class => 'Module::Build');
 __PACKAGE__->add_property(build_elements => [qw(PL support pm xs share_dir pod script)]);
 __PACKAGE__->add_property(build_script => 'Build');
 __PACKAGE__->add_property(build_bat => 0);
+__PACKAGE__->add_property(bundle_inc => []);
+__PACKAGE__->add_property(bundle_inc_preload => []);
 __PACKAGE__->add_property(config_dir => '_build');
 __PACKAGE__->add_property(include_dirs => []);
 __PACKAGE__->add_property(license => 'unknown');
@@ -1214,6 +1218,68 @@ sub write_config {
   $self->{phash}{$_}->write() foreach qw(notes cleanup features auto_features config_data runtime_params);
 }
 
+{
+  # packfile map -- keys are guts of regular expressions;  If they match,
+  # values are module names corresponding to the packlist
+  my %packlist_map = (
+    '^File::Spec'         => 'Cwd',
+    '^Devel::AssertOS'    => 'Devel::CheckOS',
+  );
+
+  sub _find_packlist {
+    my ($self, $inst, $mod) = @_;
+    my $lookup = $mod;
+    my $packlist = eval { $inst->packlist($lookup) };
+    if ( ! $packlist ) {
+      # try from packlist_map
+      while ( my ($re, $new_mod) = each %packlist_map ) {
+        if ( $mod =~ qr/$re/ ) {
+          $lookup = $new_mod;
+          $packlist = eval { $inst->packlist($lookup) };
+          last;
+        }
+      }
+    }
+    return $packlist ? $lookup : undef;
+  }
+
+  sub set_bundle_inc {
+    my $self = shift;
+    my $bundle_inc = $self->{properties}{bundle_inc};
+    my $bundle_inc_preload = $self->{properties}{bundle_inc_preload};
+    # We're in author mode if inc::latest is loaded, but not from cwd
+    return unless inc::latest->can('loaded_modules');
+    require ExtUtils::Installed;
+    # ExtUtils::Installed is buggy about finding additions to default @INC
+    my $inst = ExtUtils::Installed->new(extra_libs => [$self->_added_to_INC]);
+    my @bundle_list = map { [ $_, 0 ] } inc::latest->loaded_modules;
+
+    # XXX TODO: Need to get ordering of prerequisites correct so they are
+    # are loaded in the right order. Use an actual tree?!
+
+    while( @bundle_list ) {
+      my ($mod, $prereq) = @{ shift @bundle_list };
+
+      # XXX TODO: Append prereqs to list
+      # skip if core or already in bundle or preload lists
+      # push @bundle_list, [$_, 1] for prereqs()
+
+      # Locate packlist for bundling
+      my $lookup = $self->_find_packlist($inst,$mod);
+      if ( ! $lookup ) {
+        # XXX Really needs a more helpful error message here
+        die << "NO_PACKLIST";
+Could not find a packlist for '$mod'.  If it's a core module, try
+force installing it from CPAN.
+NO_PACKLIST
+      }
+      else {
+        push @{ $prereq ? $bundle_inc_preload : $bundle_inc }, $lookup;
+      }
+    }
+  } # sub check_bundling
+}
+
 sub check_autofeatures {
   my ($self) = @_;
   my $features = $self->auto_features;
@@ -1283,6 +1349,17 @@ sub auto_require {
   ) {
     (my $ver = $VERSION) =~ s/^(\d+\.\d\d).*$/$1/; # last major release only
     $self->_add_prereq('configure_requires', 'Module::Build', $ver);
+  }
+
+  # if we're in author mode, add inc::latest modules to 
+  # configure_requires if not already set.  If we're not in author mode
+  # then configure_requires will have been satisfied, or we'll just
+  # live with what we've bundled
+  if ( inc::latest->can('loaded_module') ) {
+    for my $mod ( inc::latest->loaded_modules ) {
+      next if exists $p->{configure_requires}{$mod};
+      $self->_add_prereq('configure_requires', $mod, $mod->VERSION);
+    }
   }
 
   # If needs_compiler is not explictly set, automatically set it
@@ -1646,7 +1723,7 @@ sub create_build_script {
     $self->log_verbose("Removed previous '$mymetafile'\n");
   }
   $self->log_info("Creating new '$mymetafile' with configuration results\n");
-  $self->write_metafile( $mymetafile, $self->prepare_metadata );
+  $self->write_metafile( $mymetafile, $self->prepare_metadata( fatal => 0 ) );
 
   # Create Build
   my ($build_script, $dist_name, $dist_version)
@@ -2547,6 +2624,7 @@ sub ACTION_code {
 
 sub ACTION_build {
   my $self = shift;
+  $self->log_info("Building " . $self->dist_name . "\n");
   $self->depends_on('code');
   $self->depends_on('docs');
 }
@@ -3250,6 +3328,7 @@ sub ACTION_installdeps {
 
 sub ACTION_clean {
   my ($self) = @_;
+  $self->log_info("Cleaning up build files\n");
   foreach my $item (map glob($_), $self->cleanup) {
     $self->delete_filetree($item);
   }
@@ -3258,6 +3337,7 @@ sub ACTION_clean {
 sub ACTION_realclean {
   my ($self) = @_;
   $self->depends_on('clean');
+  $self->log_info("Cleaning up configuration files\n");
   $self->delete_filetree(
     $self->config_dir, $self->mymetafile, $self->build_script
   );
@@ -3525,7 +3605,9 @@ EOF
     return;
   }
 
-  if ( eval {require Pod::Readme; 1} ) {
+  # work around some odd Pod::Readme->new() failures in test reports by 
+  # confirming that new() is available
+  if ( eval {require Pod::Readme; Pod::Readme->can('new') } ) {
     $self->log_info("Creating README using Pod::Readme\n");
 
     my $parser = Pod::Readme->new;
@@ -3581,6 +3663,15 @@ sub _main_docfile {
   }
 }
 
+sub do_create_bundle_inc {
+  my $self = shift;
+  my $dist_inc = File::Spec->catdir( $self->dist_dir, 'inc' );
+  require inc::latest;
+  inc::latest->write($dist_inc, @{$self->bundle_inc_preload});
+  inc::latest->bundle_module($_, $dist_inc) for @{$self->bundle_inc};
+  return 1;
+}
+
 sub ACTION_distdir {
   my ($self) = @_;
 
@@ -3607,6 +3698,8 @@ sub ACTION_distdir {
     my $new = $self->copy_if_modified(from => $file, to_dir => $dist_dir, verbose => 0);
   }
   
+  $self->do_create_bundle_inc if @{$self->bundle_inc};
+
   $self->_sign_dir($dist_dir) if $self->{properties}{sign};
 }
 
@@ -3888,6 +3981,7 @@ BEGIN { *scripts = \&script_files; }
   my %licenses = (
     perl         => 'Perl_5',
     apache       => 'Apache_2_0',
+    apache_1_1   => 'Apache_1_1', 
     artistic     => 'Artistic_1_0',
     artistic_2   => 'Artistic_2_0',
     lgpl         => 'LGPL_2_1',
@@ -3910,6 +4004,7 @@ BEGIN { *scripts = \&script_files; }
   my %license_urls = (
     perl         => 'http://dev.perl.org/licenses/',
     apache       => 'http://apache.org/licenses/LICENSE-2.0',
+    apache_1_1   => 'http://apache.org/licenses/LICENSE-1.1',
     artistic     => 'http://opensource.org/licenses/artistic-license.php',
     artistic_2   => 'http://opensource.org/licenses/artistic-license-2.0.php',
     lgpl         => 'http://opensource.org/licenses/lgpl-license.php',
@@ -3981,7 +4076,7 @@ sub do_create_metafile {
     push @INC, File::Spec->catdir($self->blib, 'lib');
   }
 
-  if ( $self->write_metafile( $self->metafile, $self->prepare_metadata ) ) {
+  if ( $self->write_metafile( $self->metafile, $self->prepare_metadata( fatal => 1 ) ) ) {
     $self->{wrote_metadata} = 1;
     $self->_add_to_manifest('MANIFEST', $metafile);
   }
@@ -4027,7 +4122,8 @@ sub normalize_version {
 }
 
 sub prepare_metadata {
-  my ($self) = @_;
+  my ($self, %args) = @_;
+  my $fatal = $args{fatal} || 0;
   my $p = $self->{properties};
   my $node = {};
 
@@ -4040,14 +4136,28 @@ sub prepare_metadata {
   foreach (qw(dist_name dist_version dist_author dist_abstract license)) {
     (my $name = $_) =~ s/^dist_//;
     $add_node->($name, $self->$_());
-    die "ERROR: Missing required field '$_' for metafile\n"
-      unless defined($node->{$name}) && length($node->{$name});
+    unless ( defined($node->{$name}) && length($node->{$name}) ) {
+      my $err = "ERROR: Missing required field '$_' for metafile\n";
+      if ( $fatal ) {
+        die $err;
+      }
+      else {
+        $self->log_warn($err);
+      }
+    }
   }
-  $node->{version} = $self->normalize_version($node->{version}); 
+  $node->{version} = $self->normalize_version($node->{version});
 
   if (defined( my $l = $self->license )) {
-    die "Unknown license string '$l'"
-      unless exists $self->valid_licenses->{ $l };
+    unless ( exists $self->valid_licenses->{ $l } ) {
+      my $err = "Unknown license string '$l'";
+      if ( $fatal ) {
+        die $err;
+      }
+      else {
+        $self->log_warn($err);
+      }
+    }
 
     if (my $key = $self->valid_licenses->{ $l }) {
       my $class = "Software::License::$key";
@@ -4292,16 +4402,22 @@ sub make_tarball {
     $self->do_system($self->split_like_shell($self->{args}{tar}), $tar_flags, "$file.tar", $dir);
     $self->do_system($self->split_like_shell($self->{args}{gzip}), "$file.tar") if $self->{args}{gzip};
   } else {
-    eval { require Archive::Tar && Archive::Tar->VERSION(1.08); 1 }
-      or die "You must install Archive::Tar to make a distribution tarball\n".
+    eval { require Archive::Tar && Archive::Tar->VERSION(1.09); 1 }
+      or die "You must install Archive::Tar 1.09+ to make a distribution tarball\n".
              "or specify a binary tar program with the '--tar' option.\n".
              "See the documentation for the 'dist' action.\n";
 
+    my $files = $self->rscan_dir($dir);
+
     # Archive::Tar versions >= 1.09 use the following to enable a compatibility
     # hack so that the resulting archive is compatible with older clients.
-    $Archive::Tar::DO_NOT_USE_PREFIX = 0;
+    # If no file path is 100 chars or longer, we disable the Prefix field
+    # for maximum compatibility.  If there are any long file paths then we 
+    # need the prefix field after all.
+    $Archive::Tar::DO_NOT_USE_PREFIX = 
+      (grep { length($_) >= 100 } @$files) ? 0 : 1;
 
-    my $files = $self->rscan_dir($dir);
+    $self->log_warn("DO_NOT_USE_PREFIX: $Archive::Tar::DO_NOT_USE_PREFIX\n");
     my $tar   = Archive::Tar->new;
     $tar->add_files(@$files);
     for my $f ($tar->get_files) {
