@@ -42,7 +42,7 @@ my $build = Module::Build->new(
     'Test::Harness'         => 0,
   },
   recommends => {
-    'Archive::Tar'       => 1.08,
+    'Archive::Tar'       => 1.09,
     'ExtUtils::CBuilder' => 0.260301, # numerous bug fixes
     'ExtUtils::Install'  => 0.30,
     'ExtUtils::Manifest' => 1.54, # public maniskip()

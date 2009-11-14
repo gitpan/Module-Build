@@ -73,7 +73,7 @@ t/properties/module_name.t
 t/properties/needs_compiler.t
 t/properties/share_dir.t
 t/README.pod
-t/really/long/file/path/that/will/hold/a/file/that/is/just/longer/than/100/chars/foobarbambazwibblewobbledingdangdong
+t/resume.t
 t/runthrough.t
 t/sample.t
 t/script_dist.t

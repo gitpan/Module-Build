@@ -14,53 +14,53 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 c38179e0a7438a6f66149d5d9ba64e22969fa1eb Build.PL
-SHA1 510e1c4e6b6fe2f81f5bfcd3e5abdcbba928295a Changes
+SHA1 30ad005887c2b3a6fefbe9154dd1117b2ac3361c Build.PL
+SHA1 7d84749fee9b997064bb1f1385ab3e2643fa2524 Changes
 SHA1 53a1a50705853db54284e60cd6095c6c6fe1e19b INSTALL
 SHA1 50e45266e4e905bf0848a94acb76a55790068f03 LICENSE
-SHA1 a6c501e6016f17d35a4412fc1cfd91bf62075c0b MANIFEST
-SHA1 97875cfedeb41d53c9e16afb35757ab4a858dbca META.yml
+SHA1 ad1e1c6668280de31080ff34054fc258b475ba43 MANIFEST
+SHA1 ccb8285aa18eb1c96f33e29163ba97f4a23ea7f4 META.yml
 SHA1 bf05fb9ef255b5dfe7fd264b0808279d25a67cf7 Makefile.PL
 SHA1 0205b284f69723469ebf5b538c00754359c5ac8f README
 SHA1 181d1b7f5777cd39643fa14269f187b84553f54d contrib/bash_completion.module-build
-SHA1 8132ed69ec91df397585460e71193d6938836ff8 lib/Module/Build.pm
+SHA1 6a93fcca6938ea3ea0c4ce545a0b08a9b8443355 lib/Module/Build.pm
 SHA1 af9632878059072dc4a7354520f10aa3a29a02f6 lib/Module/Build/API.pod
 SHA1 8b12ecc740383d16a7b79e4f265e4f7f3da9ff86 lib/Module/Build/Authoring.pod
-SHA1 bc2bff06139fbe795d5883610c6698da8182b873 lib/Module/Build/Base.pm
+SHA1 46a5ba39d5b7a3d6cd2fe7e6c55da62fb76f8ca2 lib/Module/Build/Base.pm
 SHA1 2e5f21503e9640251c865b7240e9d35461e819ea lib/Module/Build/Bundling.pod
-SHA1 0358dd9dc3fce18b4d398cf3b38521afba3d498b lib/Module/Build/Compat.pm
-SHA1 5e7a6735b74768e028c70f60ca8be4985df4551d lib/Module/Build/Config.pm
-SHA1 a2d7a52d167991bcb2c741241d9df6864439329d lib/Module/Build/Cookbook.pm
-SHA1 d76905813433b5d11ba6987429b3d009b6a9bcb3 lib/Module/Build/Dumper.pm
-SHA1 77587a2292bb3a587526eaac4a817864ad624548 lib/Module/Build/ModuleInfo.pm
-SHA1 f73fda32a91268d1378b2782013df9a6cbcd88cd lib/Module/Build/Notes.pm
-SHA1 7586a4bb9df4a3e7a4e514875629de7ad792a13e lib/Module/Build/PPMMaker.pm
-SHA1 4e405aa84c05c3b6a4ecc1663d5312cd78ca3f47 lib/Module/Build/Platform/Amiga.pm
-SHA1 1f33b98c92c8ac584a413eb40494b04a2b07504b lib/Module/Build/Platform/Default.pm
-SHA1 e7d832712dcc180108358a56aabc358a372924ee lib/Module/Build/Platform/EBCDIC.pm
-SHA1 24c1bc9a63d243c8b4bb40e7b3a1768d2e19c430 lib/Module/Build/Platform/MPEiX.pm
-SHA1 1de985ba2c885b8401a7d0e99af8760525141433 lib/Module/Build/Platform/MacOS.pm
-SHA1 fb84c1571886d66a53cb39da136059877d0ffcb4 lib/Module/Build/Platform/RiscOS.pm
-SHA1 910686d8edabe77c310531a01d54bcc815f7b01d lib/Module/Build/Platform/Unix.pm
-SHA1 fca710222850d4330830a331c3a8d45579f3beba lib/Module/Build/Platform/VMS.pm
-SHA1 19e51b9561392f6b6387bde63722cd8ef5519293 lib/Module/Build/Platform/VOS.pm
-SHA1 f6bdf3decf4d1e430697b09540bfcd2ac1766a7a lib/Module/Build/Platform/Windows.pm
-SHA1 6c6974ad70cfc03511e121352dab75101d5b2ede lib/Module/Build/Platform/aix.pm
-SHA1 3e083655be1f36431a184fe8f1d1ab5f8ac56826 lib/Module/Build/Platform/cygwin.pm
-SHA1 3993941f6d4068d6eee20d1ccbdd993ebc433fbc lib/Module/Build/Platform/darwin.pm
-SHA1 452fe6aff7358cda74ff9a46a5e5743f54a760f3 lib/Module/Build/Platform/os2.pm
-SHA1 7c37b98de2c74fca4ddd8baf419926b19e7f8ba6 lib/Module/Build/PodParser.pm
+SHA1 02b76e1012423679328ae2f50bc802a74ca72180 lib/Module/Build/Compat.pm
+SHA1 7595b79a0cfa3d989b03c3d28396ac776723122a lib/Module/Build/Config.pm
+SHA1 441335a6fab576b17c2421603ff4f5aeb3cd8ca3 lib/Module/Build/Cookbook.pm
+SHA1 08be42c813013b8d555ab32f22fae19ebcfb91d4 lib/Module/Build/Dumper.pm
+SHA1 3757502323be253fa3507bfa55a0284aba11464a lib/Module/Build/ModuleInfo.pm
+SHA1 abad039d10126d5f94066fff1e5e2507ec2d797d lib/Module/Build/Notes.pm
+SHA1 6a7239d8c7841865c3807163273434ba082d6d50 lib/Module/Build/PPMMaker.pm
+SHA1 865bffe5f6acee5310ea5ef3e2b9644b6fe091f8 lib/Module/Build/Platform/Amiga.pm
+SHA1 cac877f6dfb2e72aaae72513bd7c91624f4ec61d lib/Module/Build/Platform/Default.pm
+SHA1 662bfca49ddf4cc8b84502b4dddb6ab60c771c12 lib/Module/Build/Platform/EBCDIC.pm
+SHA1 e37aca71bce3a1e7e3167fedc4d3a8f94b3f37a7 lib/Module/Build/Platform/MPEiX.pm
+SHA1 1c0cf3e3f0800c8159b8fe809b82e8f877f4a6f7 lib/Module/Build/Platform/MacOS.pm
+SHA1 dc397734c35039d40c2f14baccb240dd93e7f4e6 lib/Module/Build/Platform/RiscOS.pm
+SHA1 24e0e8a364b34ceeff25eda6156bff7ea2ad3aa9 lib/Module/Build/Platform/Unix.pm
+SHA1 2310c487e4f5e3793c8ab21ff4024473b2bcaeb7 lib/Module/Build/Platform/VMS.pm
+SHA1 d1b4f0760316b7ee4d2d35ff87651b40caeb1c83 lib/Module/Build/Platform/VOS.pm
+SHA1 ef89687b541d71d161c8727059e212ca380e9fb2 lib/Module/Build/Platform/Windows.pm
+SHA1 6abedf4333deaaa40412d5e9548538825f75ae51 lib/Module/Build/Platform/aix.pm
+SHA1 d4fd36f79400f8f33c5f89798a6990cf62073822 lib/Module/Build/Platform/cygwin.pm
+SHA1 35958d9ab912cfb36e1bbc650da65bdd10fffa77 lib/Module/Build/Platform/darwin.pm
+SHA1 9784247ca0c2aa2d4574e293a21ec337c275ce98 lib/Module/Build/Platform/os2.pm
+SHA1 f89d391d4b8ca74c5633c1cdbe42436702eb679e lib/Module/Build/PodParser.pm
 SHA1 eb7d8c9fa63c20b1a9e2eb226a92e2bb9d6dbade lib/Module/Build/Version.pm
 SHA1 1c44e22c5993f6c32aeee09cfa47bce712cd5189 lib/Module/Build/YAML.pm
-SHA1 542bdb758e378c57dbb997305724dd6019a394ce lib/inc/latest.pm
-SHA1 8dd049f59ed79e66f02511cbeb63d358f751c47d lib/inc/latest/private.pm
+SHA1 db1f41867a9d1a637d2e329fe49de118402ebf2d lib/inc/latest.pm
+SHA1 45090d5bff3ce7bb6431fe11127a8d25725c4ddc lib/inc/latest/private.pm
 SHA1 f34987277f785499963061b7671d712adec63af9 scripts/config_data
 SHA1 f3177a8d4ce8ff135b922c142b2cd6fe0abae599 t/PL_files.t
 SHA1 36bf8d9fd951499661650aab3a0f5625da22227a t/README.pod
 SHA1 55f51b8a6e960fc147da65fcf363c5028473d4c3 t/actions/installdeps.t
 SHA1 7992017d6a2afed90fc3bbf7ac1813259aad12ce t/add_property.t
 SHA1 7550e12bc195bc91b639d3946cc3e7cce72feee4 t/basic.t
-SHA1 338468521690fcdf46683950f6b5a3d78c206ab6 t/bundle_inc.t
+SHA1 cb071c86604142059e0a1cf6b73afa9ac5243469 t/bundle_inc.t
 SHA1 30b6fc81fcc413cec011c6e53ef84a67016e28ff t/bundled/Tie/CPHash.pm
 SHA1 8b69b6972e9f9028a875f6beaf598f78815607d2 t/compat.t
 SHA1 027cc4ddc07ab0018daccf11614c78b48a258318 t/compat/exit.t
@@ -84,12 +84,12 @@ SHA1 ee916e6f532f6d3ff784c022867bf0425b5b0a16 t/notes.t
 SHA1 3d754561910adba40dc2763635b716ff9a2eddda t/par.t
 SHA1 f838c59b2bb6d1bbc2af6c49bc2deed80e52b2b0 t/parents.t
 SHA1 bc5e61b7b2e8a00045e4fbe7d3d17cb9002e38d2 t/perl_mb_opt.t
-SHA1 b38dc1539260dd205d2357209a757cd4beaa576d t/pod_parser.t
+SHA1 ccc9de4369e2df3380738872119cfaa3df797028 t/pod_parser.t
 SHA1 13512301c753f20257baa9f0e53f22486c0ba39a t/ppm.t
 SHA1 ad4b634f67a17223c486ce9ff2b9ec2a5f9ceeea t/properties/module_name.t
 SHA1 d962c37458d7bfb9eb54730cac6b3eea6baa9e62 t/properties/needs_compiler.t
 SHA1 984f8bd1a6e30cdafba86fd641ac50b501abb573 t/properties/share_dir.t
-SHA1 e242ed3bffccdf271b7fbaf34ed72d089537b42f t/really/long/file/path/that/will/hold/a/file/that/is/just/longer/than/100/chars/foobarbambazwibblewobbledingdangdong
+SHA1 46c17c2c2f94fa02c91d7e9b76b06e4ad99146ca t/resume.t
 SHA1 2efef7c5663f58344ab1334d1de2ed350d59d024 t/runthrough.t
 SHA1 c6ea0501a4f403c9018dc174b871b26d81ef8887 t/sample.t
 SHA1 631efe0884b2de4ae70ddc8c060e36379ac4e6e1 t/script_dist.t
@@ -105,7 +105,7 @@ SHA1 836c6c8f8532544a4296cd14c3ccd9c563cfa74b t/xs.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.9 (GNU/Linux)
 
-iEYEARECAAYFAkr8qSEACgkQKeygAqLMQmMdoQCfXBLa2jaii6k57u7ZUgCYDUcn
-r9oAoIfSIuHewynjsRE1p7GIM21peKmj
-=PHYL
+iEYEARECAAYFAkr/LOoACgkQKeygAqLMQmMTcwCgzfZRMMxDzxDFbpySG+1AQ0Mh
+e40AnjTjkk1qYvAsOU6YZe8yHhNpHmOk
+=PraK
 -----END PGP SIGNATURE-----

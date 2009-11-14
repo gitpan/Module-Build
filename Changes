@@ -1,6 +1,19 @@
 Revision history for Perl extension Module::Build.
 
-0.35_06 - 
+0.35_07 - Sat Nov 14 17:14:39 EST 2009
+
+ Bug fixes:
+
+ - Auto-detection of abstract and author fixed for mixed-case POD headers
+   (RT#51117) [David Wheeler]
+
+ - resume() was not restoring additions to @INC added in Build.PL
+   (RT#50145) [David Golden]
+
+ - When tarball paths are less than 100 characters, disables 'prefix'
+   mode of Archive::Tar for maximum compatibility (RT#50571) [David Golden]
+
+0.35_06 - Fri Nov 13 14:51:28 EST 2009
 
  Enhancements:
 
@@ -20,7 +33,7 @@ Revision history for Perl extension Module::Build.
  - Module::Build::Compat will now die with an error if advanced,
    non-numeric prerequisites are given, as these are not supported by
    ExtUtils::MakeMaker in PREREQ_PM [David Golden]
-   
+
  - Made MYMETA generation non-fatal if fields required for META.yml 
    are missing [David Golden]
 
@@ -29,7 +42,7 @@ Revision history for Perl extension Module::Build.
    [David Golden]
 
  - Won't die if installed Pod::Readme is broken [David Golden]
- 
+
  Other:
 
  - Fixed Module::Build::Notes POD [David Golden]
