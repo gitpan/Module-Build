@@ -32,9 +32,11 @@ my $build = Module::Build->new(
     'File::Find'            => 0,
     'File::Path'            => 0,
     'File::Spec'            => ($^O eq 'MSWin32' ? 3.30 : '0.82'), # rel2abs()
+    'ExtUtils::CBuilder'    => 0.27, # major platform fixes
     'ExtUtils::Install'     => 0,
     'ExtUtils::Manifest'    => 0,
     'ExtUtils::Mkbootstrap' => 0,
+    'ExtUtils::ParseXS'     => 2.21, # various bug fixes
     'IO::File'              => 0,
     'Cwd'                   => 0,
     'Text::Abbrev'          => 0,
@@ -93,11 +95,6 @@ my $build = Module::Build->new(
     YAML_support => {
       description => "Use YAML::Tiny to write META.yml files",
       requires    => {'YAML::Tiny' => 1.38},
-    },
-    C_support => {
-      description => "Compile/link C & XS code",
-      requires    => {'ExtUtils::CBuilder' => 0.260301,},
-      recommends  => {'ExtUtils::ParseXS' => 2.21,},
     },
     manpage_support => {
       description => "Create Unix man pages",

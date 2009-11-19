@@ -10,12 +10,10 @@ my $tmp;
 blib_load('Module::Build');
 
 {
-  my ($have_c_compiler, $C_support_feature, $tmp_exec) = check_compiler();
+  my ($have_c_compiler, $tmp_exec) = check_compiler();
 
-  if (! $C_support_feature) {
-    plan skip_all => 'C_support not enabled';
-  } elsif ( !$have_c_compiler ) {
-    plan skip_all => 'C_support enabled, but no compiler found';
+  if ( !$have_c_compiler ) {
+    plan skip_all => 'No compiler found';
   } elsif ( $^O eq 'VMS' ) {
     plan skip_all => 'Child test output confuses harness';
   } elsif ( !$Config{usedl} ) {
@@ -24,7 +22,7 @@ blib_load('Module::Build');
     plan tests => 20;
   }
   require Cwd;
-  $tmp = MBTest->tmpdir( $tmp_exec ? undef : Cwd::cwd );
+  $tmp = MBTest->tmpdir( $tmp_exec ? () : (DIR => Cwd::cwd) );
 }
 
 
@@ -65,7 +63,7 @@ is $@, '';
 }
 
 {
-  # Try again in a subprocess 
+  # Try again in a subprocess
   eval {$mb->dispatch('clean')};
   is $@, '';
 
