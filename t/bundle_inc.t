@@ -8,7 +8,12 @@ use Config;
 use IO::File;
 use File::Spec;
 use ExtUtils::Packlist;
+use ExtUtils::Installed;
 use File::Path;
+
+sub _check_EUI {
+  stdout_stderr_of( sub { ExtUtils::Installed->new(extra_libs => [@INC]) });
+}
 
 # Ensure any Module::Build modules are loaded from correct directory
 blib_load('Module::Build');
@@ -16,6 +21,9 @@ blib_load('Module::Build::ConfigData');
 
 if ( $ENV{PERL_CORE} ) {
   plan skip_all => 'bundle_inc tests will never succeed in PERL_CORE';
+}
+elsif ( timed_out( \&_check_EUI ) ) {
+  plan skip_all => 'ExtUtils::Installed takes too long on your system';
 }
 elsif ( Module::Build::ConfigData->feature('inc_bundling_support') ) {
   plan tests => 18;
