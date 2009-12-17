@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.35_13';
+$VERSION = '0.35_14';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -1090,11 +1090,11 @@ sub _guess_module_name {
     $p->{module_name} = $mi->name;
   }
   else {
-    my $mod_path = my $mod_name = File::Basename::basename($self->base_dir);
+    my $mod_path = my $mod_name = $p->{dist_name};
     $mod_name =~ s{-}{::}g;
     $mod_path =~ s{-}{/}g;
     $mod_path .= ".pm";
-    if ( -e $mod_path || -e File::Spec->catfile('lib', $mod_path) ) {
+    if ( -e $mod_path || -e "lib/$mod_path" ) {
       $p->{module_name} = $mod_name;
     }
     else {
@@ -2756,14 +2756,14 @@ sub _find_share_dir_files {
 
   my @file_map;
   if ( $share_dir->{dist} ) {
-    my $prefix = File::Spec->catdir( "dist", $self->dist_name );
+    my $prefix = "dist/".$self->dist_name;
     push @file_map, $self->_share_dir_map( $prefix, $share_dir->{dist} );
   }
 
   if ( $share_dir->{module} ) {
     for my $mod ( keys %{ $share_dir->{module} } ) {
       (my $altmod = $mod) =~ s{::}{-}g;
-      my $prefix = File::Spec->catdir("module", $altmod);
+      my $prefix = "module/$altmod";
       push @file_map, $self->_share_dir_map($prefix, $share_dir->{module}{$mod});
     }
   }
@@ -2776,9 +2776,8 @@ sub _share_dir_map {
   my %files;
   for my $dir ( @$list ) {
     for my $f ( @{ $self->rscan_dir( $dir, sub {-f} )} ) {
-      $files{File::Spec->canonpath($f)} = File::Spec->catfile(
-        $prefix, File::Spec->abs2rel( $f, $dir )
-      );
+      $f =~ s{\A.*\Q$dir\E/}{};
+      $files{"$dir/$f"} = "$prefix/$f";
     }
   }
   return %files;
@@ -3990,8 +3989,7 @@ sub share_dir {
 
   # Always coerce to proper hash form
   if    ( ! defined $p->{share_dir} ) {
-    # not set -- use default 'share' dir if exists
-    $p->{share_dir} = { dist => [ 'share' ] } if -d 'share';
+    return;
   }
   elsif ( ! ref $p->{share_dir}  ) {
     # scalar -- treat as a single 'dist' directory
