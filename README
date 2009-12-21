@@ -569,7 +569,9 @@ OPTIONS
         Suppresses the check upon startup that the version of Module::Build
         we're now running under is the same version that was initially
         invoked when building the distribution (i.e. when the `Build.PL'
-        script was first run). Use with caution.
+        script was first run). As of 0.3601, a mismatch results in a warning
+        instead of a fatal error, so this option effectively just suppresses
+        the warning.
 
     debug
         Prints Module::Build debugging information to STDOUT, such as a
