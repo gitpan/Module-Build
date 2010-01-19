@@ -1,5 +1,12 @@
 Revision history for Perl extension Module::Build.
 
+0.3602 - Mon Jan 18 22:09:54 EST 2010
+
+ Bug fixes:
+
+ - Fix failures in t/properties/needs_compiler.t when $ENV{CC} is set
+   (RT#53296) [David Golden, adapted from patch by Jens Rehsack]
+
 0.3601 - Mon Dec 21 14:39:33 EST 2009
 
  Bug fixes:
