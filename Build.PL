@@ -51,7 +51,7 @@ my $build = Module::Build->new(
     'version'            => 0.74,
   },
   recursive_test_files => 1,
-  sign          => 1,
+  sign          => 0, 
   create_readme => 1,
   create_license => 1,
 
@@ -111,11 +111,8 @@ my $build = Module::Build->new(
   script_files   => ['scripts/config_data'],
   meta_merge     => {
     resources => {
-      homepage => 'http://sourceforge.net/projects/module-build',
-      bugtracker =>
-        'http://rt.cpan.org/NoAuth/Bugs.html?Dist=Module-Build',
       MailingList => 'mailto:module-build@perl.org',
-      repository  => 'http://svn.perl.org/modules/Module-Build/'
+      repository  => 'http://github.com/dagolden/module-build.git'
     }
   },
 );
