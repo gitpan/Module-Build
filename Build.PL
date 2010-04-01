@@ -112,7 +112,7 @@ my $build = Module::Build->new(
   meta_merge     => {
     resources => {
       MailingList => 'mailto:module-build@perl.org',
-      repository  => 'http://github.com/dagolden/module-build.git'
+      repository  => 'http://github.com/dagolden/module-build/'
     }
   },
 );
