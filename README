@@ -316,6 +316,13 @@ ACTIONS
         See the distcheck and skipcheck actions if you want to find out what
         the "manifest" action would do, without actually doing anything.
 
+    manifest_skip
+        [version 0.3608]
+
+        This is an action intended for use by module authors, not people
+        installing modules. It will generate a boilerplate MANIFEST.SKIP
+        file if one does not already exist.
+
     manpages
         [version 0.28]
 
@@ -555,7 +562,8 @@ OPTIONS
         Suppress informative messages on output.
 
     verbose
-        Display extra information about the Build on output.
+        Display extra information about the Build on output. "verbose" will
+        turn off "quiet"
 
     cpan_client
         Sets the "cpan_client" command for use with the "installdeps"

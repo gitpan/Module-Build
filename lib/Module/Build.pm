@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.3607';
+$VERSION = '0.36_08';
 $VERSION = eval $VERSION;
 
 # Okay, this is the brute-force method of finding out what kind of
@@ -168,27 +168,27 @@ This illustrates initial configuration and the running of three
 'actions'.  In this case the actions run are 'build' (the default
 action), 'test', and 'install'.  Other actions defined so far include:
 
-  build                          manpages
-  checkchanges                   pardist
-  checkgit                       patch_blead
-  clean                          ppd
-  code                           ppmdist
-  config_data                    prereq_data
-  diff                           prereq_report
-  dist                           pure_install
-  distcheck                      realclean
-  distclean                      retest
-  distdir                        skipcheck
-  distmeta                       tag_git
-  distsign                       test
-  disttest                       testall
-  docs                           testcover
-  fakeinstall                    testdb
-  help                           testpod
-  html                           testpodcoverage
-  install                        upload
-  installdeps                    versioninstall
-  manifest
+  build                          manifest_skip
+  checkchanges                   manpages
+  checkgit                       pardist
+  clean                          patch_blead
+  code                           ppd
+  config_data                    ppmdist
+  diff                           prereq_data
+  dist                           prereq_report
+  distcheck                      pure_install
+  distclean                      realclean
+  distdir                        retest
+  distmeta                       skipcheck
+  distsign                       tag_git
+  disttest                       test
+  docs                           testall
+  fakeinstall                    testcover
+  help                           testdb
+  html                           testpod
+  install                        testpodcoverage
+  installdeps                    upload
+  manifest                       versioninstall
 
 You can run the 'help' action for a complete list of actions.
 
@@ -493,6 +493,14 @@ add your own stuff to it:
 See the L<distcheck> and L<skipcheck> actions if you want to find out
 what the C<manifest> action would do, without actually doing anything.
 
+=item manifest_skip
+
+[version 0.3608]
+
+This is an action intended for use by module authors, not people
+installing modules.  It will generate a boilerplate MANIFEST.SKIP file
+if one does not already exist.
+
 =item manpages
 
 [version 0.28]
@@ -754,7 +762,8 @@ Suppress informative messages on output.
 
 =item verbose
 
-Display extra information about the Build on output.
+Display extra information about the Build on output.  C<verbose> will
+turn off C<quiet>
 
 =item cpan_client
 

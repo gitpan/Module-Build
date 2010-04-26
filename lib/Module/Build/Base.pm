@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.3607';
+$VERSION = '0.36_08';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -201,15 +201,15 @@ sub _construct {
 
 sub log_info {
   my $self = shift;
-  print @_ unless(ref($self) and $self->quiet);
+  print @_ if ref($self) && ( $self->verbose || ! $self->quiet );
 }
 sub log_verbose {
   my $self = shift;
-  $self->log_info(@_) if(ref($self) and $self->verbose);
+  print @_ if ref($self) && $self->verbose;
 }
 sub log_debug {
   my $self = shift;
-  print @_ if ref $self && $self->debug;
+  print @_ if ref($self) && $self->debug;
 }
 
 sub log_warn {
@@ -1180,6 +1180,26 @@ sub version_from_file { # Method provided for backwards compatibility
 
 sub find_module_by_name { # Method provided for backwards compatibility
   return Module::Build::ModuleInfo->find_module_by_name(@_[1,2]);
+}
+
+{
+  # $unlink_list_for_pid{$$} = [ ... ]
+  my %unlink_list_for_pid;
+
+  sub _unlink_on_exit {
+    my $self = shift;
+    for my $f ( @_ ) {
+      push @{$unlink_list_for_pid{$$}}, $f if -f $f;
+    }
+    return 1;
+  }
+
+  END {
+    for my $f ( map glob($_), @{ $unlink_list_for_pid{$$} || [] } ) {
+      next unless -e $f;
+      File::Path::rmtree($f, 0, 0);
+    }
+  }
 }
 
 sub add_to_cleanup {
@@ -3671,7 +3691,10 @@ sub do_create_license {
     or die "No license specified";
 
   my $key = $self->valid_licenses->{$l}
-    or die "'$l' isn't a license key we know about";
+    or die "'$l' isn't a recognized license\n",
+           "licenses we know about:\n",
+           map { "\t$_\n" } sort keys %{ $self->valid_licenses };
+
   my $class = "Software::License::$key";
 
   eval "use $class; 1"
@@ -3779,9 +3802,6 @@ sub ACTION_distdir {
 
   $self->depends_on('distmeta');
 
-  # Must not include MYMETA
-  $self->_check_mymeta_skip('MANIFEST.SKIP');
-
   my $dist_files = $self->_read_manifest('MANIFEST')
     or die "Can't create distdir without a MANIFEST file - run 'manifest' action first.\n";
   delete $dist_files->{SIGNATURE};  # Don't copy, create a fresh one
@@ -3797,6 +3817,7 @@ sub ACTION_distdir {
   $self->add_to_cleanup($dist_dir);
 
   foreach my $file (keys %$dist_files) {
+    next if $file =~ m{^MYMETA\.}; # Double check that we skip MYMETA.*
     my $new = $self->copy_if_modified(from => $file, to_dir => $dist_dir, verbose => 0);
   }
 
@@ -3942,7 +3963,7 @@ sub _check_manifest_skip {
   if ( ! -e $maniskip ) {
     $self->log_warn("File '$maniskip' does not exist: Creating a temporary '$maniskip'\n");
     $self->_write_default_maniskip($maniskip);
-    $self->add_to_cleanup($maniskip);
+    $self->_unlink_on_exit($maniskip);
   }
   else {
     # MYMETA must not be added to MANIFEST, so always confirm the skip
@@ -3960,6 +3981,18 @@ sub ACTION_manifest {
   require ExtUtils::Manifest;  # ExtUtils::Manifest is not warnings clean.
   local ($^W, $ExtUtils::Manifest::Quiet) = (0,1);
   ExtUtils::Manifest::mkmanifest();
+}
+
+sub ACTION_manifest_skip {
+  my ($self) = @_;
+
+  if ( -e 'MANIFEST.SKIP' ) {
+    $self->log_warn("MANIFEST.SKIP already exists.\n");
+    return 0;
+  }
+  $self->log_info("Creating a new MANIFEST.SKIP file\n");
+  return $self->_write_default_maniskip;
+  return -e 'MANIFEST.SKIP'
 }
 
 # Case insensitive regex for files

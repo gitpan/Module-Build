@@ -1,5 +1,27 @@
 Revision history for Perl extension Module::Build.
 
+0.36_08 - Mon Apr 26 08:00:15 EDT 2010
+
+ Enhancements:
+
+ - Give a list of valid licenses when given one we don't recognize
+   (RT#55951) [Yanick Champoux]
+
+ - Added 'Build manifest_skip' action to generate a default MANIFEST.SKIP
+   [David Golden]
+
+ Changes:
+
+ - When temporarily generating a MANIFEST.SKIP when none exists, it will
+   be removed on exit instead of hanging around until 'Build clean'.  This
+   is less surprising/confusing and the 'Build manifest_skip' action
+   is now available instead to bootstrap the file [David Golden]
+
+ Bug fixes:
+
+ - Fixed runtime error on cygwin when searching for an executable command
+   during installdeps testing [David Golden]
+
 0.3607 - Thu Apr  1 11:27:16 EDT 2010
 
  Bug fixes:
