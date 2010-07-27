@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.36_11';
+$VERSION = '0.36_12';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -1408,8 +1408,8 @@ sub _feature_deps_msg {
     return $log_text;
 }
 
-# Automatically detect and add prerequisites based on configuration
-sub auto_require {
+# Automatically detect configure_requires prereqs
+sub auto_config_requires {
   my ($self) = @_;
   my $p = $self->{properties};
 
@@ -1420,6 +1420,10 @@ sub auto_require {
     && ! exists $p->{configure_requires}{'Module::Build'}
   ) {
     (my $ver = $VERSION) =~ s/^(\d+\.\d\d).*$/$1/; # last major release only
+    $self->log_warn(<<EOM);
+Module::Build was not found in configure_requires! Adding it now
+automatically as: configure_requires => { 'Module::Build' => $ver }
+EOM
     $self->_add_prereq('configure_requires', 'Module::Build', $ver);
   }
 
@@ -1433,6 +1437,14 @@ sub auto_require {
       $self->_add_prereq('configure_requires', $mod, $mod->VERSION);
     }
   }
+
+  return;
+}
+
+# Automatically detect and add prerequisites based on configuration
+sub auto_require {
+  my ($self) = @_;
+  my $p = $self->{properties};
 
   # If needs_compiler is not explictly set, automatically set it
   # If set, we need ExtUtils::CBuilder (and a compiler)
@@ -1591,7 +1603,7 @@ sub check_installed_status {
       return \%status;
     }
 
-    $status{have} = $pm_info->version();
+    $status{have} = eval { $pm_info->version() };
     if ($spec and !defined($status{have})) {
       @status{ qw(have message) } = (undef, "Couldn't find a \$VERSION in prerequisite $modname");
       return \%status;
@@ -1705,9 +1717,6 @@ sub print_build_script {
 
   my %q = map {$_, $self->$_()} qw(config_dir base_dir);
 
-  my $case_tolerant = 0+(File::Spec->can('case_tolerant')
-			 && File::Spec->case_tolerant);
-  $q{base_dir} = uc $q{base_dir} if $case_tolerant;
   $q{base_dir} = Win32::GetShortPathName($q{base_dir}) if $self->is_windowsish;
 
   $q{magic_numfile} = $self->config_file('magicnum');
@@ -1802,8 +1811,8 @@ sub create_mymeta {
   # if we read META OK, just update it
   if ( defined $mymeta ) {
     my $prereqs = $self->_normalize_prereqs;
-    for my $t ( keys %$prereqs ) {
-        $mymeta->{$t} = $prereqs->{$t};
+    for my $t ( 'configure_requires', @{$self->prereq_action_types} ) {
+        $mymeta->{$t} = $prereqs->{$t} if $prereqs->{$t};
     }
   }
   # but generate from scratch, ignoring errors if META doesn't exist
@@ -2685,7 +2694,7 @@ sub ACTION_testcover {
   # testcover was run.  If so, start over.
   if (-e 'cover_db') {
     my $pm_files = $self->rscan_dir
-        (File::Spec->catdir($self->blib, 'lib'), file_qr('\.pm$') );
+        (File::Spec->catdir($self->blib, 'lib'), $self->file_qr('\.pm$') );
     my $cover_files = $self->rscan_dir('cover_db', sub {-f $_ and not /\.html$/});
 
     $self->do_system(qw(cover -delete))
@@ -2750,11 +2759,11 @@ sub process_support_files {
   if (ref($p->{c_source}) eq "ARRAY") {
       push @{$p->{include_dirs}}, @{$p->{c_source}};
       for my $path (@{$p->{c_source}}) {
-          push @$files, @{ $self->rscan_dir($path, file_qr('\.c(c|p|pp|xx|\+\+)?$')) };
+          push @$files, @{ $self->rscan_dir($path, $self->file_qr('\.c(c|p|pp|xx|\+\+)?$')) };
       }
   } else {
       push @{$p->{include_dirs}}, $p->{c_source};
-      $files = $self->rscan_dir($p->{c_source}, file_qr('\.c(c|p|pp|xx|\+\+)?$'));
+      $files = $self->rscan_dir($p->{c_source}, $self->file_qr('\.c(c|p|pp|xx|\+\+)?$'));
   }
 
   foreach my $file (@$files) {
@@ -2878,8 +2887,10 @@ sub find_PL_files {
   }
 
   return unless -d 'lib';
-  return { map {$_, [/^(.*)\.PL$/i ]} @{ $self->rscan_dir('lib',
-                                                          file_qr('\.PL$')) } };
+  return { 
+    map {$_, [/^(.*)\.PL$/i ]} 
+    @{ $self->rscan_dir('lib', $self->file_qr('\.PL$')) } 
+  };
 }
 
 sub find_pm_files  { shift->_find_file_by_type('pm',  'lib') }
@@ -2932,7 +2943,7 @@ sub _find_file_by_type {
   return { map {$_, $_}
 	   map $self->localize_file_path($_),
 	   grep !/\.\#/,
-	   @{ $self->rscan_dir($dir, file_qr("\\.$type\$")) } };
+	   @{ $self->rscan_dir($dir, $self->file_qr("\\.$type\$")) } };
 }
 
 sub localize_file_path {
@@ -3005,7 +3016,7 @@ sub ACTION_testpod {
   my @files = sort keys %{$self->_find_pods($self->libdoc_dirs)},
                    keys %{$self->_find_pods
                              ($self->bindoc_dirs,
-                              exclude => [ file_qr('\.bat$') ])}
+                              exclude => [ $self->file_qr('\.bat$') ])}
     or die "Couldn't find any POD files to test\n";
 
   { package # hide from PAUSE
@@ -3086,6 +3097,10 @@ sub ACTION_manpages {
 
   foreach my $type ( qw(bin lib) ) {
     next unless ( $self->invoked_action eq 'manpages' || $self->_is_default_installable("${type}doc"));
+    my $files = $self->_find_pods( $self->{properties}{"${type}doc_dirs"},
+                                   exclude => [ $self->file_qr('\.bat$') ] );
+    next unless %$files;
+
     my $sub = $self->can("manify_${type}_pods");
     $self->$sub() if defined( $sub );
   }
@@ -3095,7 +3110,7 @@ sub manify_bin_pods {
   my $self    = shift;
 
   my $files   = $self->_find_pods( $self->{properties}{bindoc_dirs},
-                                   exclude => [ file_qr('\.bat$') ] );
+                                   exclude => [ $self->file_qr('\.bat$') ] );
   return unless keys %$files;
 
   my $mandir = File::Spec->catdir( $self->blib, 'bindoc' );
@@ -3195,7 +3210,7 @@ sub htmlify_pods {
   $self->add_to_cleanup('pod2htm*');
 
   my $pods = $self->_find_pods( $self->{properties}{"${type}doc_dirs"},
-                                exclude => [ file_qr('\.(?:bat|com|html)$') ] );
+                                exclude => [ $self->file_qr('\.(?:bat|com|html)$') ] );
   return unless %$pods;  # nothing to do
 
   unless ( -d $htmldir ) {
@@ -3218,12 +3233,32 @@ sub htmlify_pods {
   my $podpath = join(":", map { tr,:\\,|/,; $_ } @podpath);
 
   my $blibdir = join('/', File::Spec->splitdir(
-    (File::Spec->splitpath(File::Spec->rel2abs($htmldir),1))[1]),'');
+    (File::Spec->splitpath(File::Spec->rel2abs($htmldir),1))[1]),''
+  );
 
-    foreach my $pod ( keys %$pods ) {
+  my ($with_ActiveState, $htmltool);
+
+  if ( $with_ActiveState = $self->_is_ActivePerl
+    && eval { require ActivePerl::DocTools::Pod; 1 }
+  ) {
+    $htmltool = "ActiveState::DocTools::Pod " .
+      ActiveState::DocTools::Pod->VERSION;
+  }
+  else {
+      require Module::Build::PodParser;
+      require Pod::Html;
+    $htmltool = "Pod::Html " .  Pod::Html->VERSION;
+  }
+  $self->log_verbose("Converting Pod to HTML with $htmltool\n");
+
+  my $errors = 0;
+
+  POD:
+  foreach my $pod ( keys %$pods ) {
 
     my ($name, $path) = File::Basename::fileparse($pods->{$pod},
-       file_qr('\.(?:pm|plx?|pod)$'));
+      $self->file_qr('\.(?:pm|plx?|pod)$')
+    );
     my @dirs = File::Spec->splitdir( File::Spec->canonpath( $path ) );
     pop( @dirs ) if scalar(@dirs) && $dirs[-1] eq File::Spec->curdir;
 
@@ -3240,24 +3275,21 @@ sub htmlify_pods {
     }
 
     $self->log_verbose("HTMLifying $infile -> $outfile\n");
-    if ($self->_is_ActivePerl) {
+    if ( $with_ActiveState ) {
       my $depth = @rootdirs + @dirs;
       my %opts = ( infile => $infile,
-                   outfile => $tmpfile,
-                   podpath => $podpath,
-                   podroot => $podroot,
-                   index => 1,
-                   depth => $depth,
-                 );
+        outfile => $tmpfile,
+        podpath => $podpath,
+        podroot => $podroot,
+        index => 1,
+        depth => $depth,
+      );
       eval {
-        require ActivePerl::DocTools::Pod;
         ActivePerl::DocTools::Pod::pod2html(%opts);
         1;
-      } or $self->log_warn('AP::DT::P::pod2html ' .
-          join(", ", map { "$_ => $opts{$_}" } (keys %opts)) . " failed: $@");
+      } or $self->log_warn("[$htmltool] pod2html (" .
+        join(", ", map { "q{$_} => q{$opts{$_}}" } (keys %opts)) . ") failed: $@");
     } else {
-      require Module::Build::PodParser;
-      require Pod::Html;
       my $path2root = join( '/', ('..') x (@rootdirs+@dirs) );
       my $fh = IO::File->new($infile) or die "Can't read $infile: $!";
       my $abstract = Module::Build::PodParser->new(fh => $fh)->get_abstract();
@@ -3266,14 +3298,14 @@ sub htmlify_pods {
       $title .= " - $abstract" if $abstract;
 
       my @opts = (
-                  '--flush',
-                  "--title=$title",
-                  "--podpath=$podpath",
-                  "--infile=$infile",
-                  "--outfile=$tmpfile",
-                  "--podroot=$podroot",
-                  "--htmlroot=$path2root",
-                 );
+        '--flush',
+        "--title=$title",
+        "--podpath=$podpath",
+        "--infile=$infile",
+        "--outfile=$tmpfile",
+        "--podroot=$podroot",
+        "--htmlroot=$path2root",
+      );
 
       if ( eval{Pod::Html->VERSION(1.03)} ) {
         push( @opts, ('--header', '--backlink=Back to Top') );
@@ -3281,9 +3313,14 @@ sub htmlify_pods {
 
       $self->log_verbose("P::H::pod2html @opts\n");
       eval { Pod::Html::pod2html(@opts); 1 }
-        or $self->log_warn("pod2html @opts failed: $@");
+        or $self->log_warn("[$htmltool] pod2html( " .
+        join(", ", map { "q{$_}" } @opts) . ") failed: $@");
     }
     # We now have to cleanup the resulting html file
+    if ( ! -r $tmpfile ) {
+      $errors++;
+      next POD;
+    }
     my $fh = IO::File->new($tmpfile) or die "Can't read $tmpfile: $!";
     my $html = join('',<$fh>);
     $fh->close;
@@ -3306,6 +3343,9 @@ sub htmlify_pods {
     $fh->close;
     unlink($tmpfile);
   }
+
+  return ! $errors;
+
 }
 
 # Adapted from ExtUtils::MM_Unix
@@ -3350,7 +3390,7 @@ sub ACTION_diff {
   delete $installmap->{read};
   delete $installmap->{write};
 
-  my $text_suffix = file_qr('\.(pm|pod)$');
+  my $text_suffix = $self->file_qr('\.(pm|pod)$');
 
   while (my $localdir = each %$installmap) {
     my @localparts = File::Spec->splitdir($localdir);
@@ -3731,7 +3771,11 @@ sub do_create_makefile_pl {
   my $self = shift;
   require Module::Build::Compat;
   $self->log_info("Creating Makefile.PL\n");
-  Module::Build::Compat->create_makefile_pl($self->create_makefile_pl, $self, @_);
+  eval { Module::Build::Compat->create_makefile_pl($self->create_makefile_pl, $self, @_) };
+  if ( $@ ) {
+    1 while unlink 'Makefile.PL';
+    die "$@\n";
+  }
   $self->_add_to_manifest('MANIFEST', 'Makefile.PL');
 }
 
@@ -3976,6 +4020,17 @@ sub _spew {
     close $fh;
 }
 
+sub _case_tolerant {
+  my $self = shift;
+  if ( ref $self ) {
+    $self->{_case_tolerant} = File::Spec->case_tolerant
+      unless defined($self->{_case_tolerant});
+    return $self->{_case_tolerant};
+  }
+  else {
+    return File::Spec->case_tolerant;
+  }
+}
 
 sub _append_maniskip {
   my $self = shift;
@@ -4064,7 +4119,7 @@ sub ACTION_manifest_skip {
 
 # Case insensitive regex for files
 sub file_qr {
-    return File::Spec->case_tolerant ? qr($_[0])i : qr($_[0]);
+    return shift->{_case_tolerant} ? qr($_[0])i : qr($_[0]);
 }
 
 sub dist_dir {
@@ -4167,13 +4222,13 @@ sub script_files {
   }
 
   my %pl_files = map {
-    File::Spec->canonpath( File::Spec->case_tolerant ? uc $_ : $_ ) => 1
+    File::Spec->canonpath( $_ ) => 1
   } keys %{ $self->PL_files || {} };
 
   my @bin_files = $self->_files_in('bin');
 
   my %bin_map = map {
-    $_ => File::Spec->canonpath( File::Spec->case_tolerant ? uc $_ : $_ )
+    $_ => File::Spec->canonpath( $_ )
   } @bin_files;
 
   return $_ = { map {$_ => 1} grep !$pl_files{$bin_map{$_}}, @bin_files };
@@ -4245,7 +4300,6 @@ sub _hash_merge {
 
 sub ACTION_distmeta {
   my ($self) = @_;
-
   $self->do_create_makefile_pl if $self->create_makefile_pl;
   $self->do_create_readme if $self->create_readme;
   $self->do_create_license if $self->create_license;
@@ -4279,7 +4333,11 @@ sub do_create_metafile {
     push @INC, File::Spec->catdir($self->blib, 'lib');
   }
 
-  if ($self->write_metafile($self->metafile,$self->get_metadata(fatal=>1))){
+  if (
+    $self->write_metafile(
+      $self->metafile,$self->get_metadata(fatal=>1, auto => 1)
+    )
+  ){
     $self->{wrote_metadata} = 1;
     $self->_add_to_manifest('MANIFEST', $metafile);
   }
@@ -4381,6 +4439,8 @@ sub prepare_metadata {
   }
   my $fatal = $args->{fatal} || 0;
   my $p = $self->{properties};
+
+  $self->auto_config_requires if $args->{auto};
 
   # A little helper sub
   my $add_node = sub {
@@ -5355,7 +5415,7 @@ sub dir_contains {
 
   return 0 if @second_dirs < @first_dirs;
 
-  my $is_same = ( File::Spec->case_tolerant
+  my $is_same = ( $self->_case_tolerant
 		  ? sub {lc(shift()) eq lc(shift())}
 		  : sub {shift() eq shift()} );
 

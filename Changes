@@ -1,5 +1,37 @@
 Revision history for Perl extension Module::Build.
 
+0.36_12 - Tue Jul 27 00:08:51 EDT 2010
+
+  Enhancements:
+
+  - Module::Build::Compat will now convert dotted-decimal prereqs into
+    decimal rather than dying (and will warn about this). [Apocalypse]
+
+  Bug fixes:
+
+  - Caches case-sensitivity checks to boost performance, fixes 
+    RT#55162 and RT#56513 [Reini Urban]
+
+  - Won't try to use ActivePerl doc generation tools without confirming
+    that they are indeed installed. [David Golden]
+
+  - Sets temporary $ENV{HOME} in testing to an absolute path, which fixes
+    some issues when tested as part of the Perl core [Nicholas Clark]
+
+  - Module::Build::ModuleInfo now warns instead of dying when a module
+    has an invalid version.  ->version now just returns undef
+    (RT#59593) [David Golden]
+
+  Changes:
+
+  - When authors do not specify Module::Build in configure_requires and
+    Module::Build is automatically added, a warning will be issued
+    showing the added prerequisite [David Golden]
+
+  - Moved automatic configure_requires generation into get_metadata()
+    and added an 'auto' argument to toggle it (on for META and off
+    for MYMETA) [David Golden]
+
 0.36_11 - Thu May 27 09:41:23 EDT 2010
 
   Bug fixes:
