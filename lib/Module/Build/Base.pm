@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.36_13';
+$VERSION = '0.36_14';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -62,6 +62,7 @@ EOF
 
   $self->dist_name;
   $self->dist_version;
+  $self->release_status;
   $self->_guess_module_name unless $self->module_name;
 
   $self->_find_nested_builds;
@@ -963,6 +964,7 @@ __PACKAGE__->add_property($_) for qw(
   dist_abstract
   dist_author
   dist_name
+  dist_suffix
   dist_version
   dist_version_from
   extra_compiler_flags
@@ -983,6 +985,7 @@ __PACKAGE__->add_property($_) for qw(
   program_name
   quiet
   recursive_test_files
+  release_status
   script_files
   scripts
   share_dir
@@ -1123,6 +1126,41 @@ sub dist_name {
   return $p->{dist_name};
 }
 
+sub release_status {
+  my ($self) = @_;
+  my $p = $self->{properties};
+
+  if ( ! defined $p->{release_status} ) {
+    $p->{release_status} = $self->_is_dev_version ? 'testing' : 'stable';
+  }
+
+  unless ( $p->{release_status} =~ qr/\A(?:stable|testing|unstable)\z/ ) {
+    die "Illegal value '$p->{release_status}' for release_status\n";
+  }
+
+  if ( $p->{release_status} eq 'stable' && $self->_is_dev_version ) {
+    my $version = $self->dist_version;
+    die "Illegal value '$p->{release_status}' with version '$version'\n";
+  }
+  return $p->{release_status};
+}
+
+sub dist_suffix {
+  my ($self) = @_;
+  my $p = $self->{properties};
+  return $p->{dist_suffix} if defined $p->{dist_suffix};
+
+  if ( $self->release_status eq 'stable' ) {
+    $p->{dist_suffix} = "";
+  }
+  else {
+    # non-stable release but non-dev version number needs '-TRIAL' appended
+    $p->{dist_suffix} = $self->_is_dev_version ? "" : "TRIAL" ;
+  }
+
+  return $p->{dist_suffix};
+}
+
 sub dist_version_from {
   my ($self) = @_;
   my $p = $self->{properties};
@@ -1151,6 +1189,16 @@ sub dist_version {
     unless defined $p->{dist_version};
 
   return $p->{dist_version};
+}
+
+sub _is_dev_version {
+  my ($self) = @_;
+  my $dist_version = $self->dist_version;
+  my $version_obj = eval { Module::Build::Version->new( $dist_version ) };
+  # assume it's normal if the version string is fatal -- in this case
+  # the author might be doing something weird so should play along and
+  # assume they'll specify all necessary behavior
+  return $@ ? 0 : $version_obj->is_alpha;
 }
 
 sub dist_author   { shift->_pod_parse('author')   }
@@ -3789,22 +3837,17 @@ sub do_create_license {
   }
 
   my $l = $self->license
-    or die "No license specified";
+    or die "Can't create LICENSE file: No license specified\n";
 
-  my $key = $self->valid_licenses->{$l}
-    or die "'$l' isn't a recognized license\n",
-           "licenses we know about:\n",
-           map { "\t$_\n" } sort keys %{ $self->valid_licenses };
-
-  my $class = "Software::License::$key";
-
-  eval "use $class; 1"
-    or die "Can't load Software::License::$key to create LICENSE file: $@";
+  my $license = $self->_software_license_object
+    or die << "HERE";
+Can't create LICENSE file: '$l' is not a valid license key
+or Software::License subclass;
+HERE
 
   $self->delete_filetree('LICENSE');
 
   my $author = join " & ", @{ $self->dist_author };
-  my $license = $class->new({holder => $author});
   my $fh = IO::File->new('> LICENSE')
     or die "Can't write LICENSE file: $!";
   print $fh $license->fulltext;
@@ -4124,7 +4167,9 @@ sub file_qr {
 
 sub dist_dir {
   my ($self) = @_;
-  return join "-", $self->dist_name, $self->dist_version;
+  my $dir = join "-", $self->dist_name, $self->dist_version;
+  $dir .= "-" . $self->dist_suffix if $self->dist_suffix;
+  return $dir;
 }
 
 sub ppm_name {
@@ -4287,6 +4332,31 @@ BEGIN { *scripts = \&script_files; }
   }
 }
 
+# use mapping or license name directly
+sub _software_license_object {
+  my ($self) = @_;
+  return unless defined( my $license = $self->license );
+
+  my $class;
+  LICENSE: for my $l ( $self->valid_licenses->{ $license }, $license ) {
+    next unless defined $l;
+    my $trial = "Software::License::" . $l;
+    if ( eval "require Software::License; Software::License->VERSION(0.014); require $trial; 1" ) {
+      $class = $trial;
+      last LICENSE;
+    }
+  }
+  return unless defined $class;
+
+  # Software::License requires a 'holder' argument
+  my $sl = eval { $class->new({holder=>"nobody"}) };
+  if ( $@ ) {
+    $self->log_warn( "Error getting '$class' object: $@" );
+  }
+
+  return $sl;
+}
+
 sub _hash_merge {
   my ($self, $h, $k, $v) = @_;
   if (ref $h->{$k} eq 'ARRAY') {
@@ -4316,9 +4386,6 @@ sub do_create_metafile {
   unless ($p->{license}) {
     $self->log_warn("No license specified, setting license = 'unknown'\n");
     $p->{license} = 'unknown';
-  }
-  unless (exists $self->valid_licenses->{ $p->{license} }) {
-    die "Unknown license type '$p->{license}'";
   }
 
   # If we're in the distdir, the metafile may exist and be non-writable.
@@ -4449,10 +4516,10 @@ sub prepare_metadata {
     push @$keys, $name if $keys;
   };
 
-  foreach (qw(dist_name dist_version dist_author dist_abstract license)) {
-    (my $name = $_) =~ s/^dist_//;
-    $add_node->($name, $self->$_());
-    unless ( defined($node->{$name}) && length($node->{$name}) ) {
+  # validate required fields
+  foreach my $f (qw(dist_name dist_version dist_author dist_abstract license)) {
+    my $field = $self->$f();
+    unless ( defined $field and length $field ) {
       my $err = "ERROR: Missing required field '$_' for metafile\n";
       if ( $fatal ) {
         die $err;
@@ -4462,33 +4529,46 @@ sub prepare_metadata {
       }
     }
   }
-  $node->{version} = $self->normalize_version($node->{version});
 
-  if (defined( my $l = $self->license )) {
-    unless ( exists $self->valid_licenses->{ $l } ) {
-      my $err = "Unknown license string '$l'";
-      if ( $fatal ) {
-        die $err;
-      }
-      else {
-        $self->log_warn($err);
-      }
-    }
 
-    if (my $key = $self->valid_licenses->{ $l }) {
-      my $class = "Software::License::$key";
-      if (eval "require Software::License; require $class; 1") {
-        # S::L requires a 'holder' key
-        $node->{resources}{license} = $class->new({holder=>"nobody"})->url;
-      }
-      else {
-        $node->{resources}{license} = $self->_license_url($l);
-      }
-    }
-    # XXX we are silently omitting the url for any unknown license
+  # add dist_* fields
+  foreach my $f (qw(dist_name dist_version dist_author dist_abstract)) {
+    (my $name = $f) =~ s/^dist_//;
+    $add_node->($name, $self->$f());
   }
 
+  # normalize version
+  $node->{version} = $self->normalize_version($node->{version});
 
+  # validate license information
+  my $license = $self->license;
+  my ($meta_license, $meta_license_url);
+
+  # XXX this is still meta spec version 1 stuff
+
+  # if Software::License::* exists, then we can use it to get normalized name
+  # for META files
+
+  if ( my $sl = $self->_software_license_object ) {
+    $meta_license = $sl->meta_name;
+    $meta_license_url = $sl->url;
+  }
+  elsif ( exists $self->valid_licenses()->{$license} ) {
+    $meta_license = $license;
+    $meta_license_url = $self->_license_url( $license );
+  }
+  else {
+  # if we didn't find a license from a Software::License class,
+  # then treat it as unknown
+    $self->log_warn( "Can not determine license type for '" . $self->license
+      . "'\nSetting META license field to 'unknown'.\n");
+    $meta_license = 'unknown';
+  }
+
+  $node->{license} = $meta_license;
+  $node->{resources}{license} = $meta_license_url if defined $meta_license_url;
+
+  # add prerequisite data
   my $prereqs = $self->_normalize_prereqs;
   for my $t ( keys %$prereqs ) {
       $add_node->($t, $prereqs->{$t});
