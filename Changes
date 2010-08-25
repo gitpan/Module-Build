@@ -1,5 +1,12 @@
 Revision history for Perl extension Module::Build.
 
+0.36_15 - Wed Aug 25 10:41:28 EDT 2010
+
+  Bug fixes:
+
+  - Added a mock Software::License to prevent t/properties/license.t
+    from failing.
+
 0.36_14 - Sun Aug 22 22:56:50 EDT 2010
 
   Enhancements:
