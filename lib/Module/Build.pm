@@ -15,7 +15,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.36_16';
+$VERSION = '0.36_17';
 $VERSION = eval $VERSION;
 
 # Okay, this is the brute-force method of finding out what kind of
@@ -179,16 +179,17 @@ action), 'test', and 'install'.  Other actions defined so far include:
   distcheck                      pure_install
   distclean                      realclean
   distdir                        retest
-  distmeta                       skipcheck
-  distsign                       tag_git
-  disttest                       test
-  docs                           testall
-  fakeinstall                    testcover
-  help                           testdb
-  html                           testpod
-  install                        testpodcoverage
-  installdeps                    upload
-  manifest                       versioninstall
+  distinstall                    skipcheck
+  distmeta                       tag_git
+  distsign                       test
+  disttest                       testall
+  docs                           testcover
+  fakeinstall                    testdb
+  help                           testpod
+  html                           testpodcoverage
+  install                        upload
+  installdeps                    versioninstall
+  manifest
 
 You can run the 'help' action for a complete list of actions.
 
@@ -348,6 +349,15 @@ Creates a "distribution directory" named C<$dist_name-$dist_version>
 copies all the files listed in the F<MANIFEST> file to that directory.
 This directory is what the distribution tarball is created from.
 
+=item distinstall
+
+[version 0.37]
+
+Performs the 'distdir' action, then switches into that directory and runs a
+C<perl Build.PL>, followed by the 'build' and 'install' actions in that
+directory.  Use PERL_MB_OPT or F<.modulebuildrc> to set options that should be
+applied during subprocesses
+
 =item distmeta
 
 [version 0.21]
@@ -381,9 +391,11 @@ MANIFEST.
 
 [version 0.05]
 
-Performs the 'distdir' action, then switches into that directory and
-runs a C<perl Build.PL>, followed by the 'build' and 'test' actions in
-that directory.
+Performs the 'distdir' action, then switches into that directory and runs a
+C<perl Build.PL>, followed by the 'build' and 'test' actions in that directory.
+Use PERL_MB_OPT or F<.modulebuildrc> to set options that should be applied
+during subprocesses
+
 
 =item docs
 

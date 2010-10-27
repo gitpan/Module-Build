@@ -181,6 +181,14 @@ ACTIONS
         copies all the files listed in the MANIFEST file to that directory.
         This directory is what the distribution tarball is created from.
 
+    distinstall
+        [version 0.37]
+
+        Performs the 'distdir' action, then switches into that directory and
+        runs a "perl Build.PL", followed by the 'build' and 'install'
+        actions in that directory. Use PERL_MB_OPT or .modulebuildrc to set
+        options that should be applied during subprocesses
+
     distmeta
         [version 0.21]
 
@@ -213,7 +221,8 @@ ACTIONS
 
         Performs the 'distdir' action, then switches into that directory and
         runs a "perl Build.PL", followed by the 'build' and 'test' actions
-        in that directory.
+        in that directory. Use PERL_MB_OPT or .modulebuildrc to set options
+        that should be applied during subprocesses
 
     docs
         [version 0.20]
