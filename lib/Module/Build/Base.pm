@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.36_17';
+$VERSION = '0.36_18';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -96,8 +96,12 @@ sub resume {
 
   unless ($self->_perl_is_same($self->{properties}{perl})) {
     my $perl = $self->find_perl_interpreter;
-    $self->log_warn(" * WARNING: Configuration was initially created with '$self->{properties}{perl}',\n".
-		    "   but we are now using '$perl'.\n");
+    die(<<"DIEFATAL");
+* FATAL ERROR: Perl interpreter mismatch. Configuration was initially
+  created with '$self->{properties}{perl}'
+  but we are now using '$perl'.  You must
+  run 'Build realclean' or 'make realclean' and re-configure.
+DIEFATAL
   }
 
   $self->cull_args(@ARGV);
@@ -1767,6 +1771,13 @@ sub print_build_script {
 
   my $closedata="";
 
+  my $config_requires;
+  if ( -f $self->metafile ) {
+    my $meta = eval { $self->read_metafile( $self->metafile ) };
+    $config_requires = $meta && $meta->{configure_requires}{'Module::Build'};
+  }
+  $config_requires ||= 0;
+
   my %q = map {$_, $self->$_()} qw(config_dir base_dir);
 
   $q{base_dir} = Win32::GetShortPathName($q{base_dir}) if $self->is_windowsish;
@@ -1824,6 +1835,7 @@ $quoted_INC
 close(*DATA) unless eof(*DATA); # ensure no open handles to this script
 
 use $build_package;
+Module::Build->VERSION(q{$config_requires});
 
 # Some platforms have problems setting \$^X in shebang contexts, fix it up here
 \$^X = Module::Build->find_perl_interpreter;
@@ -2147,7 +2159,7 @@ sub read_args {
     $args{$_} ||= [];
     $args{$_} = [ $args{$_} ] unless ref $args{$_};
     foreach my $arg ( @{$args{$_}} ) {
-      $arg =~ /(\w+)=(.*)/
+      $arg =~ /($opt_re)=(.*)/
 	or die "Malformed '$_' argument: '$arg' should be something like 'foo=bar'";
       $hash{$1} = $2;
     }
@@ -2287,6 +2299,11 @@ sub read_modulebuildrc {
 
   my ($global_opts) =
     $self->read_args( $self->split_like_shell( $options{'*'} || '' ) );
+
+  # let fakeinstall act like install if not provided
+  if ( $action eq 'fakeinstall' && ! exists $options{fakeinstall} ) {
+    $action = 'install';
+  }
   my ($action_opts) =
     $self->read_args( $self->split_like_shell( $options{$action} || '' ) );
 
@@ -2630,6 +2647,8 @@ sub do_tests {
   my $self = shift;
 
   my $tests = $self->find_test_files;
+
+  local $ENV{PERL_DL_NONLAZY} = 1;
 
   if(@$tests) {
     my $args = $self->tap_harness_args;
@@ -3293,8 +3312,9 @@ sub htmlify_pods {
   if ( $with_ActiveState = $self->_is_ActivePerl
     && eval { require ActivePerl::DocTools::Pod; 1 }
   ) {
-    $htmltool = "ActiveState::DocTools::Pod " .
-      ActiveState::DocTools::Pod->VERSION;
+    my $tool_v = ActiveState::DocTools::Pod->VERSION;
+    $htmltool = "ActiveState::DocTools::Pod";
+    $htmltool .= " $tool_v" if $tool_v && length $tool_v;
   }
   else {
       require Module::Build::PodParser;
@@ -3480,7 +3500,14 @@ sub ACTION_install {
   my ($self) = @_;
   require ExtUtils::Install;
   $self->depends_on('build');
-  ExtUtils::Install::install($self->install_map, $self->verbose, 0, $self->{args}{uninst}||0);
+  # RT#63003 suggest that odd cirmstances that we might wind up
+  # in a different directory than we started, so wrap with _do_in_dir to
+  # ensure we get back to where we started; hope this fixes it!
+  $self->_do_in_dir( ".", sub {
+    ExtUtils::Install::install(
+      $self->install_map, $self->verbose, 0, $self->{args}{uninst}||0
+    );
+  });
   if ($self->_is_ActivePerl && $self->{_completed_actions}{html}) {
     $self->log_info("Building ActivePerl Table of Contents\n");
     eval { ActivePerl::DocTools::WriteTOC(verbose => $self->verbose ? 1 : 0); 1; }
@@ -3498,8 +3525,8 @@ sub ACTION_install {
 
     $self->log_info("For ActivePerl's PPM: touch '$F_perllocal'\n");
 
-    open PERLLOCAL, ">>$F_perllocal";
-    close PERLLOCAL;
+    open my $perllocal, ">>", $F_perllocal;
+    close $perllocal;
     utime($dt_stamp, $dt_stamp, $F_perllocal);
   }
 }
@@ -3568,8 +3595,13 @@ sub ACTION_installdeps {
   # relative command should be relative to our active Perl
   # so we need to locate that command
   if ( ! File::Spec->file_name_is_absolute( $command ) ) {
+    # prefer site to vendor to core
+    my @loc = ( 'site', 'vendor', '' );
     my @bindirs = File::Basename::dirname($self->perl);
-    push @bindirs, map {$self->config->{"install${_}bin"}} '','site','vendor';
+    push @bindirs,
+      map {
+        ($self->config->{"install${_}bin"}, $self->config->{"install${_}script"})
+      } @loc;
     for my $d ( @bindirs ) {
       my $abs_cmd = $self->find_command(File::Spec->catfile( $d, $command ));
       if ( defined $abs_cmd ) {
@@ -3787,7 +3819,7 @@ sub _sign_dir {
 sub _do_in_dir {
   my ($self, $dir, $do) = @_;
 
-  my $start_dir = $self->cwd;
+  my $start_dir = File::Spec->rel2abs($self->cwd);
   chdir $dir or die "Can't chdir() to $dir: $!";
   eval {$do->()};
   my @err = $@ ? ($@) : ();
@@ -4540,7 +4572,7 @@ sub prepare_metadata {
   foreach my $f (qw(dist_name dist_version dist_author dist_abstract license)) {
     my $field = $self->$f();
     unless ( defined $field and length $field ) {
-      my $err = "ERROR: Missing required field '$_' for metafile\n";
+      my $err = "ERROR: Missing required field '$f' for metafile\n";
       if ( $fatal ) {
         die $err;
       }

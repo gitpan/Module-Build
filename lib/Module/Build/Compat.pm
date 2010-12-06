@@ -2,7 +2,7 @@ package Module::Build::Compat;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.36_17';
+$VERSION = '0.36_18';
 
 use File::Basename ();
 use File::Spec;
@@ -207,7 +207,7 @@ EOF
   } elsif ($type eq 'traditional') {
 
     my (%MM_Args, %prereq);
-    if (eval "use Tie::IxHash; 1") {
+    if (eval "use Tie::IxHash 1.2; 1") {
       tie %MM_Args, 'Tie::IxHash'; # Don't care if it fails here
       tie %prereq,  'Tie::IxHash'; # Don't care if it fails here
     }

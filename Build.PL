@@ -44,6 +44,7 @@ my $build = Module::Build->new(
     'Text::ParseWords'      => 0,
     'Getopt::Long'          => 0,
     'Test::Harness'         => 0,
+    'Perl::OSType'          => 1, # needs 1.0 API
   },
   recommends => {
     'ExtUtils::Install'  => 0.30,

@@ -8,7 +8,7 @@ package Module::Build::ModuleInfo;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.36_17';
+$VERSION = '0.36_18';
 $VERSION = eval $VERSION;
 
 use File::Spec;
@@ -343,6 +343,10 @@ sub _evaluate_version_line {
   if ( substr($result,0,1) ne 'v' && $num_dots < 2 && $num_unders > 1 ) {
     $result =~ s{_}{}g;
   }
+
+  # Trailing alphabeticals aren't acceptable anymore, but we'll be nice
+  # and try to ignore it (even though Perl might not)
+  $result =~ s/[a-z_]+$//i;
 
   # Bless it into our own version class
   my $vobj;
