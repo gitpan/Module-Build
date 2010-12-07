@@ -2,6 +2,7 @@ Build.PL
 Changes
 contrib/bash_completion.module-build
 INSTALL
+inc/Perl/OSType.pm
 lib/inc/latest.pm
 lib/inc/latest/private.pm
 lib/Module/Build.pm

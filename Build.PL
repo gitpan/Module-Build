@@ -9,6 +9,16 @@ use lib File::Spec->catdir('lib');          # use our self to install
 use lib File::Spec->catdir('t', 'bundled'); # use bundled modules
 use lib File::Spec->catdir('t', 'lib');     # our utilities
 
+# System installed configuration prereqs should take precedence
+BEGIN {
+  if ( ! eval "require Perl::OSType; 1" ) {
+    delete $INC{'Perl/OSType.pm'};
+    eval "require inc::Perl::OSType; 1"
+      and $INC{'Perl/OSType.pm'} = {'inc/Perl/OSType.pm'};
+    die $@ if $@;
+  }
+}
+
 # We use Module::Build to test & install itself.
 use Module::Build;
 
@@ -21,6 +31,11 @@ my $build = Module::Build->new(
     'File::Temp'            => 0.15,    # tmpdir() + fixes
     'Test::More'            => 0.49,
     'Test::Harness'         => 3.16,    # PERL5LIB fixes
+  },
+  # We have to provide a boostrap copy in case configure_requires
+  # is not respected, but let's try to let people do it the right way
+  configure_requires => {
+    'Perl::OSType'          => 1,     # needs 1.0 API
   },
   # KEEP 'requires' as low as possible and target Build/test/install
   # Requirements for authors should be implemented as optional features
