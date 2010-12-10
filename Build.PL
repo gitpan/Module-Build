@@ -11,10 +11,22 @@ use lib File::Spec->catdir('t', 'lib');     # our utilities
 
 # System installed configuration prereqs should take precedence
 BEGIN {
-  if ( ! eval "require Perl::OSType; 1" ) {
+  if ( ! eval "use Perl::OSType 1 (); 1" ) {
     delete $INC{'Perl/OSType.pm'};
     eval "require inc::Perl::OSType; 1"
       and $INC{'Perl/OSType.pm'} = {'inc/Perl/OSType.pm'};
+    die $@ if $@;
+  }
+  if ( ! eval "use version 0.87 (); 1" ) {
+    delete $INC{'version.pm'};
+    eval "require inc::MBVersion; 1"
+      and $INC{'version.pm'} = {'inc/MBVersion.pm'};
+    die $@ if $@;
+  }
+  if ( ! eval "use Module::Metadata 1.000002 (); 1" ) {
+    delete $INC{'Module/Metadata.pm'};
+    eval "require inc::Module::Metadata; 1"
+      and $INC{'Module/Metadata.pm'} = {'inc/Module/Metadata.pm'};
     die $@ if $@;
   }
 }
@@ -36,6 +48,8 @@ my $build = Module::Build->new(
   # is not respected, but let's try to let people do it the right way
   configure_requires => {
     'Perl::OSType'          => 1,     # needs 1.0 API
+    'version'               => 0.87,  # No longer requires M::B
+    'Module::Metadata'      => 1.000002, # uses version.pm
   },
   # KEEP 'requires' as low as possible and target Build/test/install
   # Requirements for authors should be implemented as optional features
@@ -59,7 +73,11 @@ my $build = Module::Build->new(
     'Text::ParseWords'      => 0,
     'Getopt::Long'          => 0,
     'Test::Harness'         => 0,
+    'YAML::Tiny'            => 1.40,
+    # configure_requires repeated here
     'Perl::OSType'          => 1, # needs 1.0 API
+    'version'               => 0.87,  # No longer requires M::B
+    'Module::Metadata'      => 1.000002, # uses version.pm
   },
   recommends => {
     'ExtUtils::Install'  => 0.30,
@@ -109,10 +127,6 @@ my $build = Module::Build->new(
         'ExtUtils::Installed'   => 1.999, # technically 1.999_001 is what's available
       },
     },
-    YAML_support => {
-      description => "Use YAML::Tiny to write META.yml files",
-      requires    => {'YAML::Tiny' => 1.38},
-    },
     manpage_support => {
       description => "Create Unix man pages",
       requires    => {'Pod::Man' => 0 },
@@ -134,5 +148,15 @@ my $build = Module::Build->new(
 );
 
 $build->create_build_script;
+if (-f "META.yml" && ! -f "MYMETA.yml") { # fallback if we don't have YAML::Tiny
+  require File::Copy;
+  File::Copy::copy("META.yml", "MYMETA.yml") or warn "Error: $!\n";
+  if ( -f 'MYMETA.yml' ) {
+    warn "Copied META.yml to MYMETA.yml for bootstrapping\n";
+  }
+  else {
+    warn "Could not copy META.yml to MYMETA.yml.  That's odd!\n";
+  }
+}
 
 # vim:ts=2:sw=2:et:sta

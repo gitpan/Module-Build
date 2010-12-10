@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.36_19';
+$VERSION = '0.36_20';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -1889,7 +1889,8 @@ sub create_mymeta {
   # Note which M::B created it
   $mymeta->{generated_by} = "Module::Build version $Module::Build::VERSION";
 
-  $self->write_metafile( $mymetafile, $mymeta );
+  $self->write_metafile( $mymetafile, $mymeta ) or
+    $self->log_warn("Could not create MYMETA.yml\n");
   return 1;
 }
 
@@ -4468,16 +4469,14 @@ sub do_create_metafile {
 sub read_metafile {
   my $self = shift;
   my ($metafile) = @_;
-  my $yaml;
 
-  my $class = $self->_mb_feature('YAML_support')
-            ? 'YAML::Tiny' : 'Module::Build::YAML' ;
-
-  eval "require $class; 1" or die $@;
+  my $status = $self->check_installed_status("YAML::Tiny", 1.4);
+  return unless $status->{ok};
+  require YAML::Tiny;
 
   my $string = $self->_slurp($metafile, $] < 5.8 ? "" : ":utf8");
-  my $meta = $class->read_string($string)
-    or $self->log_warn( "Error parsing '$metafile': " . $class->errstr . "\n");
+  my $meta = YAML::Tiny->read_string($string)
+    or $self->log_warn( "Error parsing '$metafile': " . YAML::Tiny->errstr . "\n");
 
   return $meta->[0] || {};
 }
@@ -4486,16 +4485,12 @@ sub read_metafile {
 sub write_metafile {
   my $self = shift;
   my ($metafile, $node) = @_;
-  my $yaml;
 
-  if ($self->_mb_feature('YAML_support')) {
-    # XXX this is probably redundant, but stick with it
-    require YAML::Tiny;
-    $yaml = YAML::Tiny->new($node);
-  } else {
-    require Module::Build::YAML;
-    $yaml = Module::Build::YAML->new($node);
-  }
+  my $status = $self->check_installed_status("YAML::Tiny", 1.4);
+  return unless $status->{ok};
+  require YAML::Tiny;
+
+  my $yaml = YAML::Tiny->new($node);
   my $string = $yaml->write_string;
   return $self->_spew($metafile, $string, $] < 5.8 ? "" : ":utf8")
 }

@@ -1,8 +1,10 @@
 Build.PL
 Changes
 contrib/bash_completion.module-build
-INSTALL
+inc/MBVersion.pm
+inc/Module/Metadata.pm
 inc/Perl/OSType.pm
+INSTALL
 lib/inc/latest.pm
 lib/inc/latest/private.pm
 lib/Module/Build.pm
@@ -64,7 +66,6 @@ t/lib/Software/License/VaporWare.pm
 t/manifypods.t
 t/metadata.t
 t/metadata2.t
-t/moduleinfo.t
 t/mymeta.t
 t/new_from_context.t
 t/notes.t
