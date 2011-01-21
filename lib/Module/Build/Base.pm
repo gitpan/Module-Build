@@ -4,7 +4,7 @@ package Module::Build::Base;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.36_20';
+$VERSION = '0.36_21';
 $VERSION = eval $VERSION;
 BEGIN { require 5.00503 }
 
@@ -1639,6 +1639,24 @@ sub _parse_conditions {
     return (">= $spec");
   } else {
     return split /\s*,\s*/, $spec;
+  }
+}
+
+sub try_require {
+  my ($self, $modname, $spec) = @_;
+  my $status = $self->check_installed_status($modname, defined($spec) ? $spec : 0);
+  return unless $status->{ok};
+  my $path = $modname;
+  $path =~ s{::}{/}g;
+  $path .= ".pm";
+  if ( defined $INC{$path} ) {
+    return 1;
+  }
+  elsif ( exists $INC{$path} ) { # failed before, don't try again
+    return;
+  }
+  else {
+    return eval "require $modname";
   }
 }
 
@@ -4470,13 +4488,11 @@ sub read_metafile {
   my $self = shift;
   my ($metafile) = @_;
 
-  my $status = $self->check_installed_status("YAML::Tiny", 1.4);
-  return unless $status->{ok};
-  require YAML::Tiny;
+  return unless $self->try_require("CPAN::Meta::YAML", "0.002");
 
   my $string = $self->_slurp($metafile, $] < 5.8 ? "" : ":utf8");
-  my $meta = YAML::Tiny->read_string($string)
-    or $self->log_warn( "Error parsing '$metafile': " . YAML::Tiny->errstr . "\n");
+  my $meta = CPAN::Meta::YAML->read_string($string)
+    or $self->log_warn( "Error parsing '$metafile': " . CPAN::Meta::YAML->errstr . "\n");
 
   return $meta->[0] || {};
 }
@@ -4486,11 +4502,9 @@ sub write_metafile {
   my $self = shift;
   my ($metafile, $node) = @_;
 
-  my $status = $self->check_installed_status("YAML::Tiny", 1.4);
-  return unless $status->{ok};
-  require YAML::Tiny;
+  return unless $self->try_require("CPAN::Meta::YAML", "0.002");
 
-  my $yaml = YAML::Tiny->new($node);
+  my $yaml = CPAN::Meta::YAML->new($node);
   my $string = $yaml->write_string;
   return $self->_spew($metafile, $string, $] < 5.8 ? "" : ":utf8")
 }

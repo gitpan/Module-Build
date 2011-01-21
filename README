@@ -197,17 +197,14 @@ ACTIONS
         META.yml is a file containing various bits of *metadata* about the
         distribution. The metadata includes the distribution name, version,
         abstract, prerequisites, license, and various other data about the
-        distribution. This file is created as META.yml in YAML format. It is
-        recommended that the "YAML::Tiny" module be installed to create it.
-        If the "YAML::Tiny" module is not installed, an internal module
-        supplied with Module::Build will be used to write the META.yml file,
-        and this will most likely be fine.
+        distribution. This file is created as META.yml in a simplified YAML
+        format.
 
         META.yml file must also be listed in MANIFEST - if it's not, a
         warning will be issued.
 
-        The current version of the META.yml specification can be found at
-        <http://module-build.sourceforge.net/META-spec-current.html>
+        The current version of the META.yml specification can be found on
+        CPAN as CPAN::Meta::Spec.
 
     distsign
         [version 0.16]
@@ -889,10 +886,9 @@ COPYRIGHT
 
 SEE ALSO
     perl(1), Module::Build::Cookbook, Module::Build::Authoring,
-    Module::Build::API, ExtUtils::MakeMaker, YAML::Tiny
+    Module::Build::API, ExtUtils::MakeMaker
 
-    META.yml Specification:
-    <http://module-build.sourceforge.net/META-spec-current.html>
+    META.yml Specification: CPAN::Meta::Spec
 
     <http://www.dsmit.com/cons/>
 
