@@ -2,7 +2,7 @@ package Module::Build::Compat;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.36_21';
+$VERSION = '0.3622';
 
 use File::Basename ();
 use File::Spec;
@@ -449,7 +449,6 @@ __END__
 =head1 NAME
 
 Module::Build::Compat - Compatibility with ExtUtils::MakeMaker
-
 
 =head1 SYNOPSIS
 

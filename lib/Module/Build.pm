@@ -16,7 +16,7 @@ use Module::Build::Base;
 
 use vars qw($VERSION @ISA);
 @ISA = qw(Module::Build::Base);
-$VERSION = '0.36_21';
+$VERSION = '0.3622';
 $VERSION = eval $VERSION;
 
 
@@ -67,7 +67,6 @@ testall testcover testdb testpod testpodcoverage versioninstall
 =head1 NAME
 
 Module::Build - Build and install Perl modules
-
 
 =head1 SYNOPSIS
 
