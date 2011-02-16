@@ -544,7 +544,7 @@ ACTIONS
           perl Build.PL --versionlib /my/version/place/
 
         To override which version the module is installed as, specify the
-        "versionlib" parameter when you run the "Build.PL" script:
+        "version" parameter when you run the "Build.PL" script:
 
           perl Build.PL --version 0.50
 
@@ -684,7 +684,7 @@ INSTALL PATHS
         This is the same as "bindoc" above, but applies to HTML documents.
 
     libhtml
-        This is the same as "bindoc" above, but applies to HTML documents.
+        This is the same as "libdoc" above, but applies to HTML documents.
 
     Four other parameters let you control various aspects of how
     installation paths are determined:
@@ -875,8 +875,8 @@ AUTHOR
     Bug reports are also welcome at
     <http://rt.cpan.org/NoAuth/Bugs.html?Dist=Module-Build>.
 
-    The latest development version is available from the Subversion
-    repository at <https://svn.perl.org/modules/Module-Build/trunk/>
+    The latest development version is available from the Git repository at
+    <https://github.com/dagolden/module-build/>
 
 COPYRIGHT
     Copyright (c) 2001-2006 Ken Williams. All rights reserved.

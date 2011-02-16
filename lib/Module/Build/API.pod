@@ -2010,7 +2010,6 @@ accessor methods for the following properties:
 
 =back
 
-
 =head1 MODULE METADATA
 
 If you would like to add other useful metadata, C<Module::Build>
