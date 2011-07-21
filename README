@@ -49,7 +49,7 @@ DESCRIPTION
     You can run the 'help' action for a complete list of actions.
 
 GUIDE TO DOCUMENTATION
-    The documentation for "Module::Build" is broken up into three sections:
+    The documentation for "Module::Build" is broken up into sections:
 
     General Usage (Module::Build)
         This is the document you are currently reading. It describes basic
