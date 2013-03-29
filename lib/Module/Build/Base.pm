@@ -6,7 +6,7 @@ use strict;
 use vars qw($VERSION);
 use warnings;
 
-$VERSION = '0.4003';
+$VERSION = '0.4004';
 $VERSION = eval $VERSION;
 BEGIN { require 5.006001 }
 
@@ -942,7 +942,7 @@ __PACKAGE__->add_property(
 }
 
 {
-  my @prereq_action_types = qw(requires build_requires conflicts recommends);
+  my @prereq_action_types = qw(requires build_requires test_requires conflicts recommends);
   foreach my $type (@prereq_action_types) {
     __PACKAGE__->add_property($type => {});
   }
@@ -1812,7 +1812,7 @@ sub print_build_script {
 
   my @myINC = $self->_added_to_INC;
   for (@myINC, values %q) {
-    $_ = File::Spec->canonpath( $_ );
+    $_ = File::Spec->canonpath( $_ ) unless $self->is_vmsish;
     s/([\\\'])/\\$1/g;
   }
 
@@ -1915,6 +1915,7 @@ sub create_mymeta {
     # XXX refactor this mapping somewhere
     $mymeta->{prereqs}{runtime}{requires} = $prereqs->{requires};
     $mymeta->{prereqs}{build}{requires} = $prereqs->{build_requires};
+    $mymeta->{prereqs}{test}{requires} = $prereqs->{test_requires};
     $mymeta->{prereqs}{runtime}{recommends} = $prereqs->{recommends};
     $mymeta->{prereqs}{runtime}{conflicts} = $prereqs->{conflicts};
     # delete empty entries
@@ -3301,6 +3302,7 @@ sub _find_pods {
       foreach my $regexp ( @{ $args{exclude} } ) {
         next FILE if $file =~ $regexp;
       }
+      $file = $self->localize_file_path($file);
       $files{$file} = File::Spec->abs2rel($file, $dir) if $self->contains_pod( $file )
     }
   }
@@ -4094,9 +4096,9 @@ sub ACTION_disttest {
 
         $self->run_perl_script('Build.PL') # XXX Should this be run w/ --nouse-rcfile
           or die "Error executing 'Build.PL' in dist directory: $!";
-        $self->run_perl_script('Build')
-          or die "Error executing 'Build' in dist directory: $!";
-        $self->run_perl_script('Build', [], ['test'])
+        $self->run_perl_script($self->build_script)
+          or die "Error executing $self->build_script in dist directory: $!";
+        $self->run_perl_script($self->build_script, [], ['test'])
           or die "Error executing 'Build test' in dist directory";
       });
 }
@@ -4110,9 +4112,9 @@ sub ACTION_distinstall {
     sub {
       $self->run_perl_script('Build.PL')
         or die "Error executing 'Build.PL' in dist directory: $!";
-      $self->run_perl_script('Build')
-        or die "Error executing 'Build' in dist directory: $!";
-      $self->run_perl_script('Build', [], ['install'])
+      $self->run_perl_script($self->build_script)
+        or die "Error executing $self->build_script in dist directory: $!";
+      $self->run_perl_script($self->build_script, [], ['install'])
         or die "Error executing 'Build install' in dist directory";
     }
   );
