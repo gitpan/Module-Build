@@ -6,7 +6,7 @@ use strict;
 use vars qw($VERSION);
 use warnings;
 
-$VERSION = '0.4004';
+$VERSION = '0.4005';
 $VERSION = eval $VERSION;
 BEGIN { require 5.006001 }
 
@@ -922,6 +922,8 @@ __PACKAGE__->add_property(test_file_exts => ['.t']);
 __PACKAGE__->add_property(use_tap_harness => 0);
 __PACKAGE__->add_property(cpan_client => 'cpan');
 __PACKAGE__->add_property(tap_harness_args => {});
+__PACKAGE__->add_property(pureperl_only => 0);
+__PACKAGE__->add_property(allow_pureperl => 0);
 __PACKAGE__->add_property(
   'installdirs',
   default => 'site',
@@ -2120,6 +2122,8 @@ sub _translate_option {
     use_tap_harness
     tap_harness_args
     cpan_client
+    pureperl_only
+    allow_pureperl
   ); # normalize only selected option names
 
   return $opt;
@@ -2160,6 +2164,8 @@ sub _optional_arg {
     debug
     sign
     use_tap_harness
+    pureperl_only
+    allow_pureperl
   );
 
   # inverted boolean options; eg --noverbose or --no-verbose
@@ -2969,7 +2975,9 @@ sub process_PL_files {
 
 sub process_xs_files {
   my $self = shift;
+  return if $self->pureperl_only && $self->allow_pureperl;
   my $files = $self->find_xs_files;
+  croak 'Can\'t build xs files under --pureperl-only' if %$files && $self->pureperl_only;
   while (my ($from, $to) = each %$files) {
     unless ($from eq $to) {
       $self->add_to_cleanup($to);
@@ -3360,11 +3368,11 @@ sub htmlify_pods {
               : $self->original_prefix('core');
 
   my $htmlroot = $self->install_sets('core')->{libhtml};
-  my @podpath = (map { File::Spec->abs2rel($_ ,$podroot) } grep { -d  }
+  my @podpath = ( (map { File::Spec->abs2rel($_ ,$podroot) } grep { -d  }
     ( $self->install_sets('core', 'lib'), # lib
       $self->install_sets('core', 'bin'), # bin
       $self->install_sets('site', 'lib'), # site/lib
-    ) ), File::Spec->rel2abs($self->blib);
+    ) ), File::Spec->rel2abs($self->blib) );
 
   my $podpath = $ENV{PERL_CORE}
               ? File::Spec->catdir($podroot, 'lib')
@@ -3429,7 +3437,7 @@ sub htmlify_pods {
       } or $self->log_warn("[$htmltool] pod2html (" .
         join(", ", map { "q{$_} => q{$opts{$_}}" } (keys %opts)) . ") failed: $@");
     } else {
-      my $path2root = join( '/', ('..') x (@rootdirs+@dirs) );
+      my $path2root = File::Spec->catdir(File::Spec->updir x @dirs);
       my $fh = IO::File->new($infile) or die "Can't read $infile: $!";
       my $abstract = Module::Build::PodParser->new(fh => $fh)->get_abstract();
 
