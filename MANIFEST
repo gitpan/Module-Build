@@ -21,15 +21,11 @@ lib/Module/Build/Dumper.pm
 lib/Module/Build/ModuleInfo.pm
 lib/Module/Build/Notes.pm
 lib/Module/Build/Platform/aix.pm
-lib/Module/Build/Platform/Amiga.pm
 lib/Module/Build/Platform/cygwin.pm
 lib/Module/Build/Platform/darwin.pm
 lib/Module/Build/Platform/Default.pm
-lib/Module/Build/Platform/EBCDIC.pm
 lib/Module/Build/Platform/MacOS.pm
-lib/Module/Build/Platform/MPEiX.pm
 lib/Module/Build/Platform/os2.pm
-lib/Module/Build/Platform/RiscOS.pm
 lib/Module/Build/Platform/Unix.pm
 lib/Module/Build/Platform/VMS.pm
 lib/Module/Build/Platform/VOS.pm
@@ -48,6 +44,8 @@ t/00-compile.t
 t/actions/installdeps.t
 t/actions/manifest_skip.t
 t/add_property.t
+t/add_property_array.t
+t/add_property_hash.t
 t/basic.t
 t/bundle_inc.t
 t/bundled/Software/License.pm
@@ -67,6 +65,7 @@ t/lib/MBTest.pm
 t/lib/Module/Signature.pm
 t/lib/Software/License/VaporWare.pm
 t/manifypods.t
+t/manifypods_with_utf8.t
 t/metadata.t
 t/metadata2.t
 t/mymeta.t
@@ -95,6 +94,7 @@ t/test_file_exts.t
 t/test_type.t
 t/test_types.t
 t/tilde.t
+t/unit_run_test_harness.t
 t/use_tap_harness.t
 t/versions.t
 t/write_default_maniskip.t

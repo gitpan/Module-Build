@@ -23,11 +23,7 @@ DESCRIPTION
     Developers may alter the behavior of the module through subclassing in a
     much more straightforward way than with "MakeMaker". It also does not
     require a "make" on your system - most of the "Module::Build" code is
-    pure-perl and written in a very cross-platform way. In fact, you don't
-    even need a shell, so even platforms like MacOS (traditional) can use it
-    fairly easily. Its only prerequisites are modules that are included with
-    perl 5.6.0, and it works fine on perl 5.005 if you can install a few
-    additional modules.
+    pure-perl and written in a very cross-platform way.
 
     See "MOTIVATIONS" for more comparisons between "ExtUtils::MakeMaker" and
     "Module::Build".
@@ -258,6 +254,12 @@ ACTIONS
         "Config.pm". You can also supply or override install paths on the
         command line by specifying "install_path" values for the "binhtml"
         and/or "libhtml" installation targets.
+
+        With an optional "html_links" argument set to a false value, you can
+        skip the search for other documentation to link to, because that can
+        waste a lot of time if there aren't any links to generate anyway:
+
+          ./Build html --html_links 0
 
     install
         [version 0.01]
@@ -596,10 +598,10 @@ OPTIONS
 
     When Module::Build starts up, it will look first for a file,
     $ENV{HOME}/.modulebuildrc. If it's not found there, it will look in the
-    the .modulebuildrc file in the directories referred to by the
-    environment variables "HOMEDRIVE" + "HOMEDIR", "USERPROFILE", "APPDATA",
-    "WINDIR", "SYS$LOGIN". If the file exists, the options specified there
-    will be used as defaults, as if they were typed on the command line. The
+    .modulebuildrc file in the directories referred to by the environment
+    variables "HOMEDRIVE" + "HOMEDIR", "USERPROFILE", "APPDATA", "WINDIR",
+    "SYS$LOGIN". If the file exists, the options specified there will be
+    used as defaults, as if they were typed on the command line. The
     defaults can be overridden by specifying new values on the command line.
 
     The action name must come at the beginning of the line, followed by any

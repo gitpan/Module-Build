@@ -48,7 +48,6 @@ my $build = Module::Build->new(
     'ExtUtils::Manifest'    => 0,
     'ExtUtils::Mkbootstrap' => 0,
     'ExtUtils::ParseXS'     => 2.21, # various bug fixes
-    'IO::File'              => 0,
     'Cwd'                   => 0,
     'Text::Abbrev'          => 0,
     'Text::ParseWords'      => 0,
@@ -97,7 +96,6 @@ my $build = Module::Build->new(
     },
     PPM_support => {
       description => "Generate PPM files for distributions",
-      requires    => {'IO::File' => 1.13}, # binmode bug in older core IO::File
     },
     inc_bundling_support => {
       description => "Bundle Module::Build in inc/",
