@@ -6,7 +6,7 @@ use strict;
 use vars qw($VERSION);
 use warnings;
 
-$VERSION = '0.40_10';
+$VERSION = '0.40_11';
 $VERSION = eval $VERSION;
 BEGIN { require 5.006001 }
 
@@ -4597,6 +4597,16 @@ sub normalize_version {
   return $version;
 }
 
+my %prereq_map = (
+  requires => [ qw/runtime requires/],
+  configure_requires => [qw/configure requires/],
+  build_requires => [ qw/build requires/ ],
+  test_requires => [ qw/test requires/ ],
+  test_recommends => [ qw/test recommends/ ],
+  recommends => [ qw/build recommends/ ],
+  conflicts => [ qw/build conflicts/ ],
+);
+
 sub _normalize_prereqs {
   my ($self) = @_;
   my $p = $self->{properties};
@@ -4605,13 +4615,36 @@ sub _normalize_prereqs {
   my %prereq_types;
   for my $type ( 'configure_requires', @{$self->prereq_action_types} ) {
     if (exists $p->{$type} and keys %{ $p->{$type} }) {
+      my ($phase, $relation) = @{ $prereq_map{$type} };
       for my $mod ( keys %{ $p->{$type} } ) {
-        $prereq_types{$type}{$mod} =
-          $self->normalize_version($p->{$type}{$mod});
+        $prereq_types{$phase}{$relation}{$mod} = $self->normalize_version($p->{$type}{$mod});
       }
     }
   }
   return \%prereq_types;
+}
+
+sub _get_license {
+  my $self = shift;
+
+  my $license = $self->license;
+  my ($meta_license, $meta_license_url);
+
+  my $valid_licenses = $self->valid_licenses();
+  if ( my $sl = $self->_software_license_object ) {
+    $meta_license = $sl->meta2_name;
+    $meta_license_url = $sl->url;
+  }
+  elsif ( exists $valid_licenses->{$license} ) {
+    $meta_license = $valid_licenses->{$license} ? lc $valid_licenses->{$license} : $license;
+    $meta_license_url = $self->_license_url( $license );
+  }
+  else {
+    $self->log_warn( "Can not determine license type for '" . $self->license
+      . "'\nSetting META license field to 'unknown'.\n");
+    $meta_license = 'unknown';
+  }
+  return ($meta_license, $meta_license_url);
 }
 
 my %keep = map { $_ => 1 } qw/keywords dynamic_config provides no_index name version abstract/;
@@ -4636,6 +4669,9 @@ sub _upconvert_resources {
   }
   return \%output
 }
+my %custom = (
+	resources => \&_upconvert_resources,
+);
 
 sub _upconvert_metapiece {
   my ($input, $type) = @_;
@@ -4652,8 +4688,8 @@ sub _upconvert_metapiece {
     elsif ($reject{$key}) {
       croak "Can't $type $key, please use another mechanism";
     }
-    elsif ($key eq 'resources') {
-      $ret{$key} = _upconvert_resources($input->{$key});
+    elsif (my $converter = $custom{$key}) {
+      $ret{$key} = $converter->($input->{$key});
     }
     else {
       warn "Unknown key $key\n" unless $key =~ / \A x_ /xi;
@@ -4684,7 +4720,6 @@ sub get_metadata {
     }
   }
 
-
   my %metadata = (
     name => $self->dist_name,
     version => $self->normalize_version($self->dist_version),
@@ -4699,60 +4734,20 @@ sub get_metadata {
     release_status => $self->release_status,
   );
 
-  # validate license information
-  my $license = $self->license;
-  my ($meta_license, $meta_license_url);
-
-  # if Software::License::* exists, then we can use it to get normalized name
-  # for META files
-
-  my $valid_licenses = $self->valid_licenses();
-  if ( my $sl = $self->_software_license_object ) {
-    $meta_license = $sl->meta2_name;
-    $meta_license_url = $sl->url;
-  }
-  elsif ( exists $valid_licenses->{$license} ) {
-    $meta_license = $valid_licenses->{$license} ? lc $valid_licenses->{$license} : $license;
-    $meta_license_url = $self->_license_url( $license );
-  }
-  else {
-  # if we didn't find a license from a Software::License class,
-  # then treat it as unknown
-    $self->log_warn( "Can not determine license type for '" . $self->license
-      . "'\nSetting META license field to 'unknown'.\n");
-    $meta_license = 'unknown';
-  }
-
+  my ($meta_license, $meta_license_url) = $self->_get_license;
   $metadata{license} = [ $meta_license ];
   $metadata{resources}{license} = [ $meta_license_url ] if defined $meta_license_url;
 
-  my $prereqs = $self->_normalize_prereqs;
-  $metadata{prereqs} = {
-    configure => {
-      (requires => $prereqs->{configure_requires}) x !!($prereqs->{configure_requires}),
-    },
-    runtime => {
-      (requires => $prereqs->{requires}) x !!($prereqs->{requires}),
-      (recommends => $prereqs->{recommends}) x !!($prereqs->{recommends}),
-      (conflicts => $prereqs->{conflicts}) x !!($prereqs->{conflicts}),
-    },
-    build => {
-      (requires => $prereqs->{build_requires}) x !!($prereqs->{build_requires}),
-    },
-    test => {
-      (requires => $prereqs->{test_requires}) x !!($prereqs->{test_requires}),
-      (recommends => $prereqs->{test_recommends}) x !!($prereqs->{test_recommends}),
-    },
-  };
-  delete $metadata{prereqs}{$_} for grep { !keys %{ $metadata{prereqs}{$_} } } qw/configure runtime build test/;
+  $metadata{prereqs} = $self->_normalize_prereqs;
 
-  if (my $pkgs = eval { $self->find_dist_packages }) {
+  if (exists $p->{no_index}) {
+    $metadata{no_index} = $p->{no_index};
+  } elsif (my $pkgs = eval { $self->find_dist_packages }) {
     $metadata{provides} = $pkgs if %$pkgs;
   } else {
     $self->log_warn("$@\nWARNING: Possible missing or corrupt 'MANIFEST' file.\n" .
                     "Nothing to enter for 'provides' field in metafile.\n");
   }
-  $metadata{no_index} = $p->{no_index} if exists $p->{no_index};
 
   my $meta_add = _upconvert_metapiece($self->meta_add, 'add');
   while (my($k, $v) = each %{$meta_add} ) {

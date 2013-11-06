@@ -1,5 +1,11 @@
 Revision history for Perl extension Module::Build.
 
+0.40_11 - Wed Nov  6 12:46:59 CET 2013
+
+  [BUG FIXES]
+
+  - Do not set provides in metadata if no_index is set [Leon Timmermans]
+
 0.40_10 - Tue Nov  5 12:11:37 CET 2013
 
   [BUG FIXES]
