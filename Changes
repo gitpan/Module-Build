@@ -1,5 +1,15 @@
 Revision history for Perl extension Module::Build.
 
+0.4204 - Fri Jan 10 00:29:31 CET 2014
+
+  [BUG FIXES]
+
+  - Map conflicts back to runtime [Leon Timmermans]
+
+  - Use mod2fname whenever it's available [Leon Timmermans, Brian Fraser]
+
+  - Accept custom entries in meta_merge 1.4
+
 0.4203 - Wed Nov 27 19:09:05 CET 2013
 
   [BUG FIXES]
