@@ -1,5 +1,17 @@
 Revision history for Perl extension Module::Build.
 
+0.4205 - Sun Feb  9 17:51:22 CET 2014
+
+  [BUG FIXES]
+
+  - FIX license code regression for artistic license [Roy Ivy III, Leon Timmermans]
+
+  - Don't swallow ExtUtils::CBuilder loading errors [Matthew Horsfall, Leon Timmermans]
+  
+  - Handle testing on cross-compile builds [Brian Fraser]
+
+  - Protect against platforms without getpw{nam,uid} [Brian Fraser]
+
 0.4204 - Fri Jan 10 00:29:31 CET 2014
 
   [BUG FIXES]
