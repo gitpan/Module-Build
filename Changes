@@ -1,5 +1,23 @@
 Revision history for Perl extension Module::Build.
 
+0.4207 - Sat Aug 16 12:56:59 CEST 2014
+
+  [BUG FIXES]
+
+  - Fix type installdir -> installdirs [Leon Timmermans, Vitaliy Tokarev]
+
+  [DEPRECATIONS]
+
+  - Module::Build::YAML has been removed
+
+  - Module::Build::ModuleInfo has been removed
+
+  - Module::Build::Version has been removed
+
+  - Get rid of "use vars"
+
+  - Added use warnings to all modules
+
 0.4206 - Sat Jul 12 14:03:01 CEST 2014
 
   [BUG FIXES]
