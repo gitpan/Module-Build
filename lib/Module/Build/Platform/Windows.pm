@@ -2,7 +2,7 @@ package Module::Build::Platform::Windows;
 
 use strict;
 use warnings;
-our $VERSION = '0.4208';
+our $VERSION = '0.4209';
 $VERSION = eval $VERSION;
 
 use Config;
@@ -208,7 +208,7 @@ sub split_like_shell {
 
   (my $self, local $_) = @_;
 
-  return @$_ if defined() && UNIVERSAL::isa($_, 'ARRAY');
+  return @$_ if defined() && ref() eq 'ARRAY';
 
   my @argv;
   return @argv unless defined() && length();

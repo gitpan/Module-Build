@@ -1,5 +1,19 @@
 Revision history for Perl extension Module::Build.
 
+0.4209 - Mon Sep  1 12:24:40 CEST 2014
+
+  [BUG FIXES]
+
+  - Stop calling UNIVERSAL::isa as a function
+
+  [ENHANCEMENTS]
+
+  - Use CPAN::Meta::Merge for meta_merge
+
+  - Convert with CPAN::Meta::Convert in meta_add
+
+  - Add configure requirements
+
 0.4208 - Mon Aug 18 21:44:38 CEST 2014
 
   [BUG FIXES]

@@ -2,7 +2,7 @@ package Module::Build::Platform::VMS;
 
 use strict;
 use warnings;
-our $VERSION = '0.4208';
+our $VERSION = '0.4209';
 $VERSION = eval $VERSION;
 use Module::Build::Base;
 use Config;
@@ -151,7 +151,7 @@ sub _quote_args {
   # elements of it and return the reference.
   my ($self, @args) = @_;
   my $got_arrayref = (scalar(@args) == 1
-                      && UNIVERSAL::isa($args[0], 'ARRAY'))
+                      && ref $args[0] eq 'ARRAY')
                    ? 1
                    : 0;
 
